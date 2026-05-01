@@ -19,7 +19,8 @@ export function UploadForm({ connections }: UploadFormProps) {
   const [videoType, setVideoType] = useState<VideoType>('short')
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([])
   const [videoFile, setVideoFile] = useState<File | null>(null)
-  const [_thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [title, setTitle] = useState('')
