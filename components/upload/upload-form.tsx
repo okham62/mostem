@@ -169,13 +169,16 @@ export function UploadForm({ connections }: UploadFormProps) {
                 setSelectedPlatforms([])
               }}
               className={cn(
-                'flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-all',
+                'flex-1 rounded-xl border-2 py-3.5 text-sm font-medium transition-all active:scale-95',
                 videoType === type
                   ? 'border-brand bg-brand/5 text-brand dark:bg-brand/10'
                   : 'border-[var(--card-border)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--foreground)]'
               )}
             >
-              {type === 'short' ? '📱 쇼폼 (Shorts / Reels)' : '🎬 롱폼 (유튜브 전용)'}
+              {type === 'short' ? '📱 쇼폼' : '🎬 롱폼'}
+              <span className="ml-1 hidden sm:inline">
+                {type === 'short' ? '(Shorts / Reels)' : '(유튜브 전용)'}
+              </span>
             </button>
           ))}
         </div>
@@ -190,7 +193,7 @@ export function UploadForm({ connections }: UploadFormProps) {
           <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">2</span>
           업로드 플랫폼
         </p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {PLATFORMS.map((platform) => (
             <PlatformCard
               key={platform}
@@ -246,9 +249,11 @@ export function UploadForm({ connections }: UploadFormProps) {
                 : 'border-[var(--card-border)] hover:border-brand hover:bg-brand/5'
             )}
           >
-            <Upload className="mb-2 h-8 w-8 text-[var(--muted)]" />
-            <p className="text-sm font-medium text-[var(--foreground)]">영상을 드래그하거나 클릭하세요</p>
-            <p className="mt-1 text-xs text-[var(--muted)]">MP4, MOV, AVI 지원 · 최대 10GB</p>
+            <Upload className="mb-3 h-10 w-10 text-brand/60" />
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              <span className="hidden sm:inline">영상을 드래그하거나 </span>클릭하여 선택
+            </p>
+            <p className="mt-1 text-xs text-[var(--muted)]">MP4, MOV, AVI · 최대 10GB</p>
           </div>
         )}
       </Card>
