@@ -8,24 +8,83 @@ export function LoginBg() {
 
   useEffect(() => {
     let animFrame: number
-    let mouseX = window.innerWidth / 2
-    let mouseY = window.innerHeight / 2
-    let currentX = mouseX
-    let currentY = mouseY
-    let currentX2 = mouseX
-    let currentY2 = mouseY
+    const W = window.innerWidth
+    const H = window.innerHeight
 
-    const onMove = (e: MouseEvent) => {
-      mouseX = e.clientX
-      mouseY = e.clientY
+    let targetX = W / 2
+    let targetY = H / 2
+    let currentX = targetX
+    let currentY = targetY
+    let currentX2 = targetX
+    let currentY2 = targetY
+
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+
+    // ── 데스크탑: 마우스 추적 ──────────────────────
+    const onMouseMove = (e: MouseEvent) => {
+      targetX = e.clientX
+      targetY = e.clientY
     }
 
+    // ── 모바일: 자이로스코프 ────────────────────────
+    let gyroAvailable = false
+
+    const onOrientation = (e: DeviceOrientationEvent) => {
+      if (e.gamma === null || e.beta === null) return
+      gyroAvailable = true
+      // gamma: 좌우 기울기 (-90 ~ 90), beta: 앞뒤 기울기 (-180 ~ 180)
+      const x = W / 2 + (e.gamma / 45) * (W * 0.35)
+      const y = H / 2 + ((e.beta - 30) / 45) * (H * 0.35)
+      targetX = Math.max(0, Math.min(W, x))
+      targetY = Math.max(0, Math.min(H, y))
+    }
+
+    // ── 모바일: 터치 추적 (백업) ────────────────────
+    const onTouch = (e: TouchEvent) => {
+      if (e.touches[0]) {
+        targetX = e.touches[0].clientX
+        targetY = e.touches[0].clientY
+      }
+    }
+
+    // ── 자이로 없을 때: 자동 부유 애니메이션 ──────────
+    let floatAngle = 0
+    const floatAnim = () => {
+      if (!gyroAvailable && isMobile) {
+        floatAngle += 0.003
+        targetX = W / 2 + Math.sin(floatAngle) * W * 0.25
+        targetY = H / 2 + Math.cos(floatAngle * 0.7) * H * 0.2
+      }
+    }
+
+    // 이벤트 등록
+    if (isMobile) {
+      // iOS 13+: 권한 요청
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission === 'function') {
+        const req = (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission
+        req().then((res: string) => {
+          if (res === 'granted') {
+            window.addEventListener('deviceorientation', onOrientation)
+          }
+        }).catch(() => {})
+      } else {
+        window.addEventListener('deviceorientation', onOrientation)
+      }
+      window.addEventListener('touchmove', onTouch, { passive: true })
+    } else {
+      window.addEventListener('mousemove', onMouseMove)
+    }
+
+    // ── 애니메이션 루프 ─────────────────────────────
     const animate = () => {
-      // 부드럽게 따라오기 (lerp)
-      currentX += (mouseX - currentX) * 0.06
-      currentY += (mouseY - currentY) * 0.06
-      currentX2 += (mouseX - currentX2) * 0.03
-      currentY2 += (mouseY - currentY2) * 0.03
+      floatAnim()
+
+      // lerp (부드럽게 따라오기)
+      currentX += (targetX - currentX) * 0.05
+      currentY += (targetY - currentY) * 0.05
+      currentX2 += (targetX - currentX2) * 0.025
+      currentY2 += (targetY - currentY2) * 0.025
 
       if (orbRef.current) {
         orbRef.current.style.transform = `translate(${currentX - 300}px, ${currentY - 300}px)`
@@ -36,12 +95,12 @@ export function LoginBg() {
 
       animFrame = requestAnimationFrame(animate)
     }
-
-    window.addEventListener('mousemove', onMove)
     animate()
 
     return () => {
-      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('deviceorientation', onOrientation)
+      window.removeEventListener('touchmove', onTouch)
       cancelAnimationFrame(animFrame)
     }
   }, [])
@@ -58,7 +117,7 @@ export function LoginBg() {
         }}
       />
 
-      {/* 메인 오브 - 마우스 빠르게 따라옴 */}
+      {/* 메인 오브 */}
       <div
         ref={orbRef}
         className="absolute top-0 left-0 h-[600px] w-[600px] rounded-full opacity-20"
@@ -69,7 +128,7 @@ export function LoginBg() {
         }}
       />
 
-      {/* 보조 오브 - 마우스 느리게 따라옴 */}
+      {/* 보조 오브 */}
       <div
         ref={orb2Ref}
         className="absolute top-0 left-0 h-[400px] w-[400px] rounded-full opacity-15"
