@@ -1,6 +1,5 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ChannelCard } from './channel-card'
 import Link from 'next/link'
