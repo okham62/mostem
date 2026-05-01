@@ -33,8 +33,8 @@ export function LoginBg() {
       if (e.gamma === null || e.beta === null) return
       gyroAvailable = true
       // gamma: 좌우 기울기 (-90 ~ 90), beta: 앞뒤 기울기 (-180 ~ 180)
-      const x = W / 2 + (e.gamma / 45) * (W * 0.35)
-      const y = H / 2 + ((e.beta - 30) / 45) * (H * 0.35)
+      const x = W / 2 + (e.gamma / 25) * (W * 0.5)
+      const y = H / 2 + ((e.beta - 30) / 25) * (H * 0.5)
       targetX = Math.max(0, Math.min(W, x))
       targetY = Math.max(0, Math.min(H, y))
     }
@@ -80,11 +80,13 @@ export function LoginBg() {
     const animate = () => {
       floatAnim()
 
-      // lerp (부드럽게 따라오기)
-      currentX += (targetX - currentX) * 0.05
-      currentY += (targetY - currentY) * 0.05
-      currentX2 += (targetX - currentX2) * 0.025
-      currentY2 += (targetY - currentY2) * 0.025
+      // lerp - 모바일은 더 빠르게, 데스크탑은 부드럽게
+      const speed1 = isMobile ? 0.18 : 0.06
+      const speed2 = isMobile ? 0.10 : 0.03
+      currentX += (targetX - currentX) * speed1
+      currentY += (targetY - currentY) * speed1
+      currentX2 += (targetX - currentX2) * speed2
+      currentY2 += (targetY - currentY2) * speed2
 
       if (orbRef.current) {
         orbRef.current.style.transform = `translate(${currentX - 300}px, ${currentY - 300}px)`
