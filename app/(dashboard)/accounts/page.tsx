@@ -17,7 +17,7 @@ const PLATFORM_INFO: Record<Platform, {
   youtube: {
     label: 'YouTube',
     description: '유튜브 채널에 롱폼/쇼폼 영상 업로드',
-    addPath: '/accounts/add/youtube',
+    addPath: '/api/oauth/youtube/authorize',
     comingSoon: false,
     icon: (
       <svg viewBox="0 0 24 24" className="h-6 w-6 fill-[#FF0000]">

@@ -29,13 +29,18 @@ export default function AddYouTubeChannelPage() {
       fetch('/api/oauth/youtube/connected').then(r => r.json()),
     ])
       .then(([channelData, connectedData]) => {
+        if (channelData.error === 'no_pending_oauth') {
+          // OAuth 쿠키 없으면 다시 인증
+          router.replace('/api/oauth/youtube/authorize')
+          return
+        }
         if (channelData.error) setError(channelData.error)
         else setChannels(channelData.channels ?? [])
         setConnectedIds(new Set(connectedData.channelIds ?? []))
       })
       .catch(() => setError('데이터를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [router])
 
   const handleAdd = async (channel: Channel) => {
     setAdding(channel.id)

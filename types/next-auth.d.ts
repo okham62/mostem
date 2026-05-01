@@ -7,15 +7,12 @@ declare module 'next-auth' {
       id: string
       status: UserStatus
       role: UserRole
-      accessToken?: string
     } & DefaultSession['user']
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT {
-    accessToken?: string
-    refreshToken?: string
-    expiresAt?: number
+    // YouTube tokens are stored per-channel in platform_connections table
   }
 }
