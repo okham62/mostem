@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { logActivity } from '@/lib/log'
 
 export const maxDuration = 300
 
@@ -149,6 +150,8 @@ export async function POST(req: Request) {
     platform_statuses: { youtube: 'completed' },
     platform_urls: { youtube: videoUrl },
   })
+
+  logActivity(session.user.id, 'youtube_upload', { title, videoId, videoUrl }).catch(() => {})
 
   return NextResponse.json({ success: true, videoId, videoUrl })
 }

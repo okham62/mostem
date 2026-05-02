@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { logActivity } from '@/lib/log'
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -53,6 +54,8 @@ export async function POST(req: Request) {
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  logActivity(session.user.id, 'youtube_connect', { channelId, channelName }).catch(() => {})
 
   return NextResponse.json({ success: true })
 }

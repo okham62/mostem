@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { AdminActions } from './admin-actions'
 import { formatDate } from '@/lib/utils'
 import { Users } from 'lucide-react'
+import Link from 'next/link'
 import type { User } from '@/types'
 
 export default async function AdminPage() {
@@ -99,8 +100,10 @@ function UserRow({ user, showActions }: { user: User; showActions: boolean }) {
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <p className="truncate text-sm font-medium text-[var(--foreground)]">{user.name}</p>
-        <p className="truncate text-xs text-[var(--muted)]">{user.email}</p>
+        <Link href={`/admin/users/${user.id}`} className="hover:underline">
+          <p className="truncate text-sm font-medium text-[var(--foreground)]">{user.name}</p>
+        </Link>
+        <p className="truncate text-xs text-[var(--muted)]">@{user.username ?? user.email}</p>
       </div>
       <div className="flex shrink-0 items-center gap-3">
         <span className="hidden text-xs text-[var(--muted)] sm:block">{formatDate(user.created_at)}</span>

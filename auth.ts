@@ -2,6 +2,7 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getClientIP, getLocationFromIP } from '@/lib/geo'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -10,7 +11,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         username: {},
         password: {},
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.username || !credentials?.password) return null
 
         const supabase = createAdminClient()
@@ -28,12 +29,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (user.status === 'pending') throw new Error('pending')
         if (user.status === 'rejected') throw new Error('rejected')
 
+        // 로그인 기록 (비동기 - 로그인 속도에 영향 없음)
+        const ip = getClientIP(req as Request)
+        getLocationFromIP(ip).then(location => {
+          supabase.from('login_logs').insert({
+            user_id: user.id,
+            ip,
+            city: location.city,
+            region: location.region,
+            country: location.country,
+          }).then(() => {})
+        }).catch(() => {})
+
         return {
           id: user.id,
           email: user.email ?? user.username,
           name: user.name,
           image: user.image ?? null,
-          // 커스텀 필드: JWT에 저장
           status: user.status,
           role: user.role,
         }
@@ -41,7 +53,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    // JWT에 status/role 저장 → 매 요청마다 DB 조회 불필요
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id
