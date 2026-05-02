@@ -25,8 +25,10 @@ export function LoginForm() {
       redirect: false,
     })
 
-    if (result?.url) {
-      router.push(result.url)
+    if (result?.error === 'pending') {
+      router.push('/register?status=pending')
+    } else if (result?.error === 'rejected') {
+      router.push('/register?status=rejected')
     } else if (!result?.ok || result?.error) {
       setError('아이디 또는 비밀번호가 올바르지 않습니다.')
       setLoading(false)

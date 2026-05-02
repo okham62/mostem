@@ -16,7 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const supabase = createAdminClient()
         const { data: user } = await supabase
           .from('users')
-          .select('id, email, name, username, image, password_hash, status')
+          .select('id, email, name, username, image, password_hash, status, role')
           .eq('username', credentials.username as string)
           .single()
 
@@ -25,55 +25,43 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const valid = await bcrypt.compare(credentials.password as string, user.password_hash)
         if (!valid) return null
 
+        if (user.status === 'pending') throw new Error('pending')
+        if (user.status === 'rejected') throw new Error('rejected')
+
         return {
           id: user.id,
           email: user.email ?? user.username,
           name: user.name,
           image: user.image ?? null,
+          // 커스텀 필드: JWT에 저장
+          status: user.status,
+          role: user.role,
         }
       },
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
-      if (!user.id) return false
-
-      const supabase = createAdminClient()
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('status')
-        .eq('id', user.id)
-        .single()
-
-      if (!dbUser) return false
-      if (dbUser.status === 'pending') return '/register?status=pending'
-      if (dbUser.status === 'rejected') return '/register?status=rejected'
-
-      return true
+    // JWT에 status/role 저장 → 매 요청마다 DB 조회 불필요
+    async jwt({ token, user }) {
+      if (user) {
+        token.sub = user.id
+        token.status = (user as { status?: string }).status
+        token.role = (user as { role?: string }).role
+        token.name = user.name
+      }
+      return token
     },
 
     async session({ session, token }) {
-      if (token?.sub) {
-        const supabase = createAdminClient()
-        const { data: dbUser } = await supabase
-          .from('users')
-          .select('id, status, role, name')
-          .eq('id', token.sub)
-          .single()
-
-        if (dbUser) {
-          session.user.id = dbUser.id
-          session.user.status = dbUser.status
-          session.user.role = dbUser.role
-          session.user.name = dbUser.name
-        }
+      if (token) {
+        session.user.id = token.sub as string
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        session.user.status = token.status as any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        session.user.role = token.role as any
+        session.user.name = token.name as string
       }
       return session
-    },
-
-    async jwt({ token, user }) {
-      if (user) token.sub = user.id
-      return token
     },
   },
   pages: {
