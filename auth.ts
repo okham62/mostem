@@ -1,16 +1,36 @@
 import NextAuth from 'next-auth'
-import Google from 'next-auth/providers/google'
+import Credentials from 'next-auth/providers/credentials'
+import bcrypt from 'bcryptjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: 'openid email profile',
-        },
+    Credentials({
+      credentials: {
+        email: {},
+        password: {},
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null
+
+        const supabase = createAdminClient()
+        const { data: user } = await supabase
+          .from('users')
+          .select('id, email, name, image, password_hash, status')
+          .eq('email', credentials.email as string)
+          .single()
+
+        if (!user?.password_hash) return null
+
+        const valid = await bcrypt.compare(credentials.password as string, user.password_hash)
+        if (!valid) return null
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image ?? null,
+        }
       },
     }),
   ],
@@ -19,42 +39,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (!user.email) return false
 
       const supabase = createAdminClient()
-
-      const { data: existingUser } = await supabase
+      const { data: dbUser } = await supabase
         .from('users')
-        .select('id, status')
+        .select('status')
         .eq('email', user.email)
         .single()
 
-      if (!existingUser) {
-        const { error: insertError } = await supabase.from('users').insert({
-          email: user.email,
-          name: user.name ?? '',
-          image: user.image ?? '',
-          status: 'pending',
-          role: 'user',
-        })
-
-        if (insertError) {
-          console.error('Insert error:', insertError)
-          return false
-        }
-
-        return '/register?status=pending'
-      }
-
-      if (existingUser.status === 'pending') return '/register?status=pending'
-      if (existingUser.status === 'rejected') return '/register?status=rejected'
+      if (!dbUser) return false
+      if (dbUser.status === 'pending') return '/register?status=pending'
+      if (dbUser.status === 'rejected') return '/register?status=rejected'
 
       return true
     },
 
-    async session({ session, token }) {
+    async session({ session }) {
       if (session.user?.email) {
         const supabase = createAdminClient()
         const { data: dbUser } = await supabase
           .from('users')
-          .select('id, status, role, name, image')
+          .select('id, status, role')
           .eq('email', session.user.email)
           .single()
 
@@ -64,7 +67,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.role = dbUser.role
         }
       }
-
       return session
     },
 
