@@ -8,7 +8,7 @@ import { LoginBg } from './login-bg'
 
 export function LoginForm() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -20,16 +20,15 @@ export function LoginForm() {
     setError('')
 
     const result = await signIn('credentials', {
-      email,
+      username,
       password,
       redirect: false,
     })
 
     if (result?.url) {
-      // pending / rejected 리다이렉트 처리
       router.push(result.url)
     } else if (!result?.ok || result?.error) {
-      setError('이메일 또는 비밀번호가 올바르지 않습니다.')
+      setError('아이디 또는 비밀번호가 올바르지 않습니다.')
       setLoading(false)
     } else {
       router.push('/dashboard')
@@ -74,12 +73,12 @@ export function LoginForm() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <input
-              type="email"
-              placeholder="이메일"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              placeholder="아이디"
+              value={username}
+              onChange={e => setUsername(e.target.value.toLowerCase())}
               required
-              autoComplete="email"
+              autoComplete="username"
               className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:ring-1 focus:ring-indigo-500/50"
               style={{
                 background: 'rgba(255,255,255,0.06)',

@@ -7,7 +7,7 @@ import { Zap, Eye, EyeOff, CheckCircle } from 'lucide-react'
 export function RegisterForm() {
   const router = useRouter()
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -18,6 +18,13 @@ export function RegisterForm() {
     setLoading(true)
     setError('')
 
+    // 아이디 형식 검사: 영문+숫자만 허용
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      setError('아이디는 영문/숫자/밑줄(_)만 사용 가능하며 3~20자여야 합니다.')
+      setLoading(false)
+      return
+    }
+
     if (password.length < 8) {
       setError('비밀번호는 8자 이상이어야 합니다.')
       setLoading(false)
@@ -27,7 +34,7 @@ export function RegisterForm() {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, username, password }),
     })
 
     const data = await res.json()
@@ -60,7 +67,7 @@ export function RegisterForm() {
           <ul className="space-y-2 text-sm text-[var(--muted)]">
             <li className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 shrink-0 text-brand" />
-              이메일/비밀번호로 간편 가입
+              아이디/비밀번호로 간편 가입
             </li>
             <li className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 shrink-0 text-brand" />
@@ -82,20 +89,19 @@ export function RegisterForm() {
         <form onSubmit={handleSubmit} className="space-y-3">
           <input
             type="text"
-            placeholder="이름"
+            placeholder="이름 (홍길동)"
             value={name}
             onChange={e => setName(e.target.value)}
             required
-            autoComplete="name"
             className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--muted-bg)] px-4 py-3 text-sm text-[var(--foreground)] placeholder-[var(--muted)] outline-none transition focus:border-brand focus:ring-1 focus:ring-brand/30"
           />
           <input
-            type="email"
-            placeholder="이메일"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
+            type="text"
+            placeholder="아이디 (영문+숫자, 3~20자)"
+            value={username}
+            onChange={e => setUsername(e.target.value.toLowerCase())}
             required
-            autoComplete="email"
+            autoComplete="username"
             className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--muted-bg)] px-4 py-3 text-sm text-[var(--foreground)] placeholder-[var(--muted)] outline-none transition focus:border-brand focus:ring-1 focus:ring-brand/30"
           />
           <div className="relative">

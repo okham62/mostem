@@ -7,17 +7,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: {},
+        username: {},
         password: {},
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+        if (!credentials?.username || !credentials?.password) return null
 
         const supabase = createAdminClient()
         const { data: user } = await supabase
           .from('users')
-          .select('id, email, name, image, password_hash, status')
-          .eq('email', credentials.email as string)
+          .select('id, email, name, username, image, password_hash, status')
+          .eq('username', credentials.username as string)
           .single()
 
         if (!user?.password_hash) return null
@@ -27,7 +27,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         return {
           id: user.id,
-          email: user.email,
+          email: user.email ?? user.username,
           name: user.name,
           image: user.image ?? null,
         }
@@ -36,13 +36,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user }) {
-      if (!user.email) return false
+      if (!user.id) return false
 
       const supabase = createAdminClient()
       const { data: dbUser } = await supabase
         .from('users')
         .select('status')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single()
 
       if (!dbUser) return false
@@ -52,25 +52,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return true
     },
 
-    async session({ session }) {
-      if (session.user?.email) {
+    async session({ session, token }) {
+      if (token?.sub) {
         const supabase = createAdminClient()
         const { data: dbUser } = await supabase
           .from('users')
-          .select('id, status, role')
-          .eq('email', session.user.email)
+          .select('id, status, role, name')
+          .eq('id', token.sub)
           .single()
 
         if (dbUser) {
           session.user.id = dbUser.id
           session.user.status = dbUser.status
           session.user.role = dbUser.role
+          session.user.name = dbUser.name
         }
       }
       return session
     },
 
-    async jwt({ token }) {
+    async jwt({ token, user }) {
+      if (user) token.sub = user.id
       return token
     },
   },
