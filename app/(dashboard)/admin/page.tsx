@@ -82,7 +82,7 @@ export default async function AdminPage() {
   )
 }
 
-function UserRow({ user, showActions }: { user: User; showActions: boolean }) {
+function UserRow({ user }: { user: User; showActions?: boolean }) {
   const statusMap = {
     pending: { label: '대기', variant: 'warning' as const },
     approved: { label: '승인', variant: 'success' as const },
@@ -108,7 +108,9 @@ function UserRow({ user, showActions }: { user: User; showActions: boolean }) {
       <div className="flex shrink-0 items-center gap-3">
         <span className="hidden text-xs text-[var(--muted)] sm:block">{formatDate(user.created_at)}</span>
         <Badge variant={s.variant}>{s.label}</Badge>
-        {showActions && <AdminActions userId={user.id} />}
+        {user.status !== 'approved' || user.role !== 'admin' ? (
+          <AdminActions userId={user.id} currentStatus={user.status} />
+        ) : null}
       </div>
     </div>
   )
