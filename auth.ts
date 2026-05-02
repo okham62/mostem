@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getClientIP, getLocationFromIP } from '@/lib/geo'
+import { parseDevice } from '@/lib/device'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -31,6 +32,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         // 로그인 기록 (비동기 - 로그인 속도에 영향 없음)
         const ip = getClientIP(req as Request)
+        const ua = (req as Request).headers?.get('user-agent') ?? null
+        const device = parseDevice(ua)
         getLocationFromIP(ip).then(location => {
           supabase.from('login_logs').insert({
             user_id: user.id,
@@ -38,6 +41,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             city: location.city,
             region: location.region,
             country: location.country,
+            ...device,
           }).then(() => {})
         }).catch(() => {})
 

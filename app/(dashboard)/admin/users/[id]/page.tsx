@@ -118,18 +118,37 @@ export default async function UserDetailPage({
               city: string
               region: string
               country: string
+              device_type: string
+              device_os: string
+              device_browser: string
+              device_model: string
               created_at: string
-            }) => (
-              <div key={log.id} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-sm font-medium text-[var(--foreground)]">
-                    📍 {[log.city, log.region, log.country].filter(Boolean).join(' · ') || '알 수 없음'}
-                  </p>
-                  <p className="text-xs text-[var(--muted)]">IP: {log.ip}</p>
+            }) => {
+              const deviceIcon = log.device_type === '스마트폰' ? '📱'
+                : log.device_type === '태블릿' ? '📟' : '💻'
+              return (
+                <div key={log.id} className="py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      {/* 기기 정보 */}
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {deviceIcon} {log.device_type}
+                        {log.device_model ? ` · ${log.device_model}` : ''}
+                      </p>
+                      <p className="text-xs text-[var(--muted)]">
+                        {[log.device_os, log.device_browser].filter(Boolean).join(' · ')}
+                      </p>
+                      {/* 위치 */}
+                      <p className="text-xs text-[var(--muted)]">
+                        📍 {[log.city, log.region].filter(Boolean).join(' ') || '알 수 없음'}
+                        {' · '}IP: {log.ip}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-xs text-[var(--muted)]">{formatDate(log.created_at)}</p>
+                  </div>
                 </div>
-                <p className="shrink-0 text-xs text-[var(--muted)]">{formatDate(log.created_at)}</p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>
