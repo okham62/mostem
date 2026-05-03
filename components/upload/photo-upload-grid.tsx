@@ -23,18 +23,18 @@ import { Plus, X, GripVertical, Images } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface PhotoItem {
-  id: string       // 고유 ID (순서 추적용)
+  id: string
   file: File
   previewUrl: string
 }
 
 interface PhotoUploadGridProps {
   photos: PhotoItem[]
-  maxCount: number              // 플랫폼 최대 장수 (Instagram=10, TikTok=35)
+  maxCount: number
   onChange: (photos: PhotoItem[]) => void
 }
 
-// ── 개별 사진 썸네일 (드래그 가능) ──────────────────────────────
+// ── 개별 사진 썸네일 ──────────────────────────────────────────
 function SortablePhoto({
   photo,
   index,
@@ -47,24 +47,14 @@ function SortablePhoto({
   const [hovered, setHovered] = useState(false)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: photo.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: photo.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.3 : 1,
   }
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    setMousePos({ x: e.clientX, y: e.clientY })
-  }, [])
 
   return (
     <>
@@ -74,64 +64,43 @@ function SortablePhoto({
         className="group relative aspect-square rounded-xl overflow-hidden border-2 border-[var(--card-border)] bg-[var(--muted-bg)] cursor-grab active:cursor-grabbing"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        onMouseMove={handleMouseMove}
+        onMouseMove={useCallback((e: React.MouseEvent) => setMousePos({ x: e.clientX, y: e.clientY }), [])}
         {...attributes}
         {...listeners}
       >
-        {/* 사진 */}
-        <img
-          src={photo.previewUrl}
-          alt={`사진 ${index + 1}`}
-          className="h-full w-full object-cover"
-          draggable={false}
-        />
+        <img src={photo.previewUrl} alt={`사진 ${index + 1}`} className="h-full w-full object-cover" draggable={false} />
 
-        {/* 순서 번호 */}
         <div className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[10px] font-bold text-white">
           {index + 1}
         </div>
 
-        {/* 드래그 핸들 힌트 */}
         <div className="absolute right-1.5 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <GripVertical className="h-4 w-4 text-white drop-shadow" />
         </div>
 
-        {/* 삭제 버튼 */}
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRemove() }}
-          onPointerDown={(e) => e.stopPropagation()} // 드래그 이벤트 차단
+          onPointerDown={(e) => e.stopPropagation()}
           className="absolute bottom-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-600"
         >
           <X className="h-3 w-3" />
         </button>
 
-        {/* 어두운 오버레이 (호버 시) */}
-        <div className={cn(
-          'absolute inset-0 bg-black/10 transition-opacity',
-          hovered ? 'opacity-100' : 'opacity-0'
-        )} />
+        <div className={cn('absolute inset-0 bg-black/10 transition-opacity', hovered ? 'opacity-100' : 'opacity-0')} />
       </div>
 
-      {/* 즉시 확대 미리보기 (마우스 위치 따라다님) */}
       {hovered && (
         <div
           className="fixed z-[9999] pointer-events-none"
           style={{
             left: mousePos.x + 20,
             top: mousePos.y - 220,
-            transform: mousePos.x > window.innerWidth - 420
-              ? 'translateX(calc(-100% - 40px))'
-              : 'none',
+            transform: mousePos.x > window.innerWidth - 420 ? 'translateX(calc(-100% - 40px))' : 'none',
           }}
         >
           <div className="rounded-xl overflow-hidden border-2 border-white/20 shadow-2xl shadow-black/50">
-            <img
-              src={photo.previewUrl}
-              alt="미리보기"
-              className="h-96 w-96 object-cover"
-              draggable={false}
-            />
+            <img src={photo.previewUrl} alt="미리보기" className="h-96 w-96 object-cover" draggable={false} />
           </div>
           <p className="mt-1 text-center text-[10px] text-white/80 drop-shadow">
             {(photo.file.size / (1024 * 1024)).toFixed(1)} MB · {photo.file.name}
@@ -142,7 +111,6 @@ function SortablePhoto({
   )
 }
 
-// ── 드래그 중 오버레이용 (고스트) ──────────────────────────────
 function DragGhost({ photo }: { photo: PhotoItem }) {
   return (
     <div className="aspect-square w-24 rounded-xl overflow-hidden border-2 border-brand shadow-2xl rotate-3 scale-110">
@@ -154,107 +122,90 @@ function DragGhost({ photo }: { photo: PhotoItem }) {
 // ── 메인 컴포넌트 ──────────────────────────────────────────────
 export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const dropZoneRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
-  // 브라우저 전체 dragover 방지용 카운터 (enter/leave 중첩 처리)
-  const dragCounter = useRef(0)
+  const dragDepth = useRef(0) // 중첩 enter/leave 처리
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 200, tolerance: 5 },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
-  // 브라우저 기본 동작(새 탭 열기) 방지 — 컴포넌트 마운트 중 항상 막음
+  // 브라우저가 파일을 새 탭으로 여는 기본 동작을 전역에서 차단
+  // stopPropagation 없이 preventDefault만 — React 이벤트 흐름 방해 X
   useEffect(() => {
-    const prevent = (e: DragEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-    }
-    window.addEventListener('dragover', prevent)
-    window.addEventListener('drop', prevent)
+    const noop = (e: DragEvent) => { e.preventDefault() }
+    document.addEventListener('dragover', noop)
+    document.addEventListener('drop', noop)
     return () => {
-      window.removeEventListener('dragover', prevent)
-      window.removeEventListener('drop', prevent)
+      document.removeEventListener('dragover', noop)
+      document.removeEventListener('drop', noop)
     }
   }, [])
 
-  // 파일 추가
   const addFiles = useCallback((files: FileList | File[]) => {
-    const arr = Array.from(files)
-    const imageFiles = arr.filter(f => f.type.startsWith('image/'))
-    const remaining = maxCount - photos.length
-    const toAdd = imageFiles.slice(0, remaining)
-
+    const arr = Array.from(files).filter(f => f.type.startsWith('image/'))
+    const toAdd = arr.slice(0, maxCount - photos.length)
+    if (!toAdd.length) return
     const newPhotos: PhotoItem[] = toAdd.map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       file,
       previewUrl: URL.createObjectURL(file),
     }))
-
     onChange([...photos, ...newPhotos])
   }, [photos, maxCount, onChange])
 
-  // 파일 input 변경
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(e.target.files)
     e.target.value = ''
   }
 
-  // 드롭 존 이벤트 (enter/leave 중첩 문제 카운터로 해결)
-  const handleDragEnter = (e: React.DragEvent) => {
+  // dragenter — 자식 요소 진입 시 중복 실행되므로 depth 카운터로 처리
+  const onDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
-    dragCounter.current += 1
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      setIsDraggingOver(true)
-    }
+    dragDepth.current += 1
+    setIsDraggingOver(true)   // depth 체크 없이 무조건 표시
   }
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  // dragleave — depth가 0이 돼야 실제 영역 이탈
+  const onDragLeave = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
-    dragCounter.current -= 1
-    if (dragCounter.current === 0) {
+    dragDepth.current -= 1
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0
       setIsDraggingOver(false)
     }
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
+  // dragover — preventDefault 필수 (없으면 drop 이벤트 자체가 안 옴)
+  const onDragOver = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
     e.dataTransfer.dropEffect = 'copy'
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  // drop — 파일 추가
+  const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
-    dragCounter.current = 0
+    dragDepth.current = 0
     setIsDraggingOver(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (e.dataTransfer.files.length > 0) {
       addFiles(e.dataTransfer.files)
     }
   }
 
-  // 사진 삭제
   const removePhoto = (id: string) => {
-    const photo = photos.find(p => p.id === id)
-    if (photo) URL.revokeObjectURL(photo.previewUrl)
+    const p = photos.find(p => p.id === id)
+    if (p) URL.revokeObjectURL(p.previewUrl)
     onChange(photos.filter(p => p.id !== id))
   }
 
-  // 순서 변경 (드래그 끝)
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
-    const oldIndex = photos.findIndex(p => p.id === active.id)
-    const newIndex = photos.findIndex(p => p.id === over.id)
-    onChange(arrayMove(photos, oldIndex, newIndex))
+    const oldIdx = photos.findIndex(p => p.id === active.id)
+    const newIdx = photos.findIndex(p => p.id === over.id)
+    onChange(arrayMove(photos, oldIdx, newIdx))
   }
 
   const activePhoto = activeId ? photos.find(p => p.id === activeId) : null
@@ -262,16 +213,15 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
 
   return (
     <div
-      ref={dropZoneRef}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       className="relative"
     >
-      {/* 드래그 오버 오버레이 */}
+      {/* 드래그 오버 시 전체 오버레이 */}
       {isDraggingOver && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-xl border-2 border-brand bg-brand/10 backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-xl border-2 border-brand bg-brand/10 pointer-events-none">
           <Images className="h-10 w-10 text-brand" />
           <p className="mt-2 text-sm font-semibold text-brand">여기에 놓으세요!</p>
           <p className="text-xs text-brand/70">최대 {maxCount}장</p>
@@ -282,12 +232,7 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
       {photos.length === 0 ? (
         <label
           htmlFor="photo-file-input"
-          className={cn(
-            'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-12 transition-colors',
-            isDraggingOver
-              ? 'border-brand bg-brand/10'
-              : 'border-[var(--card-border)] hover:border-brand hover:bg-brand/5'
-          )}
+          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-12 transition-colors border-[var(--card-border)] hover:border-brand hover:bg-brand/5"
         >
           <Images className="h-10 w-10 text-[var(--muted)]" />
           <p className="mt-3 text-sm font-semibold text-[var(--foreground)]">
@@ -315,8 +260,6 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
                   onRemove={() => removePhoto(photo.id)}
                 />
               ))}
-
-              {/* + 추가 버튼 */}
               {canAddMore && (
                 <label
                   htmlFor="photo-file-input"
@@ -328,15 +271,12 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
               )}
             </div>
           </SortableContext>
-
-          {/* 드래그 중 고스트 이미지 */}
           <DragOverlay>
             {activePhoto && <DragGhost photo={activePhoto} />}
           </DragOverlay>
         </DndContext>
       )}
 
-      {/* 숨겨진 파일 input */}
       <input
         id="photo-file-input"
         ref={fileInputRef}
@@ -347,14 +287,10 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
         onChange={handleInputChange}
       />
 
-      {/* 안내 */}
       {photos.length > 0 && (
         <div className="mt-2 flex items-center justify-between text-xs text-[var(--muted)]">
           <span>드래그로 순서 변경 · 마우스 올리면 미리보기</span>
-          <span className={cn(
-            'font-semibold',
-            photos.length >= maxCount ? 'text-red-400' : 'text-[var(--muted)]'
-          )}>
+          <span className={cn('font-semibold', photos.length >= maxCount ? 'text-red-400' : '')}>
             {photos.length} / {maxCount}장
           </span>
         </div>
