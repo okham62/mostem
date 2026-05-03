@@ -199,8 +199,8 @@ export function UploadForm({ connections }: UploadFormProps) {
           setUploadError(err.error || 'YouTube 업로드 실패')
         }
       }
-    } catch {
-      setUploadError('업로드 중 오류가 발생했습니다.')
+    } catch (e) {
+      setUploadError(`업로드 중 오류: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setIsUploading(false)
     }

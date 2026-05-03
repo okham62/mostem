@@ -115,8 +115,9 @@ export async function POST(req: Request) {
 
   if (!initiateRes.ok) {
     const err = await initiateRes.json()
-    console.error('YouTube initiate error:', err)
-    return NextResponse.json({ error: 'YouTube 업로드 시작 실패' }, { status: 500 })
+    console.error('YouTube initiate error:', JSON.stringify(err))
+    const reason = err?.error?.errors?.[0]?.reason || err?.error?.message || JSON.stringify(err)
+    return NextResponse.json({ error: `YouTube 오류: ${reason}` }, { status: 500 })
   }
 
   const uploadUrl = initiateRes.headers.get('location')
