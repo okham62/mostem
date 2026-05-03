@@ -783,13 +783,13 @@ export function UploadForm({ connections }: UploadFormProps) {
 
           {/* 설명 */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">설명</label>
-
-            {/* 저장된 설명 세트 */}
-            <DescriptionPresetPicker
-              currentContent={description}
-              onApply={(content) => setDescription(content)}
-            />
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-xs font-medium text-[var(--foreground)]">설명</label>
+              <DescriptionPresetPicker
+                currentContent={description}
+                onApply={(content) => setDescription(content)}
+              />
+            </div>
 
             <textarea
               value={description}
@@ -806,13 +806,13 @@ export function UploadForm({ connections }: UploadFormProps) {
 
           {/* 태그 */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">해시태그</label>
-
-            {/* 저장된 태그 세트 */}
-            <TagPresetPicker
-              currentTags={tagList}
-              onApply={handleApplyPreset}
-            />
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-xs font-medium text-[var(--foreground)]">해시태그</label>
+              <TagPresetPicker
+                currentTags={tagList}
+                onApply={handleApplyPreset}
+              />
+            </div>
 
             <div className="flex gap-2">
               <input
