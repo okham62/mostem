@@ -260,21 +260,27 @@ export function UploadForm({ connections }: UploadFormProps) {
           }
         }
 
-        // Step 4: 썸네일 업로드 (videoId 있고 썸네일 선택된 경우, YouTube 처리 대기)
-        await new Promise(r => setTimeout(r, 3000))
+        // Step 4: 썸네일 업로드 (최대 4회 재시도, 5초 간격)
         const currentThumbnail = thumbnailFileRef.current
         if (finalVideoId && currentThumbnail) {
-          const thumbForm = new FormData()
-          thumbForm.append('videoId', finalVideoId)
-          thumbForm.append('thumbnail', currentThumbnail)
-          const thumbRes = await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm })
-          if (!thumbRes.ok) {
+          let thumbSuccess = false
+          for (let attempt = 0; attempt < 4; attempt++) {
+            await new Promise(r => setTimeout(r, attempt === 0 ? 5000 : 8000))
+            const thumbForm = new FormData()
+            thumbForm.append('videoId', finalVideoId)
+            thumbForm.append('thumbnail', currentThumbnail)
+            const thumbRes = await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm })
+            if (thumbRes.ok) {
+              thumbSuccess = true
+              break
+            }
             const thumbErr = await thumbRes.json().catch(() => ({}))
-            console.warn('썸네일 업로드 실패:', thumbErr)
-            setUploadError(`영상 업로드는 성공했지만 썸네일 오류: ${thumbErr.error || '알 수 없는 오류'}`)
+            console.warn(`썸네일 시도 ${attempt + 1}/4 실패 (videoId: ${finalVideoId}):`, thumbErr)
+            if (attempt === 3) {
+              setUploadError(`영상 업로드는 성공했지만 썸네일 오류: ${thumbErr.error || '알 수 없는 오류'} (videoId: ${finalVideoId})`)
+            }
           }
-        } else if (!currentThumbnail) {
-          console.log('썸네일 없음 - 건너뜀')
+          if (!thumbSuccess) console.warn('썸네일 업로드 최종 실패')
         }
 
         // Step 5: 업로드 기록 DB 저장
