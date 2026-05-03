@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { PlatformCard } from './platform-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Upload, X, ImageIcon, Sparkles, FileVideo } from 'lucide-react'
+import { Upload, X, ImageIcon, Sparkles, FileVideo, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Platform, VideoType, PlatformConnection } from '@/types'
+import type { VideoType, PlatformConnection } from '@/types'
 
 interface UploadFormProps {
   connections: PlatformConnection[]
@@ -96,11 +95,24 @@ export function UploadForm({ connections }: UploadFormProps) {
   }, [title, description, tags, visibility, videoType, selectedConnectionIds, thumbnailPreview, thumbnailFile, uploadResult])
 
   const youtubeConnections = connections.filter(c => c.platform === 'youtube')
+  const tiktokConnections  = connections.filter(c => c.platform === 'tiktok')
+  const instagramConnections = connections.filter(c => c.platform === 'instagram')
 
   const toggleConnectionId = (id: string) => {
     setSelectedConnectionIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     )
+  }
+
+  const toggleAllInPlatform = (conns: PlatformConnection[], allSelected: boolean) => {
+    if (allSelected) {
+      setSelectedConnectionIds(prev => prev.filter(id => !conns.some(c => c.id === id)))
+    } else {
+      setSelectedConnectionIds(prev => {
+        const toAdd = conns.map(c => c.id).filter(id => !prev.includes(id))
+        return [...prev, ...toAdd]
+      })
+    }
   }
 
   const handleVideoDrop = useCallback((e: React.DragEvent) => {
@@ -186,7 +198,8 @@ export function UploadForm({ connections }: UploadFormProps) {
     const tagList2 = tags.split(',').map(t => t.trim()).filter(Boolean)
 
     // 채널 1개당 업로드 처리 함수
-    const uploadToChannel = async (conn: PlatformConnection): Promise<{ channelName: string; videoUrl: string } | { error: string }> => {
+    type ChannelResult = { channelName: string; videoUrl: string; thumbError?: string } | { error: string }
+    const uploadToChannel = async (conn: PlatformConnection): Promise<ChannelResult> => {
       // Step 1: 업로드 URL 발급
       const urlRes = await fetch('/api/youtube/upload-url', {
         method: 'POST',
@@ -308,11 +321,11 @@ export function UploadForm({ connections }: UploadFormProps) {
       settled.forEach((s) => {
         if (s.status === 'fulfilled') {
           const val = s.value
-          if ('error' in val && !('videoUrl' in val)) {
+          if ('error' in val) {
             errors.push(val.error)
           } else {
-            results.push({ channelName: (val as { channelName: string; videoUrl: string }).channelName, videoUrl: (val as { channelName: string; videoUrl: string }).videoUrl })
-            if ('thumbError' in val) errors.push((val as { thumbError: string }).thumbError)
+            results.push({ channelName: val.channelName, videoUrl: val.videoUrl })
+            if (val.thumbError) errors.push(val.thumbError)
           }
         } else {
           errors.push(s.reason instanceof Error ? s.reason.message : '알 수 없는 오류')
@@ -375,77 +388,205 @@ export function UploadForm({ connections }: UploadFormProps) {
 
       {/* 2단계: 플랫폼 선택 */}
       <Card>
-        <p className="mb-3 text-sm font-semibold text-[var(--foreground)]">
+        <p className="mb-4 text-sm font-semibold text-[var(--foreground)]">
           <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">2</span>
           업로드 플랫폼
         </p>
 
-        {/* YouTube 채널들 */}
-        {youtubeConnections.length > 0 && (
-          <div className="mb-3">
-            <p className="mb-2 text-xs font-medium text-[var(--muted)]">YouTube 채널</p>
-            <div className="flex flex-wrap gap-2">
-              {youtubeConnections.map((conn) => {
-                const isSelected = selectedConnectionIds.includes(conn.id)
-                return (
-                  <button
-                    key={conn.id}
-                    type="button"
-                    onClick={() => toggleConnectionId(conn.id)}
-                    className={cn(
-                      'flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all active:scale-95',
-                      isSelected
-                        ? 'border-red-500 bg-red-500/10 text-red-500'
-                        : 'border-[var(--card-border)] text-[var(--muted)] hover:border-red-400 hover:text-[var(--foreground)]'
-                    )}
-                  >
-                    <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill={isSelected ? '#ef4444' : 'currentColor'}>
+        <div className="space-y-5">
+
+          {/* ── YouTube ── */}
+          {youtubeConnections.length > 0 ? (() => {
+            const selCount = youtubeConnections.filter(c => selectedConnectionIds.includes(c.id)).length
+            const allSel   = selCount === youtubeConnections.length
+            return (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                     </svg>
-                    <span>({conn.channel_name})</span>
-                    {isSelected && <span className="ml-1 text-xs">✓</span>}
+                    <span className="text-sm font-semibold text-[var(--foreground)]">YouTube</span>
+                    <span className="rounded-full bg-[var(--muted-bg)] px-2 py-0.5 text-[11px] text-[var(--muted)]">
+                      {selCount}/{youtubeConnections.length} 선택
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleAllInPlatform(youtubeConnections, allSel)}
+                    className="text-xs font-medium text-brand hover:underline"
+                  >
+                    {allSel ? '전체 해제' : '전체 선택'}
                   </button>
-                )
-              })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {youtubeConnections.map(conn => {
+                    const isSel = selectedConnectionIds.includes(conn.id)
+                    return (
+                      <button
+                        key={conn.id}
+                        type="button"
+                        onClick={() => toggleConnectionId(conn.id)}
+                        className={cn(
+                          'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-95',
+                          isSel
+                            ? 'border-red-500 bg-red-500/10 text-red-500'
+                            : 'border-[var(--card-border)] text-[var(--muted)] hover:border-red-400 hover:text-[var(--foreground)]'
+                        )}
+                      >
+                        {isSel && <Check className="h-3 w-3 shrink-0" />}
+                        {conn.channel_name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })() : (
+            <div className="rounded-xl border border-dashed border-[var(--card-border)] p-4 text-center text-sm text-[var(--muted)]">
+              연결된 YouTube 채널이 없습니다.{' '}
+              <a href="/accounts" className="text-brand underline">채널 연결하기</a>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* YouTube 채널 없을 때 */}
-        {youtubeConnections.length === 0 && (
-          <div className="mb-3 rounded-xl border border-dashed border-[var(--card-border)] p-4 text-center text-sm text-[var(--muted)]">
-            연결된 YouTube 채널이 없습니다. <a href="/dashboard/connections" className="text-brand underline">채널 연결하기</a>
-          </div>
-        )}
+          {/* ── TikTok (쇼폼만) ── */}
+          {videoType === 'short' && tiktokConnections.length > 0 && (() => {
+            const selCount = tiktokConnections.filter(c => selectedConnectionIds.includes(c.id)).length
+            const allSel   = selCount === tiktokConnections.length
+            return (
+              <div className="border-t border-[var(--card-border)] pt-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-[var(--foreground)]" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.32 6.32 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.24 8.24 0 004.84 1.56V6.78a4.85 4.85 0 01-1.07-.09z"/>
+                    </svg>
+                    <span className="text-sm font-semibold text-[var(--foreground)]">TikTok</span>
+                    <span className="rounded-full bg-[var(--muted-bg)] px-2 py-0.5 text-[11px] text-[var(--muted)]">
+                      {selCount}/{tiktokConnections.length} 선택
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleAllInPlatform(tiktokConnections, allSel)}
+                    className="text-xs font-medium text-brand hover:underline"
+                  >
+                    {allSel ? '전체 해제' : '전체 선택'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {tiktokConnections.map(conn => {
+                    const isSel = selectedConnectionIds.includes(conn.id)
+                    return (
+                      <button
+                        key={conn.id}
+                        type="button"
+                        onClick={() => toggleConnectionId(conn.id)}
+                        className={cn(
+                          'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-95',
+                          isSel
+                            ? 'border-[var(--foreground)] bg-[var(--foreground)]/10 text-[var(--foreground)]'
+                            : 'border-[var(--card-border)] text-[var(--muted)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]'
+                        )}
+                      >
+                        {isSel && <Check className="h-3 w-3 shrink-0" />}
+                        {conn.channel_name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
 
-        {/* TikTok / Instagram (쇼폼만) */}
-        {videoType === 'short' && (
-          <div>
-            {youtubeConnections.length > 0 && <div className="mb-2 border-t border-[var(--card-border)] pt-3" />}
-            <p className="mb-2 text-xs font-medium text-[var(--muted)]">기타 플랫폼</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {(['tiktok', 'instagram'] as Platform[]).map((platform) => {
-                const conn = connections.find(c => c.platform === platform)
-                const isConnected = !!conn
-                const isSelected = conn ? selectedConnectionIds.includes(conn.id) : false
-                return (
-                  <PlatformCard
-                    key={platform}
-                    platform={platform}
-                    isSelected={isSelected}
-                    isConnected={isConnected}
-                    isDisabled={!isConnected}
-                    onToggle={() => conn && toggleConnectionId(conn.id)}
-                  />
-                )
-              })}
+          {/* TikTok 미연결 (쇼폼만) */}
+          {videoType === 'short' && tiktokConnections.length === 0 && (
+            <div className="border-t border-[var(--card-border)] pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 text-[var(--muted)]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.32 6.32 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.24 8.24 0 004.84 1.56V6.78a4.85 4.85 0 01-1.07-.09z"/>
+                  </svg>
+                  <span className="text-sm font-medium text-[var(--muted)]">TikTok</span>
+                </div>
+                <a href="/accounts" className="text-xs text-brand underline">연결하기</a>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {selectedConnectionIds.length === 0 && (
-          <p className="mt-2 text-xs text-[var(--muted)]">업로드할 채널/플랫폼을 1개 이상 선택하세요.</p>
-        )}
+          {/* ── Instagram (쇼폼만) ── */}
+          {videoType === 'short' && instagramConnections.length > 0 && (() => {
+            const selCount = instagramConnections.filter(c => selectedConnectionIds.includes(c.id)).length
+            const allSel   = selCount === instagramConnections.length
+            return (
+              <div className="border-t border-[var(--card-border)] pt-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-pink-500" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                    </svg>
+                    <span className="text-sm font-semibold text-[var(--foreground)]">Instagram</span>
+                    <span className="rounded-full bg-[var(--muted-bg)] px-2 py-0.5 text-[11px] text-[var(--muted)]">
+                      {selCount}/{instagramConnections.length} 선택
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleAllInPlatform(instagramConnections, allSel)}
+                    className="text-xs font-medium text-brand hover:underline"
+                  >
+                    {allSel ? '전체 해제' : '전체 선택'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {instagramConnections.map(conn => {
+                    const isSel = selectedConnectionIds.includes(conn.id)
+                    return (
+                      <button
+                        key={conn.id}
+                        type="button"
+                        onClick={() => toggleConnectionId(conn.id)}
+                        className={cn(
+                          'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-95',
+                          isSel
+                            ? 'border-pink-500 bg-pink-500/10 text-pink-500'
+                            : 'border-[var(--card-border)] text-[var(--muted)] hover:border-pink-400 hover:text-[var(--foreground)]'
+                        )}
+                      >
+                        {isSel && <Check className="h-3 w-3 shrink-0" />}
+                        {conn.channel_name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Instagram 미연결 (쇼폼만) */}
+          {videoType === 'short' && instagramConnections.length === 0 && (
+            <div className="border-t border-[var(--card-border)] pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 text-[var(--muted)]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                  </svg>
+                  <span className="text-sm font-medium text-[var(--muted)]">Instagram</span>
+                </div>
+                <a href="/accounts" className="text-xs text-brand underline">연결하기</a>
+              </div>
+            </div>
+          )}
+
+          {/* 총 선택 요약 */}
+          {selectedConnectionIds.length > 0 ? (
+            <p className="text-xs font-semibold text-brand">
+              📌 총 {selectedConnectionIds.length}개 계정 선택됨
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--muted)]">업로드할 채널/계정을 1개 이상 선택하세요.</p>
+          )}
+
+        </div>
       </Card>
 
       {/* 3단계: 영상 파일 */}
