@@ -41,6 +41,20 @@ create table if not exists public.uploads (
   created_at timestamptz default now() not null
 );
 
+-- tag_presets 테이블
+create table if not exists public.tag_presets (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.users(id) on delete cascade not null,
+  name text not null,
+  tags text[] not null default '{}',
+  created_at timestamptz default now() not null
+);
+
+alter table public.tag_presets enable row level security;
+
+create policy "Users can manage own tag presets" on public.tag_presets
+  for all using (auth.uid() = user_id);
+
 -- templates 테이블
 create table if not exists public.templates (
   id uuid default gen_random_uuid() primary key,

@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Upload, X, ImageIcon, Sparkles, FileVideo, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { VideoType, PlatformConnection } from '@/types'
+import { TagPresetPicker } from './tag-preset-picker'
 
 interface UploadFormProps {
   connections: PlatformConnection[]
@@ -131,6 +132,16 @@ export function UploadForm({ connections }: UploadFormProps) {
       setThumbnailFile(file)
       setThumbnailPreview(URL.createObjectURL(file))
     }
+  }
+
+  // 프리셋 태그를 현재 태그 목록에 병합 (중복 제외)
+  const handleApplyPreset = (presetTags: string[]) => {
+    const existing = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : []
+    const merged = [...existing]
+    presetTags.forEach(t => {
+      if (t && !merged.includes(t)) merged.push(t)
+    })
+    setTags(merged.join(', '))
   }
 
   const addTag = (input?: string) => {
@@ -695,6 +706,13 @@ export function UploadForm({ connections }: UploadFormProps) {
           {/* 태그 */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">해시태그</label>
+
+            {/* 저장된 태그 세트 */}
+            <TagPresetPicker
+              currentTags={tagList}
+              onApply={handleApplyPreset}
+            />
+
             <div className="flex gap-2">
               <input
                 type="text"
