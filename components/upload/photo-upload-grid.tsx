@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -19,7 +19,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Plus, X, GripVertical } from 'lucide-react'
+import { Plus, X, GripVertical, Images } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface PhotoItem {
@@ -120,7 +120,6 @@ function SortablePhoto({
           style={{
             left: mousePos.x + 20,
             top: mousePos.y - 220,
-            // 화면 오른쪽 넘어가면 왼쪽에 표시
             transform: mousePos.x > window.innerWidth - 420
               ? 'translateX(calc(-100% - 40px))'
               : 'none',
@@ -155,17 +154,34 @@ function DragGhost({ photo }: { photo: PhotoItem }) {
 // ── 메인 컴포넌트 ──────────────────────────────────────────────
 export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dropZoneRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
+  // 브라우저 전체 dragover 방지용 카운터 (enter/leave 중첩 처리)
+  const dragCounter = useRef(0)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 }, // 5px 이상 움직여야 드래그 시작
+      activationConstraint: { distance: 5 },
     }),
     useSensor(TouchSensor, {
       activationConstraint: { delay: 200, tolerance: 5 },
     })
   )
+
+  // 브라우저 기본 동작(새 탭 열기) 방지 — 컴포넌트 마운트 중 항상 막음
+  useEffect(() => {
+    const prevent = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    window.addEventListener('dragover', prevent)
+    window.addEventListener('drop', prevent)
+    return () => {
+      window.removeEventListener('dragover', prevent)
+      window.removeEventListener('drop', prevent)
+    }
+  }, [])
 
   // 파일 추가
   const addFiles = useCallback((files: FileList | File[]) => {
@@ -186,14 +202,42 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
   // 파일 input 변경
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(e.target.files)
-    e.target.value = '' // 같은 파일 재선택 허용
+    e.target.value = ''
   }
 
-  // 드래그앤드롭으로 파일 추가 (외부에서)
-  const handleFileDrop = (e: React.DragEvent) => {
+  // 드롭 존 이벤트 (enter/leave 중첩 문제 카운터로 해결)
+  const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current += 1
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOver(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current -= 1
+    if (dragCounter.current === 0) {
+      setIsDraggingOver(false)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current = 0
     setIsDraggingOver(false)
-    if (e.dataTransfer.files) addFiles(e.dataTransfer.files)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files)
+    }
   }
 
   // 사진 삭제
@@ -217,51 +261,80 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
   const canAddMore = photos.length < maxCount
 
   return (
-    <div>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveId(null)}
-      >
-        <SortableContext items={photos.map(p => p.id)} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-            {photos.map((photo, index) => (
-              <SortablePhoto
-                key={photo.id}
-                photo={photo}
-                index={index}
-                onRemove={() => removePhoto(photo.id)}
-              />
-            ))}
+    <div
+      ref={dropZoneRef}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      className="relative"
+    >
+      {/* 드래그 오버 오버레이 */}
+      {isDraggingOver && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-xl border-2 border-brand bg-brand/10 backdrop-blur-[1px]">
+          <Images className="h-10 w-10 text-brand" />
+          <p className="mt-2 text-sm font-semibold text-brand">여기에 놓으세요!</p>
+          <p className="text-xs text-brand/70">최대 {maxCount}장</p>
+        </div>
+      )}
 
-            {/* + 추가 버튼 */}
-            {canAddMore && (
-              <label
-                className={cn(
-                  'aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors',
-                  isDraggingOver
-                    ? 'border-brand bg-brand/10'
-                    : 'border-[var(--card-border)] hover:border-brand hover:bg-brand/5'
-                )}
-                onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true) }}
-                onDragLeave={() => setIsDraggingOver(false)}
-                onDrop={handleFileDrop}
-                htmlFor="photo-file-input"
-              >
-                <Plus className="h-6 w-6 text-[var(--muted)]" />
-                <span className="mt-1 text-[10px] text-[var(--muted)]">추가</span>
-              </label>
-            )}
-          </div>
-        </SortableContext>
+      {/* 빈 상태 */}
+      {photos.length === 0 ? (
+        <label
+          htmlFor="photo-file-input"
+          className={cn(
+            'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-12 transition-colors',
+            isDraggingOver
+              ? 'border-brand bg-brand/10'
+              : 'border-[var(--card-border)] hover:border-brand hover:bg-brand/5'
+          )}
+        >
+          <Images className="h-10 w-10 text-[var(--muted)]" />
+          <p className="mt-3 text-sm font-semibold text-[var(--foreground)]">
+            사진을 드래그하거나 클릭하여 선택
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            JPEG, PNG · Instagram 최대 10장 / TikTok 최대 35장
+          </p>
+        </label>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        >
+          <SortableContext items={photos.map(p => p.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+              {photos.map((photo, index) => (
+                <SortablePhoto
+                  key={photo.id}
+                  photo={photo}
+                  index={index}
+                  onRemove={() => removePhoto(photo.id)}
+                />
+              ))}
 
-        {/* 드래그 중 고스트 이미지 */}
-        <DragOverlay>
-          {activePhoto && <DragGhost photo={activePhoto} />}
-        </DragOverlay>
-      </DndContext>
+              {/* + 추가 버튼 */}
+              {canAddMore && (
+                <label
+                  htmlFor="photo-file-input"
+                  className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors border-[var(--card-border)] hover:border-brand hover:bg-brand/5"
+                >
+                  <Plus className="h-6 w-6 text-[var(--muted)]" />
+                  <span className="mt-1 text-[10px] text-[var(--muted)]">추가</span>
+                </label>
+              )}
+            </div>
+          </SortableContext>
+
+          {/* 드래그 중 고스트 이미지 */}
+          <DragOverlay>
+            {activePhoto && <DragGhost photo={activePhoto} />}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       {/* 숨겨진 파일 input */}
       <input
@@ -275,17 +348,17 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
       />
 
       {/* 안내 */}
-      <div className="mt-2 flex items-center justify-between text-xs text-[var(--muted)]">
-        <span>
-          드래그로 순서 변경 · 마우스 올리면 미리보기
-        </span>
-        <span className={cn(
-          'font-semibold',
-          photos.length >= maxCount ? 'text-red-400' : 'text-[var(--muted)]'
-        )}>
-          {photos.length} / {maxCount}장
-        </span>
-      </div>
+      {photos.length > 0 && (
+        <div className="mt-2 flex items-center justify-between text-xs text-[var(--muted)]">
+          <span>드래그로 순서 변경 · 마우스 올리면 미리보기</span>
+          <span className={cn(
+            'font-semibold',
+            photos.length >= maxCount ? 'text-red-400' : 'text-[var(--muted)]'
+          )}>
+            {photos.length} / {maxCount}장
+          </span>
+        </div>
+      )}
     </div>
   )
 }
