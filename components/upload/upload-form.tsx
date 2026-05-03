@@ -41,9 +41,23 @@ export function UploadForm({ connections }: UploadFormProps) {
   // 불러오기: 마운트 시 저장된 임시 데이터 복원
   useEffect(() => {
     try {
+      // 업로드 성공 플래그 확인 → 있으면 초기화 후 복원 안 함
+      if (localStorage.getItem(DRAFT_KEY + '_done')) {
+        localStorage.removeItem(DRAFT_KEY + '_done')
+        localStorage.removeItem(DRAFT_KEY)
+        return
+      }
+
       const saved = localStorage.getItem(DRAFT_KEY)
       if (!saved) return
       const draft = JSON.parse(saved)
+
+      // 24시간 지난 드래프트는 자동 삭제
+      if (draft.savedAt && Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(DRAFT_KEY)
+        return
+      }
+
       if (draft.title) setTitle(draft.title)
       if (draft.description) setDescription(draft.description)
       if (draft.tags) setTags(draft.tags)
@@ -53,7 +67,6 @@ export function UploadForm({ connections }: UploadFormProps) {
       // 썸네일 복원
       if (draft.thumbnailBase64) {
         setThumbnailPreview(draft.thumbnailBase64)
-        // base64 → File 변환
         fetch(draft.thumbnailBase64)
           .then(r => r.blob())
           .then(blob => {
@@ -72,6 +85,7 @@ export function UploadForm({ connections }: UploadFormProps) {
     try {
       const draft: Record<string, unknown> = {
         title, description, tags, visibility, videoType, selectedPlatforms,
+        savedAt: Date.now(),
       }
       // 썸네일 base64로 저장 (5MB 이하만)
       if (thumbnailPreview && thumbnailFile && thumbnailFile.size < 5 * 1024 * 1024) {
@@ -269,6 +283,7 @@ export function UploadForm({ connections }: UploadFormProps) {
           : 'https://studio.youtube.com'
         setUploadResult({ videoUrl })
         localStorage.removeItem(DRAFT_KEY)
+        localStorage.setItem(DRAFT_KEY + '_done', '1')
       }
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : '업로드 중 오류가 발생했습니다.')
