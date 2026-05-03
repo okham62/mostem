@@ -63,11 +63,24 @@ export function UploadForm({ connections }: UploadFormProps) {
     }
   }
 
-  const addTag = () => {
-    const trimmed = tagInput.trim().replace(/^#/, '')
-    if (trimmed && !tags.split(',').map(t => t.trim()).includes(trimmed)) {
-      setTags(prev => prev ? `${prev}, ${trimmed}` : trimmed)
-    }
+  const addTag = (input?: string) => {
+    const raw = (input ?? tagInput).trim()
+    if (!raw) return
+
+    // 쉼표로 여러 태그 한꺼번에 추가
+    const newTags = raw
+      .split(',')
+      .map(t => t.trim().replace(/^#/, '').trim())
+      .filter(Boolean)
+
+    if (newTags.length === 0) return
+
+    const existing = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : []
+    const merged = [...existing]
+    newTags.forEach(t => {
+      if (t && !merged.includes(t)) merged.push(t)
+    })
+    setTags(merged.join(', '))
     setTagInput('')
   }
 
@@ -323,13 +336,21 @@ export function UploadForm({ connections }: UploadFormProps) {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') { e.preventDefault(); addTag() }
-                  if (e.key === ',') { e.preventDefault(); addTag() }
                 }}
-                placeholder="#태그 입력 후 Enter"
+                onPaste={(e) => {
+                  // 붙여넣기할 때 쉼표 포함되면 자동으로 분리해서 추가
+                  const pasted = e.clipboardData.getData('text')
+                  if (pasted.includes(',')) {
+                    e.preventDefault()
+                    addTag(pasted)
+                  }
+                }}
+                placeholder="#태그1, #태그2, #태그3 — 한꺼번에 붙여넣기 가능"
                 className="flex-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               />
-              <Button type="button" variant="secondary" size="md" onClick={addTag}>추가</Button>
+              <Button type="button" variant="secondary" size="md" onClick={() => addTag()}>추가</Button>
             </div>
+            <p className="mt-1 text-xs text-[var(--muted)]">쉼표(,)로 구분해서 한 번에 여러 개 추가 가능</p>
             {tagList.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {tagList.map((tag) => (
