@@ -268,8 +268,12 @@ export function UploadForm({ connections }: UploadFormProps) {
           thumbForm.append('thumbnail', currentThumbnail)
           const thumbRes = await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm })
           if (!thumbRes.ok) {
-            console.warn('썸네일 업로드 실패:', await thumbRes.json().catch(() => ({})))
+            const thumbErr = await thumbRes.json().catch(() => ({}))
+            console.warn('썸네일 업로드 실패:', thumbErr)
+            setUploadError(`영상 업로드는 성공했지만 썸네일 오류: ${thumbErr.error || '알 수 없는 오류'}`)
           }
+        } else if (!currentThumbnail) {
+          console.log('썸네일 없음 - 건너뜀')
         }
 
         // Step 5: 업로드 기록 DB 저장

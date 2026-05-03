@@ -73,7 +73,6 @@ export async function POST(req: Request) {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': thumbnail.type || 'image/jpeg',
-        'Content-Length': thumbnail.size.toString(),
       },
       body: thumbBuffer,
     }
@@ -81,8 +80,9 @@ export async function POST(req: Request) {
 
   if (!thumbRes.ok) {
     const err = await thumbRes.json().catch(() => ({}))
-    console.error('Thumbnail upload error:', err)
-    return NextResponse.json({ error: '썸네일 업로드 실패' }, { status: 500 })
+    console.error('Thumbnail upload error:', JSON.stringify(err))
+    const reason = err?.error?.errors?.[0]?.reason || err?.error?.message || `HTTP ${thumbRes.status}`
+    return NextResponse.json({ error: `썸네일 오류: ${reason}`, detail: err }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })
