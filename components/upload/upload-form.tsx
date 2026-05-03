@@ -58,7 +58,7 @@ export function UploadForm({ connections }: UploadFormProps) {
 
       if (draft.title) setTitle(draft.title)
       if (draft.description) setDescription(draft.description)
-      if (draft.tags) setTags(draft.tags)
+      // tags는 항상 리셋 (복원하지 않음)
       if (draft.visibility) setVisibility(draft.visibility)
       if (draft.videoType) setVideoType(draft.videoType)
       if (draft.selectedConnectionIds) setSelectedConnectionIds(draft.selectedConnectionIds)
@@ -83,8 +83,9 @@ export function UploadForm({ connections }: UploadFormProps) {
     if (uploadResult) return
     try {
       const draft: Record<string, unknown> = {
-        title, description, tags, visibility, videoType, selectedConnectionIds,
+        title, description, visibility, videoType, selectedConnectionIds,
         savedAt: Date.now(),
+        // tags는 저장하지 않음 — 항상 빈 상태로 시작
       }
       // 썸네일 base64로 저장 (5MB 이하만)
       if (thumbnailPreview && thumbnailFile && thumbnailFile.size < 5 * 1024 * 1024) {
@@ -93,7 +94,7 @@ export function UploadForm({ connections }: UploadFormProps) {
       }
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
     } catch { /* 저장 실패 시 무시 */ }
-  }, [title, description, tags, visibility, videoType, selectedConnectionIds, thumbnailPreview, thumbnailFile, uploadResult])
+  }, [title, description, visibility, videoType, selectedConnectionIds, thumbnailPreview, thumbnailFile, uploadResult])
 
   const youtubeConnections = connections.filter(c => c.platform === 'youtube')
   const tiktokConnections  = connections.filter(c => c.platform === 'tiktok')
