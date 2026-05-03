@@ -7,6 +7,7 @@ import { Upload, X, ImageIcon, Sparkles, FileVideo, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { VideoType, PlatformConnection } from '@/types'
 import { TagPresetPicker } from './tag-preset-picker'
+import { DescriptionPresetPicker } from './description-preset-picker'
 
 interface UploadFormProps {
   connections: PlatformConnection[]
@@ -691,6 +692,13 @@ export function UploadForm({ connections }: UploadFormProps) {
           {/* 설명 */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">설명</label>
+
+            {/* 저장된 설명 세트 */}
+            <DescriptionPresetPicker
+              currentContent={description}
+              onApply={(content) => setDescription(content)}
+            />
+
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
