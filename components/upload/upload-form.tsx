@@ -260,7 +260,8 @@ export function UploadForm({ connections }: UploadFormProps) {
           }
         }
 
-        // Step 4: 썸네일 업로드 (videoId 있고 썸네일 선택된 경우)
+        // Step 4: 썸네일 업로드 (videoId 있고 썸네일 선택된 경우, YouTube 처리 대기)
+        await new Promise(r => setTimeout(r, 3000))
         const currentThumbnail = thumbnailFileRef.current
         if (finalVideoId && currentThumbnail) {
           const thumbForm = new FormData()

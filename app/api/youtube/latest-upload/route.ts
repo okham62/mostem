@@ -59,14 +59,25 @@ export async function GET() {
   const accessToken = await getValidAccessToken(connection)
   if (!accessToken) return NextResponse.json({ error: 'Token expired' }, { status: 401 })
 
-  // 최근 업로드한 영상 가져오기
-  const res = await fetch(
-    'https://www.googleapis.com/youtube/v3/search?part=snippet&forMine=true&type=video&order=date&maxResults=1',
+  // 1단계: 채널의 업로드 재생목록 ID 가져오기 (업로드 즉시 반영)
+  const channelRes = await fetch(
+    'https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true',
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
+  const channelData = await channelRes.json()
+  const uploadsPlaylistId = channelData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads
 
-  const data = await res.json()
-  const videoId = data.items?.[0]?.id?.videoId ?? null
+  if (!uploadsPlaylistId) {
+    return NextResponse.json({ videoId: null, error: '업로드 재생목록을 찾을 수 없음' })
+  }
+
+  // 2단계: 업로드 재생목록에서 최신 영상 가져오기
+  const playlistRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=1`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+  const playlistData = await playlistRes.json()
+  const videoId = playlistData.items?.[0]?.snippet?.resourceId?.videoId ?? null
 
   return NextResponse.json({ videoId })
 }
