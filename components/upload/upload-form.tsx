@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { PlatformCard } from './platform-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -36,6 +36,51 @@ export function UploadForm({ connections }: UploadFormProps) {
 
   const videoInputRef = useRef<HTMLInputElement>(null)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
+  const DRAFT_KEY = 'mostem_upload_draft'
+
+  // 불러오기: 마운트 시 저장된 임시 데이터 복원
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY)
+      if (!saved) return
+      const draft = JSON.parse(saved)
+      if (draft.title) setTitle(draft.title)
+      if (draft.description) setDescription(draft.description)
+      if (draft.tags) setTags(draft.tags)
+      if (draft.visibility) setVisibility(draft.visibility)
+      if (draft.videoType) setVideoType(draft.videoType)
+      if (draft.selectedPlatforms) setSelectedPlatforms(draft.selectedPlatforms)
+      // 썸네일 복원
+      if (draft.thumbnailBase64) {
+        setThumbnailPreview(draft.thumbnailBase64)
+        // base64 → File 변환
+        fetch(draft.thumbnailBase64)
+          .then(r => r.blob())
+          .then(blob => {
+            const file = new File([blob], draft.thumbnailName || 'thumbnail.jpg', { type: blob.type })
+            setThumbnailFile(file)
+          }).catch(() => {})
+      }
+    } catch { /* 복원 실패 시 무시 */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 자동저장: 값 바뀔 때마다 저장
+  useEffect(() => {
+    // 업로드 완료 후엔 저장 안 함
+    if (uploadResult) return
+    try {
+      const draft: Record<string, unknown> = {
+        title, description, tags, visibility, videoType, selectedPlatforms,
+      }
+      // 썸네일 base64로 저장 (5MB 이하만)
+      if (thumbnailPreview && thumbnailFile && thumbnailFile.size < 5 * 1024 * 1024) {
+        draft.thumbnailBase64 = thumbnailPreview
+        draft.thumbnailName = thumbnailFile.name
+      }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch { /* 저장 실패 시 무시 */ }
+  }, [title, description, tags, visibility, videoType, selectedPlatforms, thumbnailPreview, thumbnailFile, uploadResult])
 
   const connectedPlatforms = connections.map(c => c.platform)
   const availablePlatforms = videoType === 'long' ? ['youtube'] as Platform[] : PLATFORMS
@@ -147,6 +192,8 @@ export function UploadForm({ connections }: UploadFormProps) {
           const data = await res.json()
           setUploadProgress(prev => ({ ...prev, youtube: 100 }))
           setUploadResult({ videoUrl: data.videoUrl })
+          // 업로드 성공 시 임시저장 삭제
+          localStorage.removeItem(DRAFT_KEY)
         } else {
           const err = await res.json()
           setUploadError(err.error || 'YouTube 업로드 실패')

@@ -9,12 +9,19 @@ async function getValidAccessToken(connection: {
   id: string
   access_token: string
   refresh_token: string | null
-  expires_at: number | null
+  expires_at: string | number | null
 }): Promise<string | null> {
   const now = Math.floor(Date.now() / 1000)
 
+  // expires_at이 ISO 문자열이면 Unix 타임스탬프로 변환
+  const expiresAtUnix = connection.expires_at
+    ? typeof connection.expires_at === 'string'
+      ? Math.floor(new Date(connection.expires_at).getTime() / 1000)
+      : connection.expires_at
+    : null
+
   // 토큰이 아직 유효하면 그대로 사용
-  if (connection.expires_at && connection.expires_at > now + 60) {
+  if (expiresAtUnix && expiresAtUnix > now + 60) {
     return connection.access_token
   }
 
@@ -67,14 +74,14 @@ export async function POST(req: Request) {
 
   // platform_connections에서 채널 토큰 가져오기
   const supabase = createAdminClient()
-  const query = supabase
+  let query = supabase
     .from('platform_connections')
     .select('id, access_token, refresh_token, expires_at, channel_id')
     .eq('user_id', session.user.id)
     .eq('platform', 'youtube')
 
   if (channelId) {
-    query.eq('channel_id', channelId)
+    query = query.eq('channel_id', channelId)
   }
 
   const { data: connections } = await query.limit(1).single()
