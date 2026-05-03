@@ -11,8 +11,104 @@ interface TagPreset {
 }
 
 interface TagPresetPickerProps {
-  currentTags: string[]        // 현재 폼에 입력된 태그 배열
-  onApply: (tags: string[]) => void  // 태그 병합 콜백
+  currentTags: string[]
+  onApply: (tags: string[]) => void
+}
+
+// 개별 프리셋 칩 — 호버 툴팁 포함
+function PresetChip({
+  preset,
+  isApplied,
+  onApply,
+  onDelete,
+}: {
+  preset: TagPreset
+  isApplied: boolean
+  onApply: () => void
+  onDelete: (e: React.MouseEvent) => void
+}) {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleMouseEnter = () => {
+    hoverTimer.current = setTimeout(() => setShowTooltip(true), 300)
+  }
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    setShowTooltip(false)
+  }
+
+  // 툴팁에 보여줄 태그 (최대 10개 + 나머지 개수)
+  const PREVIEW_MAX = 10
+  const visibleTags = preset.tags.slice(0, PREVIEW_MAX)
+  const hiddenCount = preset.tags.length - PREVIEW_MAX
+
+  return (
+    <div
+      className="group relative flex items-stretch"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* 클릭 영역 (적용) */}
+      <button
+        type="button"
+        onClick={onApply}
+        className={cn(
+          'flex items-center gap-1.5 rounded-l-full border py-1 pl-3 pr-2 text-xs font-medium transition-all active:scale-95',
+          isApplied
+            ? 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400'
+            : 'border-[var(--card-border)] text-[var(--foreground)] hover:border-brand hover:bg-brand/5 hover:text-brand'
+        )}
+      >
+        {isApplied && <Check className="h-3 w-3 shrink-0" />}
+        <span>{preset.name}</span>
+        <span className="text-[10px] opacity-60">({preset.tags.length})</span>
+      </button>
+
+      {/* 삭제 버튼 (호버 시 표시) */}
+      <button
+        type="button"
+        onClick={onDelete}
+        title="세트 삭제"
+        className={cn(
+          'flex items-center rounded-r-full border border-l-0 px-1.5 transition-all',
+          'border-[var(--card-border)] text-[var(--muted)]',
+          'opacity-0 group-hover:opacity-100',
+          'hover:border-red-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20'
+        )}
+      >
+        <X className="h-2.5 w-2.5" />
+      </button>
+
+      {/* 호버 툴팁 — 태그 미리보기 */}
+      {showTooltip && preset.tags.length > 0 && (
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 shadow-xl">
+          {/* 말풍선 꼬리 */}
+          <div className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 border-b border-r border-[var(--card-border)] bg-[var(--card-bg)]" />
+
+          <p className="mb-2 text-[11px] font-semibold text-[var(--muted)]">
+            {preset.name} · 태그 {preset.tags.length}개
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {visibleTags.map(tag => (
+              <span
+                key={tag}
+                className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand"
+              >
+                #{tag}
+              </span>
+            ))}
+            {hiddenCount > 0 && (
+              <span className="rounded-full bg-[var(--muted-bg)] px-2 py-0.5 text-[11px] text-[var(--muted)]">
+                +{hiddenCount}개 더
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-[10px] text-[var(--muted)]">클릭하면 현재 태그에 추가됩니다</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function TagPresetPicker({ currentTags, onApply }: TagPresetPickerProps) {
@@ -36,14 +132,12 @@ export function TagPresetPicker({ currentTags, onApply }: TagPresetPickerProps) 
     if (showNameInput) nameInputRef.current?.focus()
   }, [showNameInput])
 
-  // 프리셋 적용 (현재 태그와 병합, 중복 제외)
   const handleApply = (preset: TagPreset) => {
     onApply(preset.tags)
     setAppliedId(preset.id)
     setTimeout(() => setAppliedId(null), 1500)
   }
 
-  // 프리셋 저장
   const handleSave = async () => {
     if (!newName.trim() || currentTags.length === 0 || saving) return
     setSaving(true)
@@ -60,13 +154,12 @@ export function TagPresetPicker({ currentTags, onApply }: TagPresetPickerProps) 
         setShowNameInput(false)
       }
     } catch {
-      // 저장 실패 무시
+      //
     } finally {
       setSaving(false)
     }
   }
 
-  // 프리셋 삭제 (낙관적 업데이트)
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setPresets(prev => prev.filter(p => p.id !== id))
@@ -136,50 +229,22 @@ export function TagPresetPicker({ currentTags, onApply }: TagPresetPickerProps) 
         </div>
       ) : presets.length === 0 ? (
         <p className="text-xs text-[var(--muted)]">
-          아직 저장된 세트가 없어요. 태그를 입력하고 <span className="font-semibold text-brand">+ 현재 저장</span>을 눌러보세요.
+          아직 저장된 세트가 없어요.{' '}
+          태그를 입력하고{' '}
+          <span className="font-semibold text-brand">+ 현재 저장</span>
+          을 눌러보세요.
         </p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
-          {presets.map(preset => {
-            const isApplied = appliedId === preset.id
-            return (
-              <div key={preset.id} className="group flex items-stretch">
-                {/* 클릭 영역 (적용) */}
-                <button
-                  type="button"
-                  onClick={() => handleApply(preset)}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-l-full border py-1 pl-3 pr-2 text-xs font-medium transition-all active:scale-95',
-                    isApplied
-                      ? 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400'
-                      : 'border-[var(--card-border)] text-[var(--foreground)] hover:border-brand hover:bg-brand/5 hover:text-brand'
-                  )}
-                >
-                  {isApplied
-                    ? <Check className="h-3 w-3 shrink-0" />
-                    : null
-                  }
-                  <span>{preset.name}</span>
-                  <span className="text-[10px] opacity-60">({preset.tags.length})</span>
-                </button>
-
-                {/* 삭제 버튼 (호버 시 표시) */}
-                <button
-                  type="button"
-                  onClick={e => handleDelete(preset.id, e)}
-                  title="세트 삭제"
-                  className={cn(
-                    'flex items-center rounded-r-full border border-l-0 px-1.5 transition-all',
-                    'border-[var(--card-border)] text-[var(--muted)]',
-                    'opacity-0 group-hover:opacity-100',
-                    'hover:border-red-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20'
-                  )}
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              </div>
-            )
-          })}
+          {presets.map(preset => (
+            <PresetChip
+              key={preset.id}
+              preset={preset}
+              isApplied={appliedId === preset.id}
+              onApply={() => handleApply(preset)}
+              onDelete={e => handleDelete(preset.id, e)}
+            />
+          ))}
         </div>
       )}
     </div>
