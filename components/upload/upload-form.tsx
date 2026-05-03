@@ -34,52 +34,72 @@ export function UploadForm({ connections }: UploadFormProps) {
   const [uploadResult, setUploadResult] = useState<{ results: { channelName: string; videoUrl: string }[] } | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
+  // 복원 모달
+  const [showRestoreModal, setShowRestoreModal] = useState(false)
+  const [pendingDraft, setPendingDraft] = useState<Record<string, unknown> | null>(null)
 
   const videoInputRef = useRef<HTMLInputElement>(null)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
-  const thumbnailFileRef = useRef<File | null>(null)  // 항상 최신 thumbnailFile 참조
+  const thumbnailFileRef = useRef<File | null>(null)
   const DRAFT_KEY = 'mostem_upload_draft'
 
-  // 불러오기: 마운트 시 저장된 임시 데이터 복원
+  // 마운트 시: 저장된 드래프트 있으면 복원 여부 묻기
   useEffect(() => {
     try {
-      // 업로드 성공 플래그 확인 → 있으면 초기화 후 복원 안 함
       if (localStorage.getItem(DRAFT_KEY + '_done')) {
         localStorage.removeItem(DRAFT_KEY + '_done')
         localStorage.removeItem(DRAFT_KEY)
         return
       }
-
       const saved = localStorage.getItem(DRAFT_KEY)
       if (!saved) return
       const draft = JSON.parse(saved)
 
-      // 24시간 지난 드래프트는 자동 삭제
       if (draft.savedAt && Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
         localStorage.removeItem(DRAFT_KEY)
         return
       }
 
-      if (draft.title) setTitle(draft.title)
-      if (draft.description) setDescription(draft.description)
-      // tags는 항상 리셋 (복원하지 않음)
-      if (draft.visibility) setVisibility(draft.visibility)
-      if (draft.videoType) setVideoType(draft.videoType)
-      if (draft.selectedConnectionIds) setSelectedConnectionIds(draft.selectedConnectionIds)
-      // 썸네일 복원
-      if (draft.thumbnailBase64) {
-        setThumbnailPreview(draft.thumbnailBase64)
-        fetch(draft.thumbnailBase64)
-          .then(r => r.blob())
-          .then(blob => {
-            const file = new File([blob], draft.thumbnailName || 'thumbnail.jpg', { type: blob.type })
-            thumbnailFileRef.current = file
-            setThumbnailFile(file)
-          }).catch(() => {})
-      }
-    } catch { /* 복원 실패 시 무시 */ }
+      // 의미 있는 내용이 있을 때만 모달 표시
+      const hasContent = draft.title || draft.description || draft.thumbnailBase64
+      if (!hasContent) return
+
+      setPendingDraft(draft)
+      setShowRestoreModal(true)
+    } catch { /* 무시 */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 드래프트 복원 (예 클릭)
+  const applyDraft = (draft: Record<string, unknown>) => {
+    if (draft.title) setTitle(draft.title as string)
+    if (draft.description) setDescription(draft.description as string)
+    if (draft.visibility) setVisibility(draft.visibility as typeof visibility)
+    if (draft.videoType) setVideoType(draft.videoType as VideoType)
+    if (draft.selectedConnectionIds) setSelectedConnectionIds(draft.selectedConnectionIds as string[])
+    if (draft.thumbnailBase64) {
+      setThumbnailPreview(draft.thumbnailBase64 as string)
+      fetch(draft.thumbnailBase64 as string)
+        .then(r => r.blob())
+        .then(blob => {
+          const file = new File([blob], (draft.thumbnailName as string) || 'thumbnail.jpg', { type: blob.type })
+          thumbnailFileRef.current = file
+          setThumbnailFile(file)
+        }).catch(() => {})
+    }
+  }
+
+  const handleRestoreYes = () => {
+    if (pendingDraft) applyDraft(pendingDraft)
+    setPendingDraft(null)
+    setShowRestoreModal(false)
+  }
+
+  const handleRestoreNo = () => {
+    localStorage.removeItem(DRAFT_KEY)
+    setPendingDraft(null)
+    setShowRestoreModal(false)
+  }
 
   // 자동저장: 값 바뀔 때마다 저장
   useEffect(() => {
@@ -367,6 +387,66 @@ export function UploadForm({ connections }: UploadFormProps) {
   const maxDesc = 5000  // 단순화 (YouTube 기준)
 
   return (
+    <>
+    {/* 드래프트 복원 확인 모달 */}
+    {showRestoreModal && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        {/* 배경 블러 */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+        {/* 모달 카드 */}
+        <div className="relative w-full max-w-sm rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-2xl">
+          {/* 아이콘 */}
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-brand/10">
+            <svg className="h-6 w-6 text-brand" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+            </svg>
+          </div>
+
+          <h3 className="mb-1.5 text-base font-bold text-[var(--foreground)]">
+            이전 작업을 불러올까요?
+          </h3>
+          <p className="mb-5 text-sm text-[var(--muted)]">
+            작성 중이던 제목, 설명, 설정이 저장되어 있어요.
+            이어서 작업하시겠어요?
+          </p>
+
+          {/* 저장된 내용 미리보기 */}
+          {pendingDraft && (pendingDraft.title || pendingDraft.description) && (
+            <div className="mb-5 rounded-xl bg-[var(--muted-bg)] p-3 text-xs text-[var(--muted)]">
+              {pendingDraft.title ? (
+                <p className="truncate font-semibold text-[var(--foreground)]">
+                  제목: {String(pendingDraft.title)}
+                </p>
+              ) : null}
+              {pendingDraft.description ? (
+                <p className="mt-0.5 line-clamp-2 leading-relaxed">
+                  {String(pendingDraft.description)}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleRestoreNo}
+              className="flex-1 rounded-xl border border-[var(--card-border)] py-2.5 text-sm font-semibold text-[var(--muted)] transition-colors hover:border-red-400 hover:text-red-400"
+            >
+              아니요, 새로 시작
+            </button>
+            <button
+              type="button"
+              onClick={handleRestoreYes}
+              className="flex-1 rounded-xl bg-brand py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              예, 불러오기
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* 1단계: 미디어 타입 선택 */}
       <Card>
@@ -978,5 +1058,6 @@ export function UploadForm({ connections }: UploadFormProps) {
           : `${selectedConnectionIds.length}개 채널에 업로드`}
       </Button>
     </form>
+    </>
   )
 }
