@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { PlatformCard } from './platform-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { PLATFORM_LIMITS } from '@/lib/utils'
 import { Upload, X, ImageIcon, Sparkles, FileVideo } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Platform, VideoType, PlatformConnection } from '@/types'
@@ -13,11 +12,9 @@ interface UploadFormProps {
   connections: PlatformConnection[]
 }
 
-const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram']
-
 export function UploadForm({ connections }: UploadFormProps) {
   const [videoType, setVideoType] = useState<VideoType>('short')
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([])
+  const [selectedConnectionIds, setSelectedConnectionIds] = useState<string[]>([])
   const [videoFile, setVideoFile] = useState<File | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
@@ -29,8 +26,8 @@ export function UploadForm({ connections }: UploadFormProps) {
   const [visibility, setVisibility] = useState<'public' | 'unlisted' | 'private'>('public')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState<Record<Platform, number>>({} as Record<Platform, number>)
-  const [uploadResult, setUploadResult] = useState<{ videoUrl: string } | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
+  const [uploadResult, setUploadResult] = useState<{ results: { channelName: string; videoUrl: string }[] } | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
 
@@ -64,7 +61,7 @@ export function UploadForm({ connections }: UploadFormProps) {
       if (draft.tags) setTags(draft.tags)
       if (draft.visibility) setVisibility(draft.visibility)
       if (draft.videoType) setVideoType(draft.videoType)
-      if (draft.selectedPlatforms) setSelectedPlatforms(draft.selectedPlatforms)
+      if (draft.selectedConnectionIds) setSelectedConnectionIds(draft.selectedConnectionIds)
       // 썸네일 복원
       if (draft.thumbnailBase64) {
         setThumbnailPreview(draft.thumbnailBase64)
@@ -86,7 +83,7 @@ export function UploadForm({ connections }: UploadFormProps) {
     if (uploadResult) return
     try {
       const draft: Record<string, unknown> = {
-        title, description, tags, visibility, videoType, selectedPlatforms,
+        title, description, tags, visibility, videoType, selectedConnectionIds,
         savedAt: Date.now(),
       }
       // 썸네일 base64로 저장 (5MB 이하만)
@@ -96,14 +93,13 @@ export function UploadForm({ connections }: UploadFormProps) {
       }
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
     } catch { /* 저장 실패 시 무시 */ }
-  }, [title, description, tags, visibility, videoType, selectedPlatforms, thumbnailPreview, thumbnailFile, uploadResult])
+  }, [title, description, tags, visibility, videoType, selectedConnectionIds, thumbnailPreview, thumbnailFile, uploadResult])
 
-  const connectedPlatforms = connections.map(c => c.platform)
-  const availablePlatforms = videoType === 'long' ? ['youtube'] as Platform[] : PLATFORMS
+  const youtubeConnections = connections.filter(c => c.platform === 'youtube')
 
-  const togglePlatform = (platform: Platform) => {
-    setSelectedPlatforms(prev =>
-      prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]
+  const toggleConnectionId = (id: string) => {
+    setSelectedConnectionIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     )
   }
 
@@ -159,7 +155,7 @@ export function UploadForm({ connections }: UploadFormProps) {
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, platforms: selectedPlatforms, type: videoType }),
+        body: JSON.stringify({ title, type: videoType }),
       })
       const data = await res.json()
       if (data.description) setDescription(data.description)
@@ -173,135 +169,163 @@ export function UploadForm({ connections }: UploadFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!videoFile || selectedPlatforms.length === 0) return
+    if (!videoFile || selectedConnectionIds.length === 0) return
     setIsUploading(true)
     setUploadError(null)
     setUploadResult(null)
 
-    const initial = {} as Record<Platform, number>
-    selectedPlatforms.forEach(p => (initial[p] = 0))
+    // 선택된 YouTube 연결 목록
+    const selectedYoutubeConns = connections.filter(
+      c => c.platform === 'youtube' && selectedConnectionIds.includes(c.id)
+    )
+
+    const initial: Record<string, number> = {}
+    selectedYoutubeConns.forEach(c => (initial[c.id] = 0))
     setUploadProgress(initial)
 
+    const tagList2 = tags.split(',').map(t => t.trim()).filter(Boolean)
+
+    // 채널 1개당 업로드 처리 함수
+    const uploadToChannel = async (conn: PlatformConnection): Promise<{ channelName: string; videoUrl: string } | { error: string }> => {
+      // Step 1: 업로드 URL 발급
+      const urlRes = await fetch('/api/youtube/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          tags: tagList2,
+          visibility,
+          channelId: conn.channel_id,
+          fileSize: videoFile.size,
+          fileType: videoFile.type || 'video/mp4',
+        }),
+      })
+
+      if (!urlRes.ok) {
+        const err = await urlRes.json().catch(() => ({ error: '업로드 URL 요청 실패' }))
+        return { error: `(${conn.channel_name}): ${err.error}` }
+      }
+
+      const { uploadUrl } = await urlRes.json()
+
+      // Step 2: YouTube에 직접 업로드
+      let uploadedPct = 0
+      const videoData = await new Promise<{ id: string | null }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            uploadedPct = Math.min(99, Math.round((e.loaded / e.total) * 100))
+            setUploadProgress(prev => ({ ...prev, [conn.id]: uploadedPct }))
+          }
+        })
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)) }
+            catch { resolve({ id: null }) }
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText)
+              const reason = err?.error?.errors?.[0]?.reason || err?.error?.message || `${xhr.status}`
+              reject(new Error(`YouTube 업로드 실패: ${reason}`))
+            } catch {
+              reject(new Error(`YouTube 업로드 실패 (${xhr.status})`))
+            }
+          }
+        })
+        xhr.addEventListener('error', () => {
+          if (uploadedPct >= 90) resolve({ id: null })
+          else reject(new Error('네트워크 오류'))
+        })
+        xhr.addEventListener('abort', () => reject(new Error('업로드 취소')))
+        xhr.open('PUT', uploadUrl)
+        xhr.setRequestHeader('Content-Type', videoFile.type || 'video/mp4')
+        xhr.send(videoFile)
+      })
+
+      setUploadProgress(prev => ({ ...prev, [conn.id]: 100 }))
+
+      // Step 3: videoId 확인
+      let finalVideoId = videoData.id
+      if (!finalVideoId) {
+        const latestRes = await fetch('/api/youtube/latest-upload')
+        if (latestRes.ok) {
+          const latest = await latestRes.json()
+          finalVideoId = latest.videoId ?? null
+        }
+      }
+
+      // Step 4: 썸네일 업로드 (재시도 4회)
+      const currentThumbnail = thumbnailFileRef.current
+      const thumbErrors: string[] = []
+      if (finalVideoId && currentThumbnail) {
+        let thumbSuccess = false
+        for (let attempt = 0; attempt < 4; attempt++) {
+          await new Promise(r => setTimeout(r, attempt === 0 ? 5000 : 8000))
+          const thumbForm = new FormData()
+          thumbForm.append('videoId', finalVideoId)
+          thumbForm.append('thumbnail', currentThumbnail)
+          const thumbRes = await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm })
+          if (thumbRes.ok) { thumbSuccess = true; break }
+          const thumbErr = await thumbRes.json().catch(() => ({}))
+          console.warn(`(${conn.channel_name}) 썸네일 시도 ${attempt + 1}/4 실패:`, thumbErr)
+        }
+        if (!thumbSuccess) thumbErrors.push(`(${conn.channel_name}) 썸네일 업로드 실패`)
+      }
+
+      // Step 5: DB 저장
+      await fetch('/api/youtube/save-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoId: finalVideoId,
+          title, description,
+          tags: tagList2,
+          videoType,
+        }),
+      })
+
+      const result = {
+        channelName: conn.channel_name,
+        videoUrl: finalVideoId ? `https://www.youtube.com/watch?v=${finalVideoId}` : 'https://studio.youtube.com',
+      }
+
+      // 썸네일 오류가 있으면 result에 덧붙임 (업로드 자체는 성공)
+      return thumbErrors.length > 0
+        ? { ...result, thumbError: thumbErrors[0] }
+        : result
+    }
+
     try {
-      if (selectedPlatforms.includes('youtube')) {
-        // Step 1: 서버에서 YouTube 업로드 URL 발급 (메타데이터만 전송)
-        const urlRes = await fetch('/api/youtube/upload-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            description,
-            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-            visibility,
-            fileSize: videoFile.size,
-            fileType: videoFile.type || 'video/mp4',
-          }),
-        })
+      // 모든 채널 동시 업로드
+      const settled = await Promise.allSettled(
+        selectedYoutubeConns.map(conn => uploadToChannel(conn))
+      )
 
-        if (!urlRes.ok) {
-          const err = await urlRes.json().catch(() => ({ error: '업로드 URL 요청 실패' }))
-          setUploadError(err.error || '업로드 URL 요청 실패')
-          return
-        }
+      const results: { channelName: string; videoUrl: string }[] = []
+      const errors: string[] = []
 
-        const { uploadUrl } = await urlRes.json()
-
-        // Step 2: 브라우저에서 YouTube로 직접 업로드 (실시간 진행률)
-        let uploadedPct = 0
-        const videoData = await new Promise<{ id: string | null }>((resolve, reject) => {
-          const xhr = new XMLHttpRequest()
-
-          xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-              uploadedPct = Math.min(99, Math.round((e.loaded / e.total) * 100))
-              setUploadProgress(prev => ({ ...prev, youtube: uploadedPct }))
-            }
-          })
-
-          xhr.addEventListener('load', () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try { resolve(JSON.parse(xhr.responseText)) }
-              catch { resolve({ id: null }) }
-            } else {
-              try {
-                const err = JSON.parse(xhr.responseText)
-                const reason = err?.error?.errors?.[0]?.reason || err?.error?.message || `${xhr.status}`
-                reject(new Error(`YouTube 업로드 실패: ${reason}`))
-              } catch {
-                reject(new Error(`YouTube 업로드 실패 (${xhr.status})`))
-              }
-            }
-          })
-
-          // 네트워크 오류 또는 CORS 오류: 90% 이상이면 업로드 성공으로 처리
-          xhr.addEventListener('error', () => {
-            if (uploadedPct >= 90) {
-              resolve({ id: null })
-            } else {
-              reject(new Error('네트워크 오류가 발생했습니다.'))
-            }
-          })
-          xhr.addEventListener('abort', () => reject(new Error('업로드가 취소됐습니다.')))
-
-          xhr.open('PUT', uploadUrl)
-          xhr.setRequestHeader('Content-Type', videoFile.type || 'video/mp4')
-          xhr.send(videoFile)
-        })
-
-        setUploadProgress(prev => ({ ...prev, youtube: 100 }))
-
-        // Step 3: videoId 확인 (CORS로 못 받은 경우 서버에서 최근 업로드 조회)
-        let finalVideoId = videoData.id
-        if (!finalVideoId) {
-          const latestRes = await fetch('/api/youtube/latest-upload')
-          if (latestRes.ok) {
-            const latest = await latestRes.json()
-            finalVideoId = latest.videoId ?? null
+      settled.forEach((s) => {
+        if (s.status === 'fulfilled') {
+          const val = s.value
+          if ('error' in val && !('videoUrl' in val)) {
+            errors.push(val.error)
+          } else {
+            results.push({ channelName: (val as { channelName: string; videoUrl: string }).channelName, videoUrl: (val as { channelName: string; videoUrl: string }).videoUrl })
+            if ('thumbError' in val) errors.push((val as { thumbError: string }).thumbError)
           }
+        } else {
+          errors.push(s.reason instanceof Error ? s.reason.message : '알 수 없는 오류')
         }
+      })
 
-        // Step 4: 썸네일 업로드 (최대 4회 재시도, 5초 간격)
-        const currentThumbnail = thumbnailFileRef.current
-        if (finalVideoId && currentThumbnail) {
-          let thumbSuccess = false
-          for (let attempt = 0; attempt < 4; attempt++) {
-            await new Promise(r => setTimeout(r, attempt === 0 ? 5000 : 8000))
-            const thumbForm = new FormData()
-            thumbForm.append('videoId', finalVideoId)
-            thumbForm.append('thumbnail', currentThumbnail)
-            const thumbRes = await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm })
-            if (thumbRes.ok) {
-              thumbSuccess = true
-              break
-            }
-            const thumbErr = await thumbRes.json().catch(() => ({}))
-            console.warn(`썸네일 시도 ${attempt + 1}/4 실패 (videoId: ${finalVideoId}):`, thumbErr)
-            if (attempt === 3) {
-              setUploadError(`영상 업로드는 성공했지만 썸네일 오류: ${thumbErr.error || '알 수 없는 오류'} (videoId: ${finalVideoId})`)
-            }
-          }
-          if (!thumbSuccess) console.warn('썸네일 업로드 최종 실패')
-        }
-
-        // Step 5: 업로드 기록 DB 저장
-        await fetch('/api/youtube/save-upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoId: finalVideoId,
-            title,
-            description,
-            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-            videoType,
-          }),
-        })
-
-        const videoUrl = finalVideoId
-          ? `https://www.youtube.com/watch?v=${finalVideoId}`
-          : 'https://studio.youtube.com'
-        setUploadResult({ videoUrl })
+      if (results.length > 0) {
+        setUploadResult({ results })
         localStorage.removeItem(DRAFT_KEY)
         localStorage.setItem(DRAFT_KEY + '_done', '1')
+      }
+      if (errors.length > 0) {
+        setUploadError(errors.join('\n'))
       }
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : '업로드 중 오류가 발생했습니다.')
@@ -311,9 +335,7 @@ export function UploadForm({ connections }: UploadFormProps) {
   }
 
   const tagList = tags.split(',').map(t => t.trim()).filter(Boolean)
-  const maxDesc = selectedPlatforms.length > 0
-    ? Math.min(...selectedPlatforms.map(p => PLATFORM_LIMITS[p].description))
-    : 5000
+  const maxDesc = 5000  // 단순화 (YouTube 기준)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -330,7 +352,7 @@ export function UploadForm({ connections }: UploadFormProps) {
               type="button"
               onClick={() => {
                 setVideoType(type)
-                setSelectedPlatforms([])
+                setSelectedConnectionIds([])
               }}
               className={cn(
                 'flex-1 rounded-xl border-2 py-3.5 text-sm font-medium transition-all active:scale-95',
@@ -357,20 +379,72 @@ export function UploadForm({ connections }: UploadFormProps) {
           <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">2</span>
           업로드 플랫폼
         </p>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {PLATFORMS.map((platform) => (
-            <PlatformCard
-              key={platform}
-              platform={platform}
-              isSelected={selectedPlatforms.includes(platform)}
-              isConnected={connectedPlatforms.includes(platform)}
-              isDisabled={!availablePlatforms.includes(platform)}
-              onToggle={() => togglePlatform(platform)}
-            />
-          ))}
-        </div>
-        {selectedPlatforms.length === 0 && (
-          <p className="mt-2 text-xs text-[var(--muted)]">업로드할 플랫폼을 1개 이상 선택하세요.</p>
+
+        {/* YouTube 채널들 */}
+        {youtubeConnections.length > 0 && (
+          <div className="mb-3">
+            <p className="mb-2 text-xs font-medium text-[var(--muted)]">YouTube 채널</p>
+            <div className="flex flex-wrap gap-2">
+              {youtubeConnections.map((conn) => {
+                const isSelected = selectedConnectionIds.includes(conn.id)
+                return (
+                  <button
+                    key={conn.id}
+                    type="button"
+                    onClick={() => toggleConnectionId(conn.id)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all active:scale-95',
+                      isSelected
+                        ? 'border-red-500 bg-red-500/10 text-red-500'
+                        : 'border-[var(--card-border)] text-[var(--muted)] hover:border-red-400 hover:text-[var(--foreground)]'
+                    )}
+                  >
+                    <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill={isSelected ? '#ef4444' : 'currentColor'}>
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    <span>({conn.channel_name})</span>
+                    {isSelected && <span className="ml-1 text-xs">✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* YouTube 채널 없을 때 */}
+        {youtubeConnections.length === 0 && (
+          <div className="mb-3 rounded-xl border border-dashed border-[var(--card-border)] p-4 text-center text-sm text-[var(--muted)]">
+            연결된 YouTube 채널이 없습니다. <a href="/dashboard/connections" className="text-brand underline">채널 연결하기</a>
+          </div>
+        )}
+
+        {/* TikTok / Instagram (쇼폼만) */}
+        {videoType === 'short' && (
+          <div>
+            {youtubeConnections.length > 0 && <div className="mb-2 border-t border-[var(--card-border)] pt-3" />}
+            <p className="mb-2 text-xs font-medium text-[var(--muted)]">기타 플랫폼</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {(['tiktok', 'instagram'] as Platform[]).map((platform) => {
+                const conn = connections.find(c => c.platform === platform)
+                const isConnected = !!conn
+                const isSelected = conn ? selectedConnectionIds.includes(conn.id) : false
+                return (
+                  <PlatformCard
+                    key={platform}
+                    platform={platform}
+                    isSelected={isSelected}
+                    isConnected={isConnected}
+                    isDisabled={!isConnected}
+                    onToggle={() => conn && toggleConnectionId(conn.id)}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {selectedConnectionIds.length === 0 && (
+          <p className="mt-2 text-xs text-[var(--muted)]">업로드할 채널/플랫폼을 1개 이상 선택하세요.</p>
         )}
       </Card>
 
@@ -474,7 +548,6 @@ export function UploadForm({ connections }: UploadFormProps) {
             />
             <p className="mt-1 text-right text-[11px] text-[var(--muted)]">
               {description.length}/{maxDesc}
-              {selectedPlatforms.length > 0 && ' (선택한 플랫폼 중 최소값)'}
             </p>
           </div>
 
@@ -578,22 +651,22 @@ export function UploadForm({ connections }: UploadFormProps) {
         <Card>
           <p className="mb-3 text-sm font-semibold text-[var(--foreground)]">업로드 진행률</p>
           <div className="space-y-3">
-            {(Object.entries(uploadProgress) as [Platform, number][]).map(([platform, progress]) => (
-              <div key={platform}>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="font-medium text-[var(--foreground)]">
-                    {platform === 'youtube' ? 'YouTube' : platform === 'tiktok' ? 'TikTok' : 'Instagram'}
-                  </span>
-                  <span className="text-[var(--muted)]">{Math.round(progress)}%</span>
+            {Object.entries(uploadProgress).map(([connId, progress]) => {
+              const conn = connections.find(c => c.id === connId)
+              return (
+                <div key={connId}>
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span className="font-medium text-[var(--foreground)]">
+                      YouTube ({conn?.channel_name ?? connId})
+                    </span>
+                    <span className="text-[var(--muted)]">{Math.round(progress)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--muted-bg)]">
+                    <div className="h-full rounded-full bg-brand transition-all duration-300" style={{ width: `${progress}%` }} />
+                  </div>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--muted-bg)]">
-                  <div
-                    className="h-full rounded-full bg-brand transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </Card>
       )}
@@ -608,15 +681,17 @@ export function UploadForm({ connections }: UploadFormProps) {
       {/* 업로드 성공 */}
       {uploadResult && (
         <div className="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
-          <p className="text-sm font-semibold text-green-700 dark:text-green-400">✅ 업로드 완료!</p>
-          <a
-            href={uploadResult.videoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1 block truncate text-sm text-brand underline"
-          >
-            {uploadResult.videoUrl}
-          </a>
+          <p className="mb-2 text-sm font-semibold text-green-700 dark:text-green-400">✅ 업로드 완료!</p>
+          <div className="space-y-1">
+            {uploadResult.results.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span className="text-green-600 dark:text-green-400">({r.channelName})</span>
+                <a href={r.videoUrl} target="_blank" rel="noopener noreferrer" className="truncate text-brand underline">
+                  {r.videoUrl}
+                </a>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -625,15 +700,15 @@ export function UploadForm({ connections }: UploadFormProps) {
         type="submit"
         size="lg"
         className="w-full"
-        disabled={!videoFile || selectedPlatforms.length === 0 || !title || !!uploadResult}
+        disabled={!videoFile || selectedConnectionIds.length === 0 || !title || !!uploadResult}
         loading={isUploading}
       >
         <Upload className="h-4 w-4" />
         {isUploading
-          ? 'YouTube에 업로드 중...'
+          ? '업로드 중...'
           : uploadResult
           ? '업로드 완료'
-          : `${selectedPlatforms.length}개 플랫폼에 업로드`}
+          : `${selectedConnectionIds.length}개 채널에 업로드`}
       </Button>
     </form>
   )
