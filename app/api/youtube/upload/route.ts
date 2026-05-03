@@ -42,7 +42,7 @@ async function getValidAccessToken(connection: {
     .from('platform_connections')
     .update({
       access_token: data.access_token,
-      expires_at: Math.floor(Date.now() / 1000) + (data.expires_in ?? 3600),
+      expires_at: new Date((Math.floor(Date.now() / 1000) + (data.expires_in ?? 3600)) * 1000).toISOString(),
     })
     .eq('id', connection.id)
 

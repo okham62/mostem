@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     channel_name: channelName,
     access_token: oauthData.accessToken,
     refresh_token: oauthData.refreshToken,
-    expires_at: oauthData.expiresAt,
+    expires_at: new Date(oauthData.expiresAt * 1000).toISOString(),
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
