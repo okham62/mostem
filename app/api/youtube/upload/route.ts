@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { logActivity } from '@/lib/log'
 
 export const maxDuration = 300
+export const dynamic = 'force-dynamic'
 
 async function getValidAccessToken(connection: {
   id: string

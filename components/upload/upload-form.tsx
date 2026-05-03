@@ -166,41 +166,83 @@ export function UploadForm({ connections }: UploadFormProps) {
     setUploadProgress(initial)
 
     try {
-      // YouTube 업로드
       if (selectedPlatforms.includes('youtube')) {
-        const formData = new FormData()
-        formData.append('video', videoFile)
-        formData.append('title', title)
-        formData.append('description', description)
-        formData.append('tags', JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean)))
-        formData.append('type', videoType)
-        formData.append('visibility', visibility)
+        // Step 1: 서버에서 YouTube 업로드 URL 발급 (메타데이터만 전송)
+        const urlRes = await fetch('/api/youtube/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            description,
+            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+            visibility,
+            fileSize: videoFile.size,
+            fileType: videoFile.type || 'video/mp4',
+          }),
+        })
 
-        // 진행률 시뮬레이션 (서버에서 YouTube로 업로드 중)
-        const interval = setInterval(() => {
-          setUploadProgress(prev => {
-            const next = { ...prev }
-            if ((next['youtube'] ?? 0) < 85) next['youtube'] = (next['youtube'] ?? 0) + Math.random() * 10
-            return next
-          })
-        }, 800)
-
-        const res = await fetch('/api/youtube/upload', { method: 'POST', body: formData })
-        clearInterval(interval)
-
-        if (res.ok) {
-          const data = await res.json()
-          setUploadProgress(prev => ({ ...prev, youtube: 100 }))
-          setUploadResult({ videoUrl: data.videoUrl })
-          // 업로드 성공 시 임시저장 삭제
-          localStorage.removeItem(DRAFT_KEY)
-        } else {
-          const err = await res.json()
-          setUploadError(err.error || 'YouTube 업로드 실패')
+        if (!urlRes.ok) {
+          const err = await urlRes.json().catch(() => ({ error: '업로드 URL 요청 실패' }))
+          setUploadError(err.error || '업로드 URL 요청 실패')
+          return
         }
+
+        const { uploadUrl } = await urlRes.json()
+
+        // Step 2: 브라우저에서 YouTube로 직접 업로드 (실시간 진행률)
+        const videoData = await new Promise<{ id: string }>((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.min(99, Math.round((e.loaded / e.total) * 100))
+              setUploadProgress(prev => ({ ...prev, youtube: pct }))
+            }
+          })
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try { resolve(JSON.parse(xhr.responseText)) }
+              catch { reject(new Error('YouTube 응답 파싱 실패')) }
+            } else {
+              try {
+                const err = JSON.parse(xhr.responseText)
+                const reason = err?.error?.errors?.[0]?.reason || err?.error?.message || `${xhr.status}`
+                reject(new Error(`YouTube 업로드 실패: ${reason}`))
+              } catch {
+                reject(new Error(`YouTube 업로드 실패 (${xhr.status})`))
+              }
+            }
+          })
+
+          xhr.addEventListener('error', () => reject(new Error('네트워크 오류가 발생했습니다.')))
+          xhr.addEventListener('abort', () => reject(new Error('업로드가 취소됐습니다.')))
+
+          xhr.open('PUT', uploadUrl)
+          xhr.setRequestHeader('Content-Type', videoFile.type || 'video/mp4')
+          xhr.send(videoFile)
+        })
+
+        setUploadProgress(prev => ({ ...prev, youtube: 100 }))
+
+        // Step 3: 업로드 기록 DB 저장
+        await fetch('/api/youtube/save-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: videoData.id,
+            title,
+            description,
+            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+            videoType,
+          }),
+        })
+
+        setUploadResult({ videoUrl: `https://www.youtube.com/watch?v=${videoData.id}` })
+        localStorage.removeItem(DRAFT_KEY)
       }
     } catch (e) {
-      setUploadError(`업로드 중 오류: ${e instanceof Error ? e.message : String(e)}`)
+      setUploadError(e instanceof Error ? e.message : '업로드 중 오류가 발생했습니다.')
     } finally {
       setIsUploading(false)
     }
@@ -277,6 +319,7 @@ export function UploadForm({ connections }: UploadFormProps) {
           영상 파일
         </p>
         <input
+          id="video-file-input"
           ref={videoInputRef}
           type="file"
           accept="video/*"
@@ -297,8 +340,8 @@ export function UploadForm({ connections }: UploadFormProps) {
             </button>
           </div>
         ) : (
-          <div
-            onClick={() => videoInputRef.current?.click()}
+          <label
+            htmlFor="video-file-input"
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleVideoDrop}
@@ -314,7 +357,7 @@ export function UploadForm({ connections }: UploadFormProps) {
               <span className="hidden sm:inline">영상을 드래그하거나 </span>클릭하여 선택
             </p>
             <p className="mt-1 text-xs text-[var(--muted)]">MP4, MOV, AVI · 최대 10GB</p>
-          </div>
+          </label>
         )}
       </Card>
 
@@ -419,6 +462,7 @@ export function UploadForm({ connections }: UploadFormProps) {
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">썸네일</label>
             <input
+              id="thumbnail-file-input"
               ref={thumbnailInputRef}
               type="file"
               accept="image/*"
@@ -441,14 +485,13 @@ export function UploadForm({ connections }: UploadFormProps) {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => thumbnailInputRef.current?.click()}
-                className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--card-border)] px-4 py-2.5 text-sm text-[var(--muted)] hover:border-brand hover:text-brand"
+              <label
+                htmlFor="thumbnail-file-input"
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[var(--card-border)] px-4 py-2.5 text-sm text-[var(--muted)] hover:border-brand hover:text-brand"
               >
                 <ImageIcon className="h-4 w-4" />
                 썸네일 이미지 선택
-              </button>
+              </label>
             )}
           </div>
 
