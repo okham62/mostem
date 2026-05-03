@@ -36,6 +36,7 @@ export function UploadForm({ connections }: UploadFormProps) {
 
   const videoInputRef = useRef<HTMLInputElement>(null)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
+  const thumbnailFileRef = useRef<File | null>(null)  // 항상 최신 thumbnailFile 참조
   const DRAFT_KEY = 'mostem_upload_draft'
 
   // 불러오기: 마운트 시 저장된 임시 데이터 복원
@@ -71,6 +72,7 @@ export function UploadForm({ connections }: UploadFormProps) {
           .then(r => r.blob())
           .then(blob => {
             const file = new File([blob], draft.thumbnailName || 'thumbnail.jpg', { type: blob.type })
+            thumbnailFileRef.current = file
             setThumbnailFile(file)
           }).catch(() => {})
       }
@@ -117,6 +119,7 @@ export function UploadForm({ connections }: UploadFormProps) {
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      thumbnailFileRef.current = file
       setThumbnailFile(file)
       setThumbnailPreview(URL.createObjectURL(file))
     }
@@ -258,11 +261,15 @@ export function UploadForm({ connections }: UploadFormProps) {
         }
 
         // Step 4: 썸네일 업로드 (videoId 있고 썸네일 선택된 경우)
-        if (finalVideoId && thumbnailFile) {
+        const currentThumbnail = thumbnailFileRef.current
+        if (finalVideoId && currentThumbnail) {
           const thumbForm = new FormData()
           thumbForm.append('videoId', finalVideoId)
-          thumbForm.append('thumbnail', thumbnailFile)
-          await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm }).catch(() => {})
+          thumbForm.append('thumbnail', currentThumbnail)
+          const thumbRes = await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm })
+          if (!thumbRes.ok) {
+            console.warn('썸네일 업로드 실패:', await thumbRes.json().catch(() => ({})))
+          }
         }
 
         // Step 5: 업로드 기록 DB 저장
