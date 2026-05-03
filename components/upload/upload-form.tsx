@@ -44,9 +44,28 @@ export function UploadForm({ connections }: UploadFormProps) {
   const thumbnailFileRef = useRef<File | null>(null)
   const DRAFT_KEY = 'mostem_upload_draft'
 
+  // 마운트 시: 재업로드 데이터 먼저 확인
+  useEffect(() => {
+    try {
+      const reuseRaw = localStorage.getItem('mostem_reuse')
+      if (reuseRaw) {
+        const reuse = JSON.parse(reuseRaw)
+        localStorage.removeItem('mostem_reuse')
+        if (reuse.title) setTitle(reuse.title)
+        if (reuse.description) setDescription(reuse.description)
+        if (reuse.tags?.length) setTags(reuse.tags.join(', '))
+        if (reuse.videoType) setVideoType(reuse.videoType as VideoType)
+        return // 재업로드 데이터 있으면 드래프트 복원 모달 건너뜀
+      }
+    } catch { /* 무시 */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // 마운트 시: 저장된 드래프트 있으면 복원 여부 묻기
   useEffect(() => {
     try {
+      // 재업로드 데이터가 있었으면 드래프트 모달 생략
+      if (localStorage.getItem('mostem_reuse')) return
       if (localStorage.getItem(DRAFT_KEY + '_done')) {
         localStorage.removeItem(DRAFT_KEY + '_done')
         localStorage.removeItem(DRAFT_KEY)
