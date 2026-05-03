@@ -118,11 +118,11 @@ function SortablePhoto({
         <div
           className="fixed z-[9999] pointer-events-none"
           style={{
-            left: mousePos.x + 16,
-            top: mousePos.y - 120,
+            left: mousePos.x + 20,
+            top: mousePos.y - 220,
             // 화면 오른쪽 넘어가면 왼쪽에 표시
-            transform: mousePos.x > window.innerWidth - 260
-              ? 'translateX(calc(-100% - 32px))'
+            transform: mousePos.x > window.innerWidth - 420
+              ? 'translateX(calc(-100% - 40px))'
               : 'none',
           }}
         >
@@ -130,7 +130,7 @@ function SortablePhoto({
             <img
               src={photo.previewUrl}
               alt="미리보기"
-              className="h-48 w-48 object-cover"
+              className="h-96 w-96 object-cover"
               draggable={false}
             />
           </div>
