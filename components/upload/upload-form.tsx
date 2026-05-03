@@ -3,20 +3,23 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Upload, X, ImageIcon, Sparkles, FileVideo, Check } from 'lucide-react'
+import { Upload, X, ImageIcon, Sparkles, FileVideo, Check, Images } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { VideoType, PlatformConnection } from '@/types'
 import { TagPresetPicker } from './tag-preset-picker'
 import { DescriptionPresetPicker } from './description-preset-picker'
+import { PhotoUploadGrid, type PhotoItem } from './photo-upload-grid'
 
 interface UploadFormProps {
   connections: PlatformConnection[]
 }
 
 export function UploadForm({ connections }: UploadFormProps) {
+  const [mediaType, setMediaType] = useState<'video' | 'photo'>('video')
   const [videoType, setVideoType] = useState<VideoType>('short')
   const [selectedConnectionIds, setSelectedConnectionIds] = useState<string[]>([])
   const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [photos, setPhotos] = useState<PhotoItem[]>([])
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
@@ -365,37 +368,70 @@ export function UploadForm({ connections }: UploadFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* 1단계: 영상 타입 선택 */}
+      {/* 1단계: 미디어 타입 선택 */}
       <Card>
         <p className="mb-3 text-sm font-semibold text-[var(--foreground)]">
           <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">1</span>
-          영상 타입
+          미디어 타입
         </p>
-        <div className="flex gap-3">
-          {(['short', 'long'] as VideoType[]).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => {
-                setVideoType(type)
-                setSelectedConnectionIds([])
-              }}
-              className={cn(
-                'flex-1 rounded-xl border-2 py-3.5 text-sm font-medium transition-all active:scale-95',
-                videoType === type
-                  ? 'border-brand bg-brand/5 text-brand dark:bg-brand/10'
-                  : 'border-[var(--card-border)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--foreground)]'
-              )}
-            >
-              {type === 'short' ? '📱 쇼폼' : '🎬 롱폼'}
-              <span className="ml-1 hidden sm:inline">
-                {type === 'short' ? '(Shorts / Reels)' : '(유튜브 전용)'}
-              </span>
-            </button>
-          ))}
+
+        {/* 영상 / 사진 */}
+        <div className="mb-3 flex gap-3">
+          <button
+            type="button"
+            onClick={() => { setMediaType('video'); setPhotos([]); setSelectedConnectionIds([]) }}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium transition-all active:scale-95',
+              mediaType === 'video'
+                ? 'border-brand bg-brand/5 text-brand dark:bg-brand/10'
+                : 'border-[var(--card-border)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--foreground)]'
+            )}
+          >
+            <FileVideo className="h-4 w-4" /> 영상
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMediaType('photo'); setVideoFile(null); setVideoType('short'); setSelectedConnectionIds([]) }}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium transition-all active:scale-95',
+              mediaType === 'photo'
+                ? 'border-brand bg-brand/5 text-brand dark:bg-brand/10'
+                : 'border-[var(--card-border)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--foreground)]'
+            )}
+          >
+            <Images className="h-4 w-4" /> 사진
+          </button>
         </div>
-        {videoType === 'long' && (
+
+        {/* 영상일 때만: 쇼폼 / 롱폼 */}
+        {mediaType === 'video' && (
+          <div className="flex gap-3">
+            {(['short', 'long'] as VideoType[]).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => { setVideoType(type); setSelectedConnectionIds([]) }}
+                className={cn(
+                  'flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-all active:scale-95',
+                  videoType === type
+                    ? 'border-brand bg-brand/5 text-brand dark:bg-brand/10'
+                    : 'border-[var(--card-border)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--foreground)]'
+                )}
+              >
+                {type === 'short' ? '📱 쇼폼' : '🎬 롱폼'}
+                <span className="ml-1 hidden sm:inline text-xs">
+                  {type === 'short' ? '(Shorts / Reels)' : '(유튜브 전용)'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mediaType === 'video' && videoType === 'long' && (
           <p className="mt-2 text-xs text-[var(--muted)]">롱폼 영상은 유튜브에만 업로드 가능합니다.</p>
+        )}
+        {mediaType === 'photo' && (
+          <p className="mt-1 text-xs text-[var(--muted)]">사진은 Instagram · TikTok에 업로드됩니다. (YouTube 제외)</p>
         )}
       </Card>
 
@@ -602,52 +638,108 @@ export function UploadForm({ connections }: UploadFormProps) {
         </div>
       </Card>
 
-      {/* 3단계: 영상 파일 */}
+      {/* 3단계: 파일 */}
       <Card>
         <p className="mb-3 text-sm font-semibold text-[var(--foreground)]">
           <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">3</span>
-          영상 파일
+          {mediaType === 'video' ? '영상 파일' : '사진 파일'}
         </p>
-        <input
-          id="video-file-input"
-          ref={videoInputRef}
-          type="file"
-          accept="video/*"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && setVideoFile(e.target.files[0])}
-        />
-        {videoFile ? (
-          <div className="flex items-center gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--muted-bg)] p-4">
-            <FileVideo className="h-8 w-8 shrink-0 text-brand" />
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium text-[var(--foreground)]">{videoFile.name}</p>
-              <p className="text-xs text-[var(--muted)]">
-                {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
-              </p>
-            </div>
-            <button type="button" onClick={() => setVideoFile(null)}>
-              <X className="h-4 w-4 text-[var(--muted)] hover:text-red-500" />
-            </button>
-          </div>
-        ) : (
-          <label
-            htmlFor="video-file-input"
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleVideoDrop}
-            className={cn(
-              'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-10 transition-colors',
-              isDragging
-                ? 'border-brand bg-brand/5'
-                : 'border-[var(--card-border)] hover:border-brand hover:bg-brand/5'
+
+        {mediaType === 'video' ? (
+          <>
+            <input
+              id="video-file-input"
+              ref={videoInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && setVideoFile(e.target.files[0])}
+            />
+            {videoFile ? (
+              <div className="flex items-center gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--muted-bg)] p-4">
+                <FileVideo className="h-8 w-8 shrink-0 text-brand" />
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-sm font-medium text-[var(--foreground)]">{videoFile.name}</p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
+                  </p>
+                </div>
+                <button type="button" onClick={() => setVideoFile(null)}>
+                  <X className="h-4 w-4 text-[var(--muted)] hover:text-red-500" />
+                </button>
+              </div>
+            ) : (
+              <label
+                htmlFor="video-file-input"
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleVideoDrop}
+                className={cn(
+                  'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-10 transition-colors',
+                  isDragging
+                    ? 'border-brand bg-brand/5'
+                    : 'border-[var(--card-border)] hover:border-brand hover:bg-brand/5'
+                )}
+              >
+                <Upload className="mb-3 h-10 w-10 text-brand/60" />
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  <span className="hidden sm:inline">영상을 드래그하거나 </span>클릭하여 선택
+                </p>
+                <p className="mt-1 text-xs text-[var(--muted)]">MP4, MOV, AVI · 최대 10GB</p>
+              </label>
             )}
-          >
-            <Upload className="mb-3 h-10 w-10 text-brand/60" />
-            <p className="text-sm font-semibold text-[var(--foreground)]">
-              <span className="hidden sm:inline">영상을 드래그하거나 </span>클릭하여 선택
-            </p>
-            <p className="mt-1 text-xs text-[var(--muted)]">MP4, MOV, AVI · 최대 10GB</p>
-          </label>
+          </>
+        ) : (
+          <>
+            {/* 사진 업로드 그리드 */}
+            {photos.length === 0 ? (
+              <label
+                htmlFor="photo-file-input"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--card-border)] py-10 transition-colors hover:border-brand hover:bg-brand/5"
+              >
+                <Images className="mb-3 h-10 w-10 text-brand/60" />
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  <span className="hidden sm:inline">사진을 드래그하거나 </span>클릭하여 선택
+                </p>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  JPEG, PNG · Instagram 최대 10장 / TikTok 최대 35장
+                </p>
+                <input
+                  id="photo-file-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      const maxCount = selectedConnectionIds.some(id => {
+                        const conn = connections.find(c => c.id === id)
+                        return conn?.platform === 'tiktok'
+                      }) ? 35 : 10
+                      const files = Array.from(e.target.files).slice(0, maxCount)
+                      setPhotos(files.map(file => ({
+                        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                        file,
+                        previewUrl: URL.createObjectURL(file),
+                      })))
+                    }
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+            ) : (
+              <PhotoUploadGrid
+                photos={photos}
+                maxCount={
+                  selectedConnectionIds.some(id => connections.find(c => c.id === id)?.platform === 'tiktok')
+                  && !selectedConnectionIds.some(id => connections.find(c => c.id === id)?.platform === 'instagram')
+                    ? 35   // TikTok만 선택 시
+                    : 10   // Instagram 있거나 기본값
+                }
+                onChange={setPhotos}
+              />
+            )}
+          </>
         )}
       </Card>
 
@@ -868,7 +960,12 @@ export function UploadForm({ connections }: UploadFormProps) {
         type="submit"
         size="lg"
         className="w-full"
-        disabled={!videoFile || selectedConnectionIds.length === 0 || !title || !!uploadResult}
+        disabled={
+          (mediaType === 'video' ? !videoFile : photos.length === 0) ||
+          selectedConnectionIds.length === 0 ||
+          !title ||
+          !!uploadResult
+        }
         loading={isUploading}
       >
         <Upload className="h-4 w-4" />
@@ -876,6 +973,8 @@ export function UploadForm({ connections }: UploadFormProps) {
           ? '업로드 중...'
           : uploadResult
           ? '업로드 완료'
+          : mediaType === 'photo'
+          ? `${selectedConnectionIds.length}개 계정에 사진 ${photos.length}장 업로드`
           : `${selectedConnectionIds.length}개 채널에 업로드`}
       </Button>
     </form>
