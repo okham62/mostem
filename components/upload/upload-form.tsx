@@ -190,20 +190,21 @@ export function UploadForm({ connections }: UploadFormProps) {
         const { uploadUrl } = await urlRes.json()
 
         // Step 2: 브라우저에서 YouTube로 직접 업로드 (실시간 진행률)
-        const videoData = await new Promise<{ id: string }>((resolve, reject) => {
+        let uploadedPct = 0
+        const videoData = await new Promise<{ id: string | null }>((resolve, reject) => {
           const xhr = new XMLHttpRequest()
 
           xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
-              const pct = Math.min(99, Math.round((e.loaded / e.total) * 100))
-              setUploadProgress(prev => ({ ...prev, youtube: pct }))
+              uploadedPct = Math.min(99, Math.round((e.loaded / e.total) * 100))
+              setUploadProgress(prev => ({ ...prev, youtube: uploadedPct }))
             }
           })
 
           xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
               try { resolve(JSON.parse(xhr.responseText)) }
-              catch { reject(new Error('YouTube 응답 파싱 실패')) }
+              catch { resolve({ id: null }) }
             } else {
               try {
                 const err = JSON.parse(xhr.responseText)
@@ -215,7 +216,14 @@ export function UploadForm({ connections }: UploadFormProps) {
             }
           })
 
-          xhr.addEventListener('error', () => reject(new Error('네트워크 오류가 발생했습니다.')))
+          // 네트워크 오류 또는 CORS 오류: 90% 이상이면 업로드 성공으로 처리
+          xhr.addEventListener('error', () => {
+            if (uploadedPct >= 90) {
+              resolve({ id: null })
+            } else {
+              reject(new Error('네트워크 오류가 발생했습니다.'))
+            }
+          })
           xhr.addEventListener('abort', () => reject(new Error('업로드가 취소됐습니다.')))
 
           xhr.open('PUT', uploadUrl)
@@ -225,12 +233,30 @@ export function UploadForm({ connections }: UploadFormProps) {
 
         setUploadProgress(prev => ({ ...prev, youtube: 100 }))
 
-        // Step 3: 업로드 기록 DB 저장
+        // Step 3: videoId 확인 (CORS로 못 받은 경우 서버에서 최근 업로드 조회)
+        let finalVideoId = videoData.id
+        if (!finalVideoId) {
+          const latestRes = await fetch('/api/youtube/latest-upload')
+          if (latestRes.ok) {
+            const latest = await latestRes.json()
+            finalVideoId = latest.videoId ?? null
+          }
+        }
+
+        // Step 4: 썸네일 업로드 (videoId 있고 썸네일 선택된 경우)
+        if (finalVideoId && thumbnailFile) {
+          const thumbForm = new FormData()
+          thumbForm.append('videoId', finalVideoId)
+          thumbForm.append('thumbnail', thumbnailFile)
+          await fetch('/api/youtube/set-thumbnail', { method: 'POST', body: thumbForm }).catch(() => {})
+        }
+
+        // Step 5: 업로드 기록 DB 저장
         await fetch('/api/youtube/save-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            videoId: videoData.id,
+            videoId: finalVideoId,
             title,
             description,
             tags: tags.split(',').map(t => t.trim()).filter(Boolean),
@@ -238,7 +264,10 @@ export function UploadForm({ connections }: UploadFormProps) {
           }),
         })
 
-        setUploadResult({ videoUrl: `https://www.youtube.com/watch?v=${videoData.id}` })
+        const videoUrl = finalVideoId
+          ? `https://www.youtube.com/watch?v=${finalVideoId}`
+          : 'https://studio.youtube.com'
+        setUploadResult({ videoUrl })
         localStorage.removeItem(DRAFT_KEY)
       }
     } catch (e) {
