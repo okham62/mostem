@@ -36,7 +36,8 @@ export function UploadForm({ connections }: UploadFormProps) {
   const [tagInput, setTagInput] = useState('')
   // 복원 모달
   const [showRestoreModal, setShowRestoreModal] = useState(false)
-  const [pendingDraft, setPendingDraft] = useState<Record<string, unknown> | null>(null)
+  type DraftData = { title?: string; description?: string; visibility?: string; videoType?: string; selectedConnectionIds?: string[]; thumbnailBase64?: string; thumbnailName?: string; savedAt?: number }
+  const [pendingDraft, setPendingDraft] = useState<DraftData | null>(null)
 
   const videoInputRef = useRef<HTMLInputElement>(null)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
@@ -64,25 +65,25 @@ export function UploadForm({ connections }: UploadFormProps) {
       const hasContent = draft.title || draft.description || draft.thumbnailBase64
       if (!hasContent) return
 
-      setPendingDraft(draft)
+      setPendingDraft(draft as DraftData)
       setShowRestoreModal(true)
     } catch { /* 무시 */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 드래프트 복원 (예 클릭)
-  const applyDraft = (draft: Record<string, unknown>) => {
-    if (draft.title) setTitle(draft.title as string)
-    if (draft.description) setDescription(draft.description as string)
+  const applyDraft = (draft: DraftData) => {
+    if (draft.title) setTitle(draft.title)
+    if (draft.description) setDescription(draft.description)
     if (draft.visibility) setVisibility(draft.visibility as typeof visibility)
     if (draft.videoType) setVideoType(draft.videoType as VideoType)
-    if (draft.selectedConnectionIds) setSelectedConnectionIds(draft.selectedConnectionIds as string[])
+    if (draft.selectedConnectionIds) setSelectedConnectionIds(draft.selectedConnectionIds)
     if (draft.thumbnailBase64) {
-      setThumbnailPreview(draft.thumbnailBase64 as string)
-      fetch(draft.thumbnailBase64 as string)
+      setThumbnailPreview(draft.thumbnailBase64)
+      fetch(draft.thumbnailBase64)
         .then(r => r.blob())
         .then(blob => {
-          const file = new File([blob], (draft.thumbnailName as string) || 'thumbnail.jpg', { type: blob.type })
+          const file = new File([blob], draft.thumbnailName || 'thumbnail.jpg', { type: blob.type })
           thumbnailFileRef.current = file
           setThumbnailFile(file)
         }).catch(() => {})
@@ -406,8 +407,8 @@ export function UploadForm({ connections }: UploadFormProps) {
           <h3 className="mb-1.5 text-base font-bold text-[var(--foreground)]">
             이전 작업을 불러올까요?
           </h3>
-          <p className="mb-5 text-sm text-[var(--muted)]">
-            작성 중이던 제목, 설명, 설정이 저장되어 있어요.
+          <p className="mb-5 text-sm leading-relaxed text-[var(--muted)]">
+            작성 중이던 제목, 설명, 설정이 저장되어 있어요.{' '}
             이어서 작업하시겠어요?
           </p>
 
@@ -416,12 +417,12 @@ export function UploadForm({ connections }: UploadFormProps) {
             <div className="mb-5 rounded-xl bg-[var(--muted-bg)] p-3 text-xs text-[var(--muted)]">
               {pendingDraft.title ? (
                 <p className="truncate font-semibold text-[var(--foreground)]">
-                  제목: {String(pendingDraft.title)}
+                  제목: {pendingDraft.title}
                 </p>
               ) : null}
               {pendingDraft.description ? (
                 <p className="mt-0.5 line-clamp-2 leading-relaxed">
-                  {String(pendingDraft.description)}
+                  {pendingDraft.description}
                 </p>
               ) : null}
             </div>
