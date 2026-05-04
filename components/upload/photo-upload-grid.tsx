@@ -194,17 +194,6 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
     }
   }, [addFiles])
 
-  // ── 컴포넌트 외부 영역에 드롭 시 새 탭 열기 방지 ──
-  useEffect(() => {
-    const prevent = (e: DragEvent) => e.preventDefault()
-    document.addEventListener('dragover', prevent)
-    document.addEventListener('drop', prevent)
-    return () => {
-      document.removeEventListener('dragover', prevent)
-      document.removeEventListener('drop', prevent)
-    }
-  }, [])
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(e.target.files)
     e.target.value = ''

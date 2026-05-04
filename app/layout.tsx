@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { PreventFileDrop } from '@/components/prevent-file-drop'
 
 export const metadata: Metadata = {
   title: 'MOSTEM - 멀티플랫폼 영상 업로드',
@@ -13,7 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <PreventFileDrop />
+        {children}
+      </body>
     </html>
   )
 }
