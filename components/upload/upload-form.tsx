@@ -795,7 +795,33 @@ export function UploadForm({ connections }: UploadFormProps) {
             {photos.length === 0 ? (
               <label
                 htmlFor="photo-file-input"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--card-border)] py-10 transition-colors hover:border-brand hover:bg-brand/5"
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragEnter={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setIsDragging(false)
+                  const files = e.dataTransfer.files
+                  if (!files.length) return
+                  const maxCount = selectedConnectionIds.some(id => {
+                    const conn = connections.find(c => c.id === id)
+                    return conn?.platform === 'tiktok'
+                  }) ? 35 : 10
+                  const arr = Array.from(files)
+                    .filter(f => f.type.startsWith('image/'))
+                    .slice(0, maxCount)
+                  setPhotos(arr.map(file => ({
+                    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    file,
+                    previewUrl: URL.createObjectURL(file),
+                  })))
+                }}
+                className={cn(
+                  'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-10 transition-colors',
+                  isDragging
+                    ? 'border-brand bg-brand/5'
+                    : 'border-[var(--card-border)] hover:border-brand hover:bg-brand/5'
+                )}
               >
                 <Images className="mb-3 h-10 w-10 text-brand/60" />
                 <p className="text-sm font-semibold text-[var(--foreground)]">
