@@ -47,6 +47,11 @@ function SortablePhoto({
   const [hovered, setHovered] = useState(false)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
+  // useCallback은 반드시 컴포넌트 최상단에서만 호출
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY })
+  }, [])
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: photo.id })
 
@@ -64,7 +69,7 @@ function SortablePhoto({
         className="group relative aspect-square rounded-xl overflow-hidden border-2 border-[var(--card-border)] bg-[var(--muted-bg)] cursor-grab active:cursor-grabbing"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        onMouseMove={useCallback((e: React.MouseEvent) => setMousePos({ x: e.clientX, y: e.clientY }), [])}
+        onMouseMove={handleMouseMove}
         {...attributes}
         {...listeners}
       >
@@ -122,26 +127,15 @@ function DragGhost({ photo }: { photo: PhotoItem }) {
 // ── 메인 컴포넌트 ──────────────────────────────────────────────
 export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const outerRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
-  const dragDepth = useRef(0) // 중첩 enter/leave 처리
+  const dragDepth = useRef(0)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
-
-  // 브라우저가 파일을 새 탭으로 여는 기본 동작을 전역에서 차단
-  // stopPropagation 없이 preventDefault만 — React 이벤트 흐름 방해 X
-  useEffect(() => {
-    const noop = (e: DragEvent) => { e.preventDefault() }
-    document.addEventListener('dragover', noop)
-    document.addEventListener('drop', noop)
-    return () => {
-      document.removeEventListener('dragover', noop)
-      document.removeEventListener('drop', noop)
-    }
-  }, [])
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const arr = Array.from(files).filter(f => f.type.startsWith('image/'))
@@ -155,42 +149,65 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
     onChange([...photos, ...newPhotos])
   }, [photos, maxCount, onChange])
 
+  // ── 네이티브 DOM 이벤트로 파일 드래그 처리 (React 합성 이벤트 우회) ──
+  useEffect(() => {
+    const el = outerRef.current
+    if (!el) return
+
+    const onDragEnter = (e: DragEvent) => {
+      e.preventDefault()
+      dragDepth.current += 1
+      setIsDraggingOver(true)
+    }
+    const onDragLeave = (e: DragEvent) => {
+      e.preventDefault()
+      dragDepth.current -= 1
+      if (dragDepth.current <= 0) {
+        dragDepth.current = 0
+        setIsDraggingOver(false)
+      }
+    }
+    const onDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    }
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dragDepth.current = 0
+      setIsDraggingOver(false)
+      if (e.dataTransfer?.files?.length) {
+        addFiles(e.dataTransfer.files)
+      }
+    }
+
+    el.addEventListener('dragenter', onDragEnter)
+    el.addEventListener('dragleave', onDragLeave)
+    el.addEventListener('dragover', onDragOver)
+    el.addEventListener('drop', onDrop)
+
+    return () => {
+      el.removeEventListener('dragenter', onDragEnter)
+      el.removeEventListener('dragleave', onDragLeave)
+      el.removeEventListener('dragover', onDragOver)
+      el.removeEventListener('drop', onDrop)
+    }
+  }, [addFiles])
+
+  // ── 컴포넌트 외부 영역에 드롭 시 새 탭 열기 방지 ──
+  useEffect(() => {
+    const prevent = (e: DragEvent) => e.preventDefault()
+    document.addEventListener('dragover', prevent)
+    document.addEventListener('drop', prevent)
+    return () => {
+      document.removeEventListener('dragover', prevent)
+      document.removeEventListener('drop', prevent)
+    }
+  }, [])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(e.target.files)
     e.target.value = ''
-  }
-
-  // dragenter — 자식 요소 진입 시 중복 실행되므로 depth 카운터로 처리
-  const onDragEnter = (e: React.DragEvent) => {
-    e.preventDefault()
-    dragDepth.current += 1
-    setIsDraggingOver(true)   // depth 체크 없이 무조건 표시
-  }
-
-  // dragleave — depth가 0이 돼야 실제 영역 이탈
-  const onDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    dragDepth.current -= 1
-    if (dragDepth.current <= 0) {
-      dragDepth.current = 0
-      setIsDraggingOver(false)
-    }
-  }
-
-  // dragover — preventDefault 필수 (없으면 drop 이벤트 자체가 안 옴)
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
-  }
-
-  // drop — 파일 추가
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    dragDepth.current = 0
-    setIsDraggingOver(false)
-    if (e.dataTransfer.files.length > 0) {
-      addFiles(e.dataTransfer.files)
-    }
   }
 
   const removePhoto = (id: string) => {
@@ -212,13 +229,7 @@ export function PhotoUploadGrid({ photos, maxCount, onChange }: PhotoUploadGridP
   const canAddMore = photos.length < maxCount
 
   return (
-    <div
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      className="relative"
-    >
+    <div ref={outerRef} className="relative">
       {/* 드래그 오버 시 전체 오버레이 */}
       {isDraggingOver && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-xl border-2 border-brand bg-brand/10 pointer-events-none">
