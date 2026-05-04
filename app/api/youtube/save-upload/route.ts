@@ -7,13 +7,22 @@ export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { videoId, title, description, tags, videoType } = await req.json()
-  if (!videoId || !title) return NextResponse.json({ error: 'Missing data' }, { status: 400 })
+  const { title, description, tags, videoType, channels } = await req.json()
+  if (!title) return NextResponse.json({ error: 'Missing title' }, { status: 400 })
 
-  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
+  // channels: [{ channelName: string, videoUrl: string }]
+  const channelList: { channelName: string; videoUrl: string }[] = channels ?? []
+
+  // platform_urls: { "채널명": "url", ... }
+  const platformUrls: Record<string, string> = {}
+  const platformStatuses: Record<string, string> = {}
+  channelList.forEach(({ channelName, videoUrl }) => {
+    platformUrls[channelName] = videoUrl
+    platformStatuses[channelName] = 'completed'
+  })
+
   const supabase = createAdminClient()
-
-  await supabase.from('uploads').insert({
+  const { error } = await supabase.from('uploads').insert({
     user_id: session.user.id,
     title,
     description: description || '',
@@ -21,11 +30,16 @@ export async function POST(req: Request) {
     type: videoType || 'short',
     platforms: ['youtube'],
     status: 'completed',
-    platform_statuses: { youtube: 'completed' },
-    platform_urls: { youtube: videoUrl },
+    platform_statuses: platformStatuses,
+    platform_urls: platformUrls,
   })
 
-  logActivity(session.user.id, 'youtube_upload', { title, videoId, videoUrl }).catch(() => {})
+  if (error) {
+    console.error('save-upload error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
-  return NextResponse.json({ success: true, videoId, videoUrl })
+  logActivity(session.user.id, 'youtube_upload', { title, channels: channelList }).catch(() => {})
+
+  return NextResponse.json({ success: true })
 }

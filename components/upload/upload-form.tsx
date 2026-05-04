@@ -342,27 +342,11 @@ export function UploadForm({ connections }: UploadFormProps) {
         if (!thumbSuccess) thumbErrors.push(`(${conn.channel_name}) 썸네일 업로드 실패`)
       }
 
-      // Step 5: DB 저장
-      await fetch('/api/youtube/save-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoId: finalVideoId,
-          title, description,
-          tags: tagList2,
-          videoType,
-        }),
-      })
-
-      const result = {
+      return {
         channelName: conn.channel_name,
         videoUrl: finalVideoId ? `https://www.youtube.com/watch?v=${finalVideoId}` : 'https://studio.youtube.com',
+        ...(thumbErrors.length > 0 ? { thumbError: thumbErrors[0] } : {}),
       }
-
-      // 썸네일 오류가 있으면 result에 덧붙임 (업로드 자체는 성공)
-      return thumbErrors.length > 0
-        ? { ...result, thumbError: thumbErrors[0] }
-        : result
     }
 
     try {
@@ -392,6 +376,18 @@ export function UploadForm({ connections }: UploadFormProps) {
         setUploadResult({ results })
         localStorage.removeItem(DRAFT_KEY)
         localStorage.setItem(DRAFT_KEY + '_done', '1')
+
+        // 업로드 기록 저장 — 성공한 모든 채널을 하나의 레코드로
+        fetch('/api/youtube/save-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title, description,
+            tags: tagList2,
+            videoType,
+            channels: results, // [{ channelName, videoUrl }]
+          }),
+        }).catch(() => {})
       }
       if (errors.length > 0) {
         setUploadError(errors.join('\n'))

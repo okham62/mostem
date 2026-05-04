@@ -5,19 +5,7 @@ import { ExternalLink, RefreshCw, ChevronDown, ChevronUp, FileVideo, Images } fr
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { formatDate } from '@/lib/utils'
-import type { Upload, Platform } from '@/types'
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  youtube: 'YouTube',
-  tiktok: 'TikTok',
-  instagram: 'Instagram',
-}
-
-const PLATFORM_COLORS: Record<Platform, string> = {
-  youtube: 'text-red-500',
-  tiktok: 'text-[var(--foreground)]',
-  instagram: 'text-pink-500',
-}
+import type { Upload } from '@/types'
 
 const STATUS_MAP: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'default' }> = {
   completed: { label: '완료', variant: 'success' },
@@ -39,40 +27,36 @@ export function HistoryCard({ upload }: HistoryCardProps) {
   const tags: string[] = upload.tags ?? []
   const typeLabel = upload.type === 'short' ? '📱 쇼폼' : '🎬 롱폼'
 
-  // 다시 업로드: localStorage에 데이터 저장 후 /upload로 이동
+  // platform_urls 키가 채널명 또는 플랫폼명 어느 것이든 처리
+  const urlEntries = Object.entries(upload.platform_urls ?? {})
+
+  // 다시 업로드
   const handleReupload = () => {
-    const reuseData = {
+    localStorage.setItem('mostem_reuse', JSON.stringify({
       title: upload.title,
       description: upload.description,
       tags: upload.tags,
       videoType: upload.type,
       platforms: upload.platforms,
-    }
-    localStorage.setItem('mostem_reuse', JSON.stringify(reuseData))
+    }))
     router.push('/upload')
   }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition-shadow hover:shadow-md">
-      {/* 상단 메인 영역 */}
+      {/* 상단 메인 */}
       <div className="flex gap-4 p-4">
         {/* 썸네일 */}
         <div className="relative shrink-0">
           {upload.thumbnail_url ? (
-            <img
-              src={upload.thumbnail_url}
-              alt={upload.title}
-              className="h-20 w-32 rounded-xl object-cover"
-            />
+            <img src={upload.thumbnail_url} alt={upload.title} className="h-20 w-32 rounded-xl object-cover" />
           ) : (
             <div className="flex h-20 w-32 flex-col items-center justify-center gap-1 rounded-xl bg-[var(--muted-bg)]">
               {upload.type === 'short'
                 ? <Images className="h-6 w-6 text-[var(--muted)]" />
-                : <FileVideo className="h-6 w-6 text-[var(--muted)]" />
-              }
+                : <FileVideo className="h-6 w-6 text-[var(--muted)]" />}
             </div>
           )}
-          {/* 타입 뱃지 */}
           <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[var(--card-bg)] border border-[var(--card-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--muted)]">
             {typeLabel}
           </span>
@@ -90,27 +74,23 @@ export function HistoryCard({ upload }: HistoryCardProps) {
             <p className="mt-0.5 text-xs text-[var(--muted)]">{formatDate(upload.created_at)}</p>
           </div>
 
-          {/* 플랫폼 상태 */}
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {upload.platforms.map((platform: Platform) => {
-              const pStatus = upload.platform_statuses?.[platform] ?? upload.status
-              const ps = STATUS_MAP[pStatus] ?? { label: pStatus, variant: 'default' as const }
-              const url = upload.platform_urls?.[platform]
-              return (
-                <div key={platform} className="flex items-center gap-1 rounded-full border border-[var(--card-border)] bg-[var(--muted-bg)] px-2.5 py-1 text-[11px]">
-                  <span className={`font-semibold ${PLATFORM_COLORS[platform]}`}>
-                    {PLATFORM_LABELS[platform]}
-                  </span>
-                  <Badge variant={ps.variant} className="text-[10px]">{ps.label}</Badge>
-                  {url && (
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="ml-0.5 text-brand hover:text-brand/80">
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          {/* 채널별 링크 칩 */}
+          {urlEntries.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {urlEntries.map(([channelName, url]) => (
+                <a
+                  key={channelName}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-full border border-[var(--card-border)] bg-[var(--muted-bg)] px-2.5 py-1 text-[11px] font-semibold text-red-500 hover:border-brand hover:text-brand transition-colors"
+                >
+                  {channelName}
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -130,7 +110,7 @@ export function HistoryCard({ upload }: HistoryCardProps) {
         </div>
       )}
 
-      {/* 설명 (접었다 펼치기) */}
+      {/* 설명 */}
       {upload.description && (
         <div className="border-t border-[var(--card-border)] px-4 py-2.5">
           <p className={`text-xs leading-relaxed text-[var(--muted)] ${!expanded ? 'line-clamp-2' : ''}`}>
@@ -142,36 +122,14 @@ export function HistoryCard({ upload }: HistoryCardProps) {
               onClick={() => setExpanded(e => !e)}
               className="mt-1 flex items-center gap-0.5 text-[10px] font-medium text-brand hover:underline"
             >
-              {expanded
-                ? <><ChevronUp className="h-3 w-3" /> 접기</>
-                : <><ChevronDown className="h-3 w-3" /> 더 보기</>
-              }
+              {expanded ? <><ChevronUp className="h-3 w-3" /> 접기</> : <><ChevronDown className="h-3 w-3" /> 더 보기</>}
             </button>
           )}
         </div>
       )}
 
-      {/* 액션 버튼 */}
+      {/* 액션 */}
       <div className="flex items-center justify-end gap-2 border-t border-[var(--card-border)] px-4 py-3">
-        {/* 영상 보기 링크들 */}
-        {upload.platforms.map((platform: Platform) => {
-          const url = upload.platform_urls?.[platform]
-          if (!url) return null
-          return (
-            <a
-              key={platform}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 rounded-lg border border-[var(--card-border)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:border-brand hover:text-brand"
-            >
-              <ExternalLink className="h-3 w-3" />
-              {PLATFORM_LABELS[platform]} 보기
-            </a>
-          )
-        })}
-
-        {/* 다시 업로드 */}
         <button
           type="button"
           onClick={handleReupload}
