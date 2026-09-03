@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
-import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
+import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, formatCount } from '@/lib/collect-labels'
+import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
+import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
 
 export function ThreadCard({ post }: { post: CollectedPost }) {
@@ -14,7 +16,7 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
   const date = collected ? collected.toISOString().slice(0, 10) : ''
   const shortDate = collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : ''
   const grade = post.grade ? GRADE_LABEL[post.grade] : null
-  const thumb = mediaSrc(post.thumbnail_url)
+  const mediaItems = parseMediaItems(post)
   const caption =
     post.caption && post.caption !== post.author && post.caption !== `@${post.author}`
       ? post.caption
@@ -73,10 +75,24 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
         </div>
       </div>
 
-      <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-white/80">{caption}</p>
+      <p className="mb-3 whitespace-pre-wrap text-[15px] leading-[1.45] text-[#f3f5f7]">
+        {caption === '본문 없음'
+          ? caption
+          : splitCaption(caption).map((part, index) =>
+              isHashtag(part) ? (
+                <span key={`${part}-${index}`} className="text-[#1d9bf0]">
+                  {part}
+                </span>
+              ) : (
+                <span key={`${part}-${index}`}>{part}</span>
+              )
+            )}
+      </p>
 
-      {thumb && (
-        <img src={thumb} alt="" className="mb-3 h-44 w-full rounded-xl object-cover" />
+      {mediaItems.length > 0 && (
+        <div className="mb-3">
+          <ThreadMedia items={mediaItems} />
+        </div>
       )}
 
       <div className="mb-3 grid grid-cols-3 gap-y-2 rounded-xl bg-[#0c0c10] px-3 py-2.5 text-center">

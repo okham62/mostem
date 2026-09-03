@@ -12,6 +12,13 @@ export type CollectStatus =
   | 'uploaded'
 export type PerformanceGrade = 'explosion' | 'strong' | 'excellent' | 'normal' | 'weak'
 
+export interface CollectMediaItem {
+  url: string
+  type: 'image' | 'video'
+  poster?: string
+  videoUrl?: string
+}
+
 export interface CollectedPost {
   id: string
   user_id: string
@@ -23,6 +30,7 @@ export interface CollectedPost {
   caption: string | null
   thumbnail_url: string | null
   media_url: string | null
+  media_items?: CollectMediaItem[] | null
   views: number
   likes: number
   comments: number

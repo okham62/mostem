@@ -41,6 +41,12 @@ type IncomingPost = {
   }
   collectedAt?: string
   collectedBy?: string
+  mediaItems?: Array<{
+    url: string
+    type?: 'image' | 'video'
+    poster?: string
+    videoUrl?: string
+  }>
 }
 
 function num(...values: Array<number | null | undefined>) {
@@ -89,8 +95,17 @@ function toRow(userId: string, post: IncomingPost, collectedBy?: string) {
     author: post.author ?? null,
     author_id: post.authorId ?? null,
     caption: cleanCaption(post.caption, post.author),
-    thumbnail_url: post.thumbnailUrl ?? null,
-    media_url: post.mediaUrl ?? null,
+    thumbnail_url: post.mediaItems?.[0]?.poster ?? post.mediaItems?.[0]?.url ?? post.thumbnailUrl ?? null,
+    media_url: post.mediaItems?.length
+      ? JSON.stringify(
+          post.mediaItems.map((item) => ({
+            url: item.url,
+            type: item.type === 'video' ? 'video' : 'image',
+            poster: item.poster,
+            videoUrl: item.videoUrl,
+          }))
+        )
+      : post.mediaUrl ?? null,
     views,
     likes: num(m.likes, post.likes),
     comments: num(m.comments, post.comments),
@@ -136,7 +151,10 @@ function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): Coll
     ...next,
     caption: keepText(next.caption, prev.caption as string | null),
     thumbnail_url: keepText(next.thumbnail_url, prev.thumbnail_url as string | null),
-    media_url: keepText(next.media_url, prev.media_url as string | null),
+    media_url:
+      next.media_url?.startsWith('[')
+        ? next.media_url
+        : keepText(next.media_url, prev.media_url as string | null),
     url: keepText(next.url, prev.url as string | null),
     author: keepText(next.author, prev.author as string | null),
     views,
