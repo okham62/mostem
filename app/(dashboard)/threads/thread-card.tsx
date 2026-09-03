@@ -34,18 +34,8 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
   }
 
   return (
-    <article className="relative flex flex-col rounded-2xl border border-[var(--card-border)] bg-[#141418] p-4">
-      <button
-        type="button"
-        onClick={remove}
-        disabled={removing}
-        aria-label="수집 삭제"
-        className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/55 text-sm text-white/70 hover:bg-red-500 hover:text-white disabled:opacity-50"
-      >
-        ✕
-      </button>
-
-      <div className="mb-3 flex items-start justify-between gap-2 pr-9">
+    <article className="flex flex-col rounded-2xl border border-[var(--card-border)] bg-[#141418] p-4">
+      <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
             {initial}
@@ -65,12 +55,22 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
             <p className="text-[11px] text-white/35">{date}</p>
           </div>
         </div>
-        {grade && (
-          <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
-            {grade}
-            {post.multiplier != null ? ` ${Number(post.multiplier).toFixed(1)}배` : ''}
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {grade && (
+            <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
+              {grade}
+              {post.multiplier != null ? ` ${Number(post.multiplier).toFixed(1)}배` : ''}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={remove}
+            disabled={removing}
+            className="rounded-lg border border-red-400/50 bg-red-500/20 px-2.5 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500 hover:text-white disabled:opacity-50"
+          >
+            {removing ? '삭제 중' : '삭제'}
+          </button>
+        </div>
       </div>
 
       <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-white/80">{caption}</p>
