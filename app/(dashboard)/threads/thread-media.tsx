@@ -94,13 +94,17 @@ function MediaTile({
   )
 }
 
+function stopBubble(event: { stopPropagation: () => void }) {
+  event.stopPropagation()
+}
+
 function VideoViewer({ item, onClose }: { item: CollectMediaItem; onClose: () => void }) {
   const [muted, setMuted] = useState(false)
   const imageUrl = cleanMediaUrl(item.poster) ?? cleanMediaUrl(item.url)
   const videoUrl = cleanMediaUrl(item.videoUrl) ?? cleanMediaUrl(item.url)
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center px-4 py-12">
+    <div className="pointer-events-none flex h-full w-full items-center justify-center px-4 py-12">
       {videoUrl ? (
         <video
           key={videoUrl}
@@ -110,15 +114,18 @@ function VideoViewer({ item, onClose }: { item: CollectMediaItem; onClose: () =>
           controls
           playsInline
           muted={muted}
-          className="max-h-[min(92vh,920px)] max-w-[min(100%,560px)] rounded-2xl bg-black object-contain shadow-2xl"
+          onClick={stopBubble}
+          className="pointer-events-auto max-h-[min(92vh,920px)] max-w-[min(100%,560px)] rounded-2xl bg-black object-contain shadow-2xl"
         />
       ) : imageUrl ? (
-        <FallbackImage url={imageUrl} fit="contain" />
+        <div className="pointer-events-auto" onClick={stopBubble}>
+          <FallbackImage url={imageUrl} fit="contain" />
+        </div>
       ) : null}
       <button
         type="button"
         onClick={() => setMuted((value) => !value)}
-        className="absolute bottom-6 right-6 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+        className="pointer-events-auto absolute bottom-6 right-6 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
         aria-label={muted ? '소리 켜기' : '음소거'}
       >
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
@@ -126,7 +133,7 @@ function VideoViewer({ item, onClose }: { item: CollectMediaItem; onClose: () =>
       <button
         type="button"
         onClick={onClose}
-        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+        className="pointer-events-auto absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
         aria-label="닫기"
       >
         <X className="h-5 w-5" />
@@ -150,15 +157,19 @@ function PhotoViewer({
   const imageUrl = current ? cleanMediaUrl(current.poster) ?? cleanMediaUrl(current.url) : null
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="pointer-events-none flex h-full w-full flex-col">
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-14 py-6">
-        {imageUrl ? <FallbackImage url={imageUrl} fit="contain" /> : null}
+        {imageUrl ? (
+          <div className="pointer-events-auto" onClick={stopBubble}>
+            <FallbackImage url={imageUrl} fit="contain" />
+          </div>
+        ) : null}
         {items.length > 1 && (
           <>
             <button
               type="button"
               onClick={() => onIndex((index - 1 + items.length) % items.length)}
-              className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+              className="pointer-events-auto absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
               aria-label="이전 이미지"
             >
               <ChevronLeft className="h-6 w-6" />
@@ -166,7 +177,7 @@ function PhotoViewer({
             <button
               type="button"
               onClick={() => onIndex((index + 1) % items.length)}
-              className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+              className="pointer-events-auto absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
               aria-label="다음 이미지"
             >
               <ChevronRight className="h-6 w-6" />
@@ -175,7 +186,7 @@ function PhotoViewer({
         )}
       </div>
       {items.length > 1 && (
-        <div className="flex shrink-0 justify-center gap-2 overflow-x-auto px-4 pb-5">
+        <div className="pointer-events-auto flex shrink-0 justify-center gap-2 overflow-x-auto px-4 pb-5">
           {items.map((item, itemIndex) => {
             const thumb = cleanMediaUrl(item.poster) ?? cleanMediaUrl(item.url)
             if (!thumb) return null
@@ -194,13 +205,13 @@ function PhotoViewer({
           })}
         </div>
       )}
-      <p className="absolute left-4 top-4 text-sm font-medium text-white/70">
+      <p className="pointer-events-none absolute left-4 top-4 text-sm font-medium text-white/70">
         {index + 1} / {items.length}
       </p>
       <button
         type="button"
         onClick={onClose}
-        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+        className="pointer-events-auto absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
         aria-label="닫기"
       >
         <X className="h-5 w-5" />
@@ -233,13 +244,11 @@ function MediaLightbox({ viewer, onClose, onIndex }: { viewer: Viewer; onClose: 
 
   return createPortal(
     <div className="fixed inset-0 z-[80] bg-black/92" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="h-full w-full" onClick={(event) => event.stopPropagation()}>
-        {viewer.kind === 'video' ? (
-          <VideoViewer item={viewer.item} onClose={onClose} />
-        ) : (
-          <PhotoViewer items={viewer.items} index={viewer.index} onIndex={onIndex} onClose={onClose} />
-        )}
-      </div>
+      {viewer.kind === 'video' ? (
+        <VideoViewer item={viewer.item} onClose={onClose} />
+      ) : (
+        <PhotoViewer items={viewer.items} index={viewer.index} onIndex={onIndex} onClose={onClose} />
+      )}
     </div>,
     document.body
   )
