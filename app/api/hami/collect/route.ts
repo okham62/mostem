@@ -188,7 +188,10 @@ function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): Coll
     quotes: Math.max(next.quotes, num(prev.quotes as number)),
     followers,
     engagement_rate: next.engagement_rate ?? optNum(prev.engagement_rate as number),
-    views_per_hour: next.views_per_hour ?? optNum(prev.views_per_hour as number),
+    views_per_hour:
+      next.views_per_hour != null && next.views_per_hour > 0
+        ? next.views_per_hour
+        : optNum(prev.views_per_hour as number),
     spread: next.spread ?? optNum(prev.spread as number),
     multiplier,
     grade,
@@ -257,8 +260,64 @@ export async function POST(req: Request) {
     )
   }
 
+  const { data: saved } = await supabase
+    .from('collected_posts')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .in('post_id', rows.map((row) => row.post_id))
+
   return NextResponse.json(
-    { ok: true, count: merged.length },
+    { ok: true, count: merged.length, posts: (saved ?? merged).map(toClientPost) },
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
+}
+
+function toClientPost(row: Record<string, unknown>) {
+  return {
+    platform: row.platform,
+    postId: row.post_id,
+    views: row.views ?? 0,
+    followers: row.followers ?? 0,
+    likes: row.likes ?? 0,
+    comments: row.comments ?? 0,
+    shares: row.shares ?? 0,
+    reposts: row.reposts ?? 0,
+    quotes: row.quotes ?? 0,
+    engagementRate: row.engagement_rate ?? null,
+    viewsPerHour: row.views_per_hour ?? null,
+    spread: row.spread ?? null,
+    multiplier: row.multiplier ?? null,
+    grade: row.grade ?? null,
+    postedAt: row.posted_at ?? null,
+  }
+}
+
+export async function GET(req: Request) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const url = new URL(req.url)
+  const platform = url.searchParams.get('platform') ?? 'threads'
+  const postId = url.searchParams.get('postId')
+  if (!postId) {
+    return NextResponse.json({ error: 'postId가 필요합니다.' }, { status: 400 })
+  }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('collected_posts')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .eq('platform', platform)
+    .eq('post_id', postId)
+    .maybeSingle()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ ok: false, saved: null }, { status: 404 })
+  return NextResponse.json(
+    { ok: true, saved: toClientPost(data) },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }
