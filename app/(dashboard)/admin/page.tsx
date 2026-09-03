@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AdminActions } from './admin-actions'
+import { AdminPassword } from './admin-password'
 import { formatDate } from '@/lib/utils'
 import { Users } from 'lucide-react'
 import Link from 'next/link'
@@ -28,7 +29,9 @@ export default async function AdminPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--foreground)]">회원 관리</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">가입 신청을 검토하고 승인하세요.</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          가입 신청을 검토하고, 비밀번호를 수정하거나 초기화할 수 있습니다.
+        </p>
       </div>
 
       {/* 통계 */}
@@ -105,9 +108,10 @@ function UserRow({ user }: { user: User; showActions?: boolean }) {
         </Link>
         <p className="truncate text-xs text-[var(--muted)]">@{user.username ?? user.email}</p>
       </div>
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="relative flex shrink-0 items-center gap-2">
         <span className="hidden text-xs text-[var(--muted)] sm:block">{formatDate(user.created_at)}</span>
         <Badge variant={s.variant}>{s.label}</Badge>
+        <AdminPassword userId={user.id} />
         {user.status !== 'approved' || user.role !== 'admin' ? (
           <AdminActions userId={user.id} currentStatus={user.status} />
         ) : null}

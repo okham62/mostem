@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import type { User } from '@/types'
+import { AdminPassword } from '../../admin-password'
 
 const ACTION_LABELS: Record<string, { label: string; icon: string }> = {
   youtube_connect: { label: 'YouTube 채널 연결', icon: '📺' },
@@ -76,6 +77,9 @@ export default async function UserDetailPage({
             </div>
             <p className="text-sm text-[var(--muted)]">아이디: {user.username ?? '-'}</p>
             <p className="text-xs text-[var(--muted)]">가입일: {formatDate(user.created_at)}</p>
+          </div>
+          <div className="relative">
+            <AdminPassword userId={user.id} />
           </div>
         </div>
 
