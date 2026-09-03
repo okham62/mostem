@@ -11,7 +11,7 @@ function isVideoFile(url: string) {
   return /\.(mp4|m3u8|webm|mov)(\?|$)/i.test(url)
 }
 
-function isVideoItem(item: CollectMediaItem) {
+export function isVideoItem(item: CollectMediaItem) {
   return item.type === 'video' || !!item.videoUrl || isVideoFile(item.url)
 }
 

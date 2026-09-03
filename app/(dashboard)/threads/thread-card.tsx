@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
-import { GRADE_LABEL, GRADE_PILL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount } from '@/lib/collect-labels'
+import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
@@ -57,15 +57,6 @@ export function ThreadCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-              stats.grade ? GRADE_PILL[stats.grade] : 'bg-white/8 text-white/40'
-            }`}
-          >
-            {grade
-              ? `${grade} ${stats.multiplier != null ? `${Number(stats.multiplier).toFixed(1)}배` : ''}`
-              : '집계 전'}
-          </span>
           <button
             type="button"
             onClick={remove}

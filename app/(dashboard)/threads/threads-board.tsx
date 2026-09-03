@@ -383,7 +383,6 @@ function KanbanView({
                       <article key={post.id} className="rounded-xl border border-white/10 bg-[#141418] p-3">
                         <div className="mb-2 flex items-start justify-between gap-2">
                           <p className="truncate text-xs font-semibold text-white">@{post.author || 'unknown'}</p>
-                          <GradePill post={post} />
                         </div>
                         <p className="line-clamp-3 text-sm text-white/80">{captionOf(post)}</p>
                         <p className="mt-3 text-[11px] text-white/40">
