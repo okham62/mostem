@@ -51,7 +51,7 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
 
   if (ordered.length === 1) {
     return (
-      <div className="w-full max-w-[280px] overflow-hidden rounded-2xl bg-black">
+      <div className="w-full overflow-hidden rounded-2xl bg-black">
         <div className="aspect-[4/5]">
           <MediaTile item={ordered[0]} />
         </div>
@@ -60,7 +60,7 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
   }
 
   return (
-    <div className="grid w-full max-w-[420px] grid-cols-2 gap-1.5">
+    <div className="grid w-full grid-cols-2 gap-1.5">
       {ordered.slice(0, 4).map((item, index) => (
         <div key={`${item.url}-${index}`} className="aspect-[4/5] overflow-hidden rounded-2xl bg-black">
           <MediaTile item={item} />
