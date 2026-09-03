@@ -49,16 +49,27 @@ type IncomingPost = {
   }>
 }
 
-function num(...values: Array<number | null | undefined>) {
+function toFinite(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseFloat(value.replace(/,/g, ''))
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function num(...values: unknown[]) {
   for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) return value
+    const parsed = toFinite(value)
+    if (parsed != null) return parsed
   }
   return 0
 }
 
-function optNum(...values: Array<number | null | undefined>) {
+function optNum(...values: unknown[]) {
   for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) return value
+    const parsed = toFinite(value)
+    if (parsed != null) return parsed
   }
   return null
 }
@@ -226,5 +237,8 @@ export async function POST(req: Request) {
     )
   }
 
-  return NextResponse.json({ ok: true, count: rows.length })
+  return NextResponse.json(
+    { ok: true, count: merged.length },
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
 }

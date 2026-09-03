@@ -77,12 +77,36 @@ export function ThreadsBoard({
   accounts: ConnectedAccount[]
 }) {
   const [posts, setPosts] = useState(initialPosts)
+  const [hiddenIds, setHiddenIds] = useState<string[]>([])
   const [view, setView] = useState<ViewMode>('grid')
 
   useEffect(() => {
     const saved = window.localStorage.getItem('mostem-threads-view')
     if (saved === 'list' || saved === 'kanban' || saved === 'grid') setView(saved)
   }, [])
+
+  useEffect(() => {
+    let alive = true
+    async function pull() {
+      const res = await fetch('/api/threads/posts', { cache: 'no-store' })
+      if (!res.ok || !alive) return
+      const data = await res.json()
+      if (Array.isArray(data.posts) && alive) {
+        setPosts(data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)))
+      }
+    }
+    void pull()
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void pull()
+    }, 2000)
+    const onFocus = () => void pull()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [hiddenIds])
   const [query, setQuery] = useState('')
   const [grade, setGrade] = useState<'all' | PerformanceGrade>('all')
 
@@ -97,6 +121,7 @@ export function ThreadsBoard({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return posts.filter((post) => {
+      if (hiddenIds.includes(post.id)) return false
       const stats = derivePostStats(post)
       if (grade !== 'all' && stats.grade !== grade) return false
       if (!q) return true
@@ -105,7 +130,7 @@ export function ThreadsBoard({
         (post.caption ?? '').toLowerCase().includes(q)
       )
     })
-  }, [posts, query, grade])
+  }, [posts, query, grade, hiddenIds])
 
   function setMode(next: ViewMode) {
     setView(next)
@@ -113,7 +138,9 @@ export function ThreadsBoard({
   }
 
   function onRemoved(id: string) {
+    setHiddenIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
     setPosts((prev) => prev.filter((post) => post.id !== id))
+    void fetch(`/api/threads/posts/${id}`, { method: 'DELETE' })
   }
 
   return (
@@ -308,11 +335,7 @@ function ListView({
                     </Link>
                     <button
                       type="button"
-                      onClick={async () => {
-                        if (!window.confirm('이 수집을 삭제할까요?')) return
-                        const res = await fetch(`/api/threads/posts/${post.id}`, { method: 'DELETE' })
-                        if (res.ok) onRemoved(post.id)
-                      }}
+                      onClick={() => onRemoved(post.id)}
                       className="rounded-lg px-2 py-1 text-[11px] text-red-300 hover:bg-red-500/20"
                     >
                       ✕
@@ -376,11 +399,7 @@ function KanbanView({
                           </Link>
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!window.confirm('이 수집을 삭제할까요?')) return
-                              const res = await fetch(`/api/threads/posts/${post.id}`, { method: 'DELETE' })
-                              if (res.ok) onRemoved(post.id)
-                            }}
+                            onClick={() => onRemoved(post.id)}
                             className="rounded-lg px-2 py-1 text-[10px] text-red-300"
                           >
                             삭제

@@ -1,10 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
-import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount } from '@/lib/collect-labels'
+import { GRADE_LABEL, GRADE_PILL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
@@ -16,8 +14,6 @@ export function ThreadCard({
   post: CollectedPost
   onRemoved?: (id: string) => void
 }) {
-  const router = useRouter()
-  const [removing, setRemoving] = useState(false)
   const collected = post.collected_at ? new Date(post.collected_at) : null
   const date = collected ? collected.toISOString().slice(0, 10) : ''
   const shortDate = collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : ''
@@ -30,17 +26,12 @@ export function ThreadCard({
       : '본문 없음'
   const initial = (post.author?.[0] ?? 'U').toUpperCase()
 
-  async function remove() {
-    if (removing) return
-    if (!window.confirm('이 수집을 삭제할까요?')) return
-    setRemoving(true)
-    const res = await fetch(`/api/threads/posts/${post.id}`, { method: 'DELETE' })
-    if (!res.ok) {
-      setRemoving(false)
+  function remove() {
+    if (onRemoved) {
+      onRemoved(post.id)
       return
     }
-    onRemoved?.(post.id)
-    router.refresh()
+    void fetch(`/api/threads/posts/${post.id}`, { method: 'DELETE' })
   }
 
   return (
@@ -66,19 +57,21 @@ export function ThreadCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {grade && (
-            <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
-              {grade}
-              {stats.multiplier != null ? ` ${Number(stats.multiplier).toFixed(1)}배` : ''}
-            </span>
-          )}
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              stats.grade ? GRADE_PILL[stats.grade] : 'bg-white/8 text-white/40'
+            }`}
+          >
+            {grade
+              ? `${grade} ${stats.multiplier != null ? `${Number(stats.multiplier).toFixed(1)}배` : ''}`
+              : '집계 전'}
+          </span>
           <button
             type="button"
             onClick={remove}
-            disabled={removing}
-            className="rounded-lg border border-red-400/50 bg-red-500/20 px-2.5 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500 hover:text-white disabled:opacity-50"
+            className="rounded-lg border border-red-400/50 bg-red-500/20 px-2.5 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500 hover:text-white"
           >
-            {removing ? '삭제 중' : '삭제'}
+            삭제
           </button>
         </div>
       </div>
