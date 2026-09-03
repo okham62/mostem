@@ -4,18 +4,25 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
-import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, formatCount } from '@/lib/collect-labels'
+import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
 
-export function ThreadCard({ post }: { post: CollectedPost }) {
+export function ThreadCard({
+  post,
+  onRemoved,
+}: {
+  post: CollectedPost
+  onRemoved?: (id: string) => void
+}) {
   const router = useRouter()
   const [removing, setRemoving] = useState(false)
   const collected = post.collected_at ? new Date(post.collected_at) : null
   const date = collected ? collected.toISOString().slice(0, 10) : ''
   const shortDate = collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : ''
-  const grade = post.grade ? GRADE_LABEL[post.grade] : null
+  const stats = derivePostStats(post)
+  const grade = stats.grade ? GRADE_LABEL[stats.grade] : null
   const mediaItems = parseMediaItems(post)
   const caption =
     post.caption && post.caption !== post.author && post.caption !== `@${post.author}`
@@ -32,6 +39,7 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
       setRemoving(false)
       return
     }
+    onRemoved?.(post.id)
     router.refresh()
   }
 
@@ -61,7 +69,7 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
           {grade && (
             <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
               {grade}
-              {post.multiplier != null ? ` ${Number(post.multiplier).toFixed(1)}배` : ''}
+              {stats.multiplier != null ? ` ${Number(stats.multiplier).toFixed(1)}배` : ''}
             </span>
           )}
           <button
@@ -95,13 +103,32 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/75">
-        <span>조회 {formatCount(post.views)}</span>
-        <span>좋아요 {formatCount(post.likes)}</span>
-        <span>답글 {formatCount(post.comments)}</span>
-        <span>리포스트 {formatCount(post.reposts)}</span>
-        <span>공유 {formatCount(post.shares)}</span>
-        <span>인용 {formatCount(post.quotes)}</span>
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {grade && (
+          <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold text-white">
+            {grade} {stats.multiplier != null ? `${Number(stats.multiplier).toFixed(1)}배` : ''}
+          </span>
+        )}
+        <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold text-amber-300">
+          조회 {formatCount(stats.views)}
+        </span>
+        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white/80">
+          팔로워 {formatCount(stats.followers)}
+        </span>
+        <span className="rounded-full bg-violet-500/20 px-2.5 py-1 text-[11px] font-semibold text-violet-300">
+          참여율 {stats.engagement != null ? `${stats.engagement.toFixed(1)}%` : '0%'}
+        </span>
+        <span className="rounded-full bg-orange-500/20 px-2.5 py-1 text-[11px] font-semibold text-orange-300">
+          시간당 조회 {formatCount(stats.viewsPerHour)}
+        </span>
+        <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
+          확산 {stats.spread != null ? stats.spread.toFixed(1) : '0.0'}
+        </span>
+        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">좋아요 {formatCount(stats.likes)}</span>
+        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">답글 {formatCount(stats.comments)}</span>
+        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">리포스트 {formatCount(stats.reposts)}</span>
+        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">공유 {formatCount(stats.shares)}</span>
+        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">인용 {formatCount(stats.quotes)}</span>
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-2">

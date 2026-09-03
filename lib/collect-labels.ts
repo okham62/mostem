@@ -28,11 +28,64 @@ export const GRADE_LABEL: Record<PerformanceGrade, string> = {
   weak: '약함',
 }
 
+export const GRADE_PILL: Record<PerformanceGrade, string> = {
+  explosion: 'bg-brand text-white',
+  strong: 'bg-amber-500/25 text-amber-200',
+  excellent: 'bg-violet-500/25 text-violet-200',
+  normal: 'bg-white/10 text-white/70',
+  weak: 'bg-white/5 text-white/45',
+}
+
 export function formatCount(value?: number | null) {
   if (value == null || value === 0) return '0'
   if (value >= 10000) return `${(value / 10000).toFixed(1)}만`
   if (value >= 1000) return `${(value / 1000).toFixed(1)}천`
   return String(Math.round(value))
+}
+
+function gradeFromMultiplier(multiplier: number): PerformanceGrade {
+  if (multiplier >= 30) return 'explosion'
+  if (multiplier >= 10) return 'strong'
+  if (multiplier >= 3) return 'excellent'
+  if (multiplier >= 1) return 'normal'
+  return 'weak'
+}
+
+export function derivePostStats(post: {
+  views?: number | null
+  followers?: number | null
+  likes?: number | null
+  comments?: number | null
+  shares?: number | null
+  reposts?: number | null
+  quotes?: number | null
+  multiplier?: number | null
+  grade?: PerformanceGrade | null
+  engagement_rate?: number | null
+  views_per_hour?: number | null
+  spread?: number | null
+  collected_at?: string | null
+}) {
+  const views = post.views ?? 0
+  const followers = post.followers ?? 0
+  const likes = post.likes ?? 0
+  const comments = post.comments ?? 0
+  const shares = post.shares ?? 0
+  const reposts = post.reposts ?? 0
+  const quotes = post.quotes ?? 0
+  const multiplier =
+    post.multiplier ?? (views > 0 && followers > 0 ? views / followers : null)
+  const grade = post.grade ?? (multiplier != null ? gradeFromMultiplier(multiplier) : null)
+  const engagement =
+    post.engagement_rate ??
+    (views > 0 ? ((likes + comments + reposts + shares) / views) * 100 : null)
+  const hours = post.collected_at
+    ? Math.max((Date.now() - new Date(post.collected_at).getTime()) / 3_600_000, 0.25)
+    : null
+  const viewsPerHour =
+    post.views_per_hour ?? (views > 0 && hours ? views / hours : null)
+  const spread = post.spread ?? (views > 0 ? ((reposts + shares) / views) * 1000 : null)
+  return { views, followers, likes, comments, shares, reposts, quotes, multiplier, grade, engagement, viewsPerHour, spread }
 }
 
 export function mediaSrc(url?: string | null) {
