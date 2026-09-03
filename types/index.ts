@@ -46,6 +46,7 @@ export interface CollectedPost {
   status: CollectStatus
   collected_by: string | null
   collected_at: string
+  posted_at?: string | null
 }
 
 export interface ConnectedAccount {

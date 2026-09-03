@@ -73,6 +73,7 @@ export function derivePostStats(post: {
   engagement_rate?: number | null
   views_per_hour?: number | null
   spread?: number | null
+  posted_at?: string | null
   collected_at?: string | null
 }) {
   const views = post.views ?? 0
@@ -88,11 +89,15 @@ export function derivePostStats(post: {
   const engagement =
     post.engagement_rate ??
     (views > 0 ? ((likes + comments + reposts + shares) / views) * 100 : null)
-  const hours = post.collected_at
-    ? Math.max((Date.now() - new Date(post.collected_at).getTime()) / 3_600_000, 0.25)
+  const postedHours = post.posted_at
+    ? Math.max((Date.now() - new Date(post.posted_at).getTime()) / 3_600_000, 0.25)
     : null
   const viewsPerHour =
-    post.views_per_hour ?? (views > 0 && hours ? views / hours : null)
+    post.views_per_hour != null && post.views_per_hour > 0
+      ? post.views_per_hour
+      : views > 0 && postedHours
+        ? views / postedHours
+        : null
   const spread = post.spread ?? (views > 0 ? ((reposts + shares) / views) * 1000 : null)
   return { views, followers, likes, comments, shares, reposts, quotes, multiplier, grade, engagement, viewsPerHour, spread }
 }

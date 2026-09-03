@@ -40,6 +40,8 @@ type IncomingPost = {
     grade?: string
   }
   collectedAt?: string
+  createdAt?: string
+  postedAt?: string
   collectedBy?: string
   mediaItems?: Array<{
     url: string
@@ -89,11 +91,19 @@ function gradeFromMultiplier(multiplier: number) {
   return 'weak'
 }
 
+function viewsPerHourFromPostedAt(views: number, postedAt?: string | null) {
+  if (!views || !postedAt) return null
+  const created = Date.parse(postedAt)
+  if (Number.isNaN(created)) return null
+  return views / Math.max((Date.now() - created) / 3_600_000, 0.25)
+}
+
 function toRow(userId: string, post: IncomingPost, collectedBy?: string) {
   if (!post.platform || !post.postId) return null
   const m = post.metrics ?? {}
   const views = num(m.views, post.views)
   const followers = num(m.followers, post.followers)
+  const postedAt = post.postedAt ?? post.createdAt ?? null
   const multiplier =
     optNum(m.multiplier, post.performanceMultiplier, post.multiplier) ??
     (views > 0 && followers > 0 ? views / followers : null)
@@ -125,8 +135,10 @@ function toRow(userId: string, post: IncomingPost, collectedBy?: string) {
     quotes: num(m.quotes, post.quotes),
     followers,
     engagement_rate: optNum(m.engagementRate, post.engagementRate),
-    views_per_hour: optNum(m.viewsPerHour, post.viewsPerHour),
+    views_per_hour:
+      optNum(m.viewsPerHour, post.viewsPerHour) ?? viewsPerHourFromPostedAt(views, postedAt),
     spread: optNum(m.spread, post.spread),
+    posted_at: postedAt,
     multiplier,
     grade,
     status: 'collected',
@@ -180,6 +192,7 @@ function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): Coll
     spread: next.spread ?? optNum(prev.spread as number),
     multiplier,
     grade,
+    posted_at: next.posted_at ?? (typeof prev.posted_at === 'string' ? prev.posted_at : null),
     status: prevStatus !== 'collected' ? prevStatus : next.status,
     collected_at: (prev.collected_at as string) ?? next.collected_at,
   }
@@ -225,9 +238,16 @@ export async function POST(req: Request) {
   )
   const merged = rows.map((row) => mergeRow(row, prevByKey.get(`${row.platform}:${row.post_id}`)))
 
-  const { error } = await supabase.from('collected_posts').upsert(merged, {
+  let { error } = await supabase.from('collected_posts').upsert(merged, {
     onConflict: 'user_id,platform,post_id',
   })
+  if (error && /posted_at/i.test(error.message)) {
+    const withoutPosted = merged.map(({ posted_at: _postedAt, ...row }) => row)
+    const retry = await supabase.from('collected_posts').upsert(withoutPosted, {
+      onConflict: 'user_id,platform,post_id',
+    })
+    error = retry.error
+  }
 
   if (error) {
     console.error('hami collect error:', error)

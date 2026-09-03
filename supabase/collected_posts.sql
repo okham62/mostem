@@ -24,6 +24,7 @@ create table if not exists public.collected_posts (
   status text not null default 'collected',
   collected_by text,
   collected_at timestamptz not null default now(),
+  posted_at timestamptz,
   unique (user_id, platform, post_id)
 );
 
