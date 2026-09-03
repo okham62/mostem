@@ -1,5 +1,12 @@
 import type { CollectMediaItem, CollectedPost } from '@/types'
 
+export function cleanMediaUrl(url?: string | null) {
+  if (!url) return null
+  const value = url.replace(/\\u0026/g, '&').replace(/&amp;/g, '&').trim()
+  if (!value.startsWith('http://') && !value.startsWith('https://')) return null
+  return value
+}
+
 function isVideoFile(url: string) {
   return /\.(mp4|m3u8|webm|mov)(\?|$)/i.test(url)
 }
@@ -18,7 +25,16 @@ export function parseMediaItems(post: CollectedPost): CollectMediaItem[] {
     try {
       const parsed = JSON.parse(raw) as CollectMediaItem[]
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return sortMediaVideoLeft(parsed.filter((item) => item?.url))
+        return sortMediaVideoLeft(
+          parsed
+            .map((item) => ({
+              ...item,
+              url: cleanMediaUrl(item.url) ?? '',
+              poster: cleanMediaUrl(item.poster) ?? undefined,
+              videoUrl: cleanMediaUrl(item.videoUrl) ?? undefined,
+            }))
+            .filter((item) => item.url)
+        )
       }
     } catch {
       /* keep fallback */
@@ -26,14 +42,16 @@ export function parseMediaItems(post: CollectedPost): CollectMediaItem[] {
   }
 
   const items: CollectMediaItem[] = []
-  if (post.thumbnail_url) {
-    items.push({ url: post.thumbnail_url, type: 'image' })
+  const thumb = cleanMediaUrl(post.thumbnail_url)
+  if (thumb) {
+    items.push({ url: thumb, type: 'image' })
   }
-  if (raw && raw !== post.thumbnail_url && !raw.trim().startsWith('[')) {
+  const single = cleanMediaUrl(raw && !raw.trim().startsWith('[') ? raw : null)
+  if (single && single !== thumb) {
     items.push({
-      url: raw,
-      type: isVideoFile(raw) ? 'video' : 'image',
-      videoUrl: isVideoFile(raw) ? raw : undefined,
+      url: single,
+      type: isVideoFile(single) ? 'video' : 'image',
+      videoUrl: isVideoFile(single) ? single : undefined,
     })
   }
   return sortMediaVideoLeft(items)

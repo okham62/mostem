@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { mediaSrc } from '@/lib/collect-labels'
-import { sortMediaVideoLeft } from '@/lib/collect-media'
+import { cleanMediaUrl, sortMediaVideoLeft } from '@/lib/collect-media'
 import type { CollectMediaItem } from '@/types'
 
 function MuteIcon() {
@@ -15,17 +16,41 @@ function MuteIcon() {
   )
 }
 
-function MediaTile({ item }: { item: CollectMediaItem }) {
-  const videoUrl = item.videoUrl ?? (item.type === 'video' && /\.(mp4|m3u8|webm|mov)(\?|$)/i.test(item.url) ? item.url : null)
-  const poster = mediaSrc(item.poster ?? item.url)
-  const videoSrc = mediaSrc(videoUrl)
+function FallbackImage({ url }: { url: string }) {
+  const direct = cleanMediaUrl(url)
+  const proxied = direct ? mediaSrc(direct) : null
+  const [src, setSrc] = useState(direct ?? proxied ?? '')
+  const [hidden, setHidden] = useState(!src)
 
-  if (item.type === 'video' && videoSrc) {
+  if (hidden || !src) return null
+
+  return (
+    <img
+      src={src}
+      alt=""
+      referrerPolicy="no-referrer"
+      className="h-full w-full object-cover"
+      onError={() => {
+        if (direct && src === direct && proxied) {
+          setSrc(proxied)
+          return
+        }
+        setHidden(true)
+      }}
+    />
+  )
+}
+
+function MediaTile({ item }: { item: CollectMediaItem }) {
+  const imageUrl = cleanMediaUrl(item.poster) ?? cleanMediaUrl(item.url)
+  const videoUrl = cleanMediaUrl(item.videoUrl)
+
+  if (item.type === 'video' && videoUrl) {
     return (
-      <div className="relative h-full w-full bg-black">
+      <div className="relative h-full w-full">
         <video
-          src={videoSrc}
-          poster={poster ?? undefined}
+          src={mediaSrc(videoUrl) ?? videoUrl}
+          poster={imageUrl ?? undefined}
           muted
           loop
           playsInline
@@ -37,21 +62,25 @@ function MediaTile({ item }: { item: CollectMediaItem }) {
     )
   }
 
+  if (!imageUrl) return null
+
   return (
-    <div className="relative h-full w-full bg-black">
-      {poster && <img src={poster} alt="" className="h-full w-full object-cover" />}
+    <div className="relative h-full w-full">
+      <FallbackImage url={imageUrl} />
       {item.type === 'video' && <MuteIcon />}
     </div>
   )
 }
 
 export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
-  const ordered = sortMediaVideoLeft(items)
+  const ordered = sortMediaVideoLeft(items).filter(
+    (item) => cleanMediaUrl(item.url) || cleanMediaUrl(item.poster) || cleanMediaUrl(item.videoUrl)
+  )
   if (ordered.length === 0) return null
 
   if (ordered.length === 1) {
     return (
-      <div className="w-full overflow-hidden rounded-2xl bg-black">
+      <div className="w-full overflow-hidden rounded-2xl">
         <div className="aspect-[4/5]">
           <MediaTile item={ordered[0]} />
         </div>
@@ -62,7 +91,7 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
   return (
     <div className="grid w-full grid-cols-2 gap-1.5">
       {ordered.slice(0, 4).map((item, index) => (
-        <div key={`${item.url}-${index}`} className="aspect-[4/5] overflow-hidden rounded-2xl bg-black">
+        <div key={`${item.url}-${index}`} className="aspect-[4/5] overflow-hidden rounded-2xl">
           <MediaTile item={item} />
         </div>
       ))}

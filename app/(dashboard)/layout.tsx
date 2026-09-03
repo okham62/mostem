@@ -27,7 +27,7 @@ export default async function DashboardLayout({
       <main className="flex flex-1 flex-col overflow-hidden">
         <AppHeader />
         <div className="flex-1 overflow-y-auto scrollbar-thin pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
-          <div className="p-4 md:p-6">{children}</div>
+          <div className="p-3 md:p-4">{children}</div>
         </div>
       </main>
 
