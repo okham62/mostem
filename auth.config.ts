@@ -7,7 +7,21 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
-      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard') ||
+      const isOnDashboard =
+        nextUrl.pathname.startsWith('/dashboard') ||
+        nextUrl.pathname.startsWith('/keywords') ||
+        nextUrl.pathname.startsWith('/trends') ||
+        nextUrl.pathname.startsWith('/shopping') ||
+        nextUrl.pathname.startsWith('/products') ||
+        nextUrl.pathname.startsWith('/threads') ||
+        nextUrl.pathname.startsWith('/compose') ||
+        nextUrl.pathname.startsWith('/ai') ||
+        nextUrl.pathname.startsWith('/calendar') ||
+        nextUrl.pathname.startsWith('/links') ||
+        nextUrl.pathname.startsWith('/profit') ||
+        nextUrl.pathname.startsWith('/challenge') ||
+        nextUrl.pathname.startsWith('/ranking') ||
+        nextUrl.pathname.startsWith('/settings') ||
         nextUrl.pathname.startsWith('/upload') ||
         nextUrl.pathname.startsWith('/history') ||
         nextUrl.pathname.startsWith('/accounts') ||

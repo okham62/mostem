@@ -3,8 +3,8 @@ import './globals.css'
 import { PreventFileDrop } from '@/components/prevent-file-drop'
 
 export const metadata: Metadata = {
-  title: 'MOSTEM - 멀티플랫폼 영상 업로드',
-  description: '유튜브, 틱톡, 인스타그램에 영상을 한 번에 업로드하는 서비스',
+  title: 'MOSTEM',
+  description: '콘텐츠 수집, 분석, 발행을 한곳에서',
 }
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" className="dark" suppressHydrationWarning>
       <body>
         <PreventFileDrop />
         {children}

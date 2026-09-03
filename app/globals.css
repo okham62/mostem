@@ -2,26 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --sidebar-bg: #f8fafc;
-  --sidebar-border: #e2e8f0;
-  --card-bg: #ffffff;
-  --card-border: #e2e8f0;
-  --muted: #64748b;
-  --muted-bg: #f1f5f9;
-}
-
+:root,
 .dark {
-  --background: #0f172a;
-  --foreground: #f1f5f9;
-  --sidebar-bg: #1e293b;
-  --sidebar-border: #334155;
-  --card-bg: #1e293b;
-  --card-border: #334155;
-  --muted: #94a3b8;
-  --muted-bg: #334155;
+  --background: #0b0b0d;
+  --foreground: #f4f4f5;
+  --sidebar-bg: #111114;
+  --sidebar-border: #23232a;
+  --card-bg: #16161b;
+  --card-border: #2a2a33;
+  --muted: #9ca3af;
+  --muted-bg: #1c1c22;
+  --gold: #f5c518;
+  --gold-hover: #ffd84a;
+  --accent: #8b5cf6;
 }
 
 body {

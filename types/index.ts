@@ -1,6 +1,55 @@
 export type UserStatus = 'pending' | 'approved' | 'rejected'
 export type UserRole = 'user' | 'admin'
-export type Platform = 'youtube' | 'tiktok' | 'instagram'
+export type Platform = 'youtube' | 'tiktok' | 'instagram' | 'threads'
+export type CollectPlatform = 'instagram' | 'threads' | 'tiktok' | 'douyin' | 'xiaohongshu'
+export type CollectStatus =
+  | 'collected'
+  | 'analysis'
+  | 'editing'
+  | 'ready'
+  | 'failed'
+  | 'scheduled'
+  | 'uploaded'
+export type PerformanceGrade = 'explosion' | 'strong' | 'excellent' | 'normal' | 'weak'
+
+export interface CollectedPost {
+  id: string
+  user_id: string
+  platform: CollectPlatform
+  post_id: string
+  url: string | null
+  author: string | null
+  author_id: string | null
+  caption: string | null
+  thumbnail_url: string | null
+  media_url: string | null
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  reposts: number
+  quotes: number
+  followers: number
+  engagement_rate: number | null
+  views_per_hour: number | null
+  spread: number | null
+  multiplier: number | null
+  grade: PerformanceGrade | null
+  status: CollectStatus
+  collected_by: string | null
+  collected_at: string
+}
+
+export interface ConnectedAccount {
+  id: string
+  user_id: string
+  platform: 'threads'
+  username: string
+  display_name: string | null
+  intro: string | null
+  topics: string[]
+  created_at: string
+}
 export type VideoType = 'long' | 'short'
 export type UploadStatus = 'pending' | 'uploading' | 'completed' | 'failed' | 'scheduled'
 

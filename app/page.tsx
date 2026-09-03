@@ -3,6 +3,6 @@ import { auth } from '@/auth'
 
 export default async function RootPage() {
   const session = await auth()
-  if (session?.user?.status === 'approved') redirect('/dashboard')
+  if (session?.user?.status === 'approved') redirect('/threads')
   redirect('/login')
 }

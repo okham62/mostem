@@ -2,28 +2,26 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Upload, History, Link2, Users } from 'lucide-react'
+import { Flame, MessageSquare, Sparkles, BarChart3, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Session } from 'next-auth'
 
 const navItems = [
-  { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-  { href: '/upload', label: '업로드', icon: Upload },
-  { href: '/history', label: '기록', icon: History },
-  { href: '/accounts', label: '계정', icon: Link2 },
+  { href: '/keywords', label: '키워드', icon: Flame },
+  { href: '/threads', label: '스레드', icon: MessageSquare },
+  { href: '/ai', label: 'AI', icon: Sparkles },
+  { href: '/profit', label: '수익', icon: BarChart3 },
 ]
 
 export function MobileNav({ session }: { session: Session | null }) {
   const pathname = usePathname()
   const isAdmin = session?.user?.role === 'admin'
-
   const items = isAdmin
     ? [...navItems, { href: '/admin', label: '관리', icon: Users }]
     : navItems
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
-      {/* 블러 배경 */}
       <div
         className="flex items-stretch border-t border-white/10"
         style={{
@@ -41,17 +39,17 @@ export function MobileNav({ session }: { session: Session | null }) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all duration-200',
-                isActive
-                  ? 'text-brand'
-                  : 'text-white/40 hover:text-white/70'
+                'flex flex-1 flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium',
+                isActive ? 'text-brand' : 'text-white/40'
               )}
             >
-              <div className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200',
-                isActive ? 'bg-brand/15 scale-110' : ''
-              )}>
-                <Icon className={cn('h-5 w-5', isActive ? 'stroke-[2.5px]' : 'stroke-2')} />
+              <div
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-xl',
+                  isActive && 'bg-brand/15'
+                )}
+              >
+                <Icon className="h-5 w-5" />
               </div>
               <span>{item.label}</span>
             </Link>
