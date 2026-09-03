@@ -49,8 +49,8 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
 
   if (items.length === 1) {
     return (
-      <div className="overflow-hidden rounded-[18px] bg-black">
-        <div className="aspect-[4/5] w-full">
+      <div className="w-full max-w-[280px] overflow-hidden rounded-2xl bg-black">
+        <div className="aspect-[4/5]">
           <MediaTile item={items[0]} />
         </div>
       </div>
@@ -58,9 +58,9 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-[3px] overflow-hidden rounded-[18px] bg-black">
+    <div className="grid w-full max-w-[420px] grid-cols-2 gap-1.5">
       {items.slice(0, 4).map((item, index) => (
-        <div key={`${item.url}-${index}`} className="aspect-[3/4] min-w-0">
+        <div key={`${item.url}-${index}`} className="aspect-[4/5] overflow-hidden rounded-2xl bg-black">
           <MediaTile item={item} />
         </div>
       ))}

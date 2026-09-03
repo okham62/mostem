@@ -95,20 +95,13 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
         </div>
       )}
 
-      <div className="mb-3 grid grid-cols-3 gap-y-2 rounded-xl bg-[#0c0c10] px-3 py-2.5 text-center">
-        {[
-          ['조회', post.views],
-          ['좋아요', post.likes],
-          ['답글', post.comments],
-          ['리포스트', post.reposts],
-          ['공유', post.shares],
-          ['인용', post.quotes],
-        ].map(([label, value]) => (
-          <div key={String(label)}>
-            <p className="text-[10px] text-white/35">{label}</p>
-            <p className="text-xs font-semibold text-white">{formatCount(value as number)}</p>
-          </div>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/75">
+        <span>조회 {formatCount(post.views)}</span>
+        <span>좋아요 {formatCount(post.likes)}</span>
+        <span>답글 {formatCount(post.comments)}</span>
+        <span>리포스트 {formatCount(post.reposts)}</span>
+        <span>공유 {formatCount(post.shares)}</span>
+        <span>인용 {formatCount(post.quotes)}</span>
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-2">
