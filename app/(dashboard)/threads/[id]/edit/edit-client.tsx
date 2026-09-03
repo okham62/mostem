@@ -29,7 +29,13 @@ export function EditClient({
   const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
   const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [scheduleMins, setScheduleMins] = useState(10)
   const [scheduleAt, setScheduleAt] = useState(() => new Date(Date.now() + 10 * 60 * 1000))
+
+  function pickSchedule(mins: number) {
+    setScheduleMins(mins)
+    setScheduleAt(new Date(Date.now() + mins * 60 * 1000))
+  }
 
   const thumb = mediaSrc(post.thumbnail_url)
   const selected = accounts.find((a) => a.id === accountId)
@@ -139,29 +145,25 @@ export function EditClient({
           </button>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => persist('ready')}
-            className="rounded-lg bg-white/8 px-3 py-1.5 text-xs text-white"
-          >
+          <span className="hidden items-center rounded-lg bg-white/8 px-3 py-1.5 text-xs text-white/70 sm:inline-flex">
             발행대기
-          </button>
+          </span>
           <button
             type="button"
             onClick={() => {
-              setScheduleAt(new Date(Date.now() + 10 * 60 * 1000))
+              pickSchedule(10)
               setScheduleOpen(true)
             }}
-            className="rounded-lg bg-white/8 px-3 py-1.5 text-xs text-white"
+            className="rounded-lg border border-white/15 bg-transparent px-3 py-1.5 text-xs text-white hover:bg-white/5"
           >
-            예약발행
+            📅 예약발행
           </button>
           <button
             type="button"
             onClick={() => openTab('publish')}
             className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white"
           >
-            즉시발행
+            ⚡ 즉시발행
           </button>
         </div>
       </div>
@@ -366,8 +368,12 @@ export function EditClient({
                 <button
                   key={String(label)}
                   type="button"
-                  onClick={() => setScheduleAt(new Date(Date.now() + Number(mins) * 60 * 1000))}
-                  className="rounded-full bg-white/8 px-3 py-1.5 text-xs text-white/80 hover:bg-white/12"
+                  onClick={() => pickSchedule(Number(mins))}
+                  className={`rounded-full px-3 py-1.5 text-xs ${
+                    scheduleMins === Number(mins)
+                      ? 'bg-white text-black'
+                      : 'bg-white/8 text-white/80 hover:bg-white/12'
+                  }`}
                 >
                   {label}
                 </button>
@@ -390,8 +396,12 @@ export function EditClient({
                 Threads 공식 API로 예약
               </p>
               <p className="mt-1 text-xs text-white/40">
-                공식 API가 예약 시각에 발행해요. 브라우저를 켜둘 필요는 없어요.
+                공식 API가 예약 시각에 발행해요. 브라우저나 노드를 켜둘 필요가 없어요.
               </p>
+            </div>
+
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              확장이 응답하지 않으면 크롬 확장 관리에서 하미를 새로고침한 뒤 다시 시도해 주세요.
             </div>
 
             <button
@@ -406,7 +416,7 @@ export function EditClient({
               }}
               className="w-full rounded-xl bg-gold py-3 text-sm font-bold text-black disabled:opacity-50"
             >
-              🗓️ 이 시각에 예약하기
+              🗓️ (확장프로그램 방식) 이 시각에 예약하기
             </button>
             {!selected && (
               <p className="mt-2 text-xs text-gold">설정에서 업로드할 스레드 아이디를 먼저 연결하세요.</p>
