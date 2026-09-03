@@ -33,13 +33,14 @@ export function SettingsClient() {
 
   useEffect(() => {
     void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (!selected) return
     setIntro(selected.intro ?? '')
     setTopics(selected.topics ?? [])
-  }, [selectedId, accounts])
+  }, [selected])
 
   async function addAccount(e?: React.FormEvent) {
     e?.preventDefault()

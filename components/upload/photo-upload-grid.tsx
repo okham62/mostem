@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -121,7 +121,6 @@ function DragGhost({ photo }: { photo: PhotoItem }) {
 // ── 파일 드롭 영역 (투명 레이어로 전체 영역 커버) ─────────────
 function FileDropZone({
   onFiles,
-  isDraggingOver,
   setIsDraggingOver,
 }: {
   onFiles: (files: FileList) => void
