@@ -104,9 +104,10 @@ export function ThreadCard({
         </div>
         <div className="flex flex-wrap gap-1.5">
           <span className="mostem-pill mostem-pill-plain">좋아요 {formatCount(stats.likes)}</span>
-          <span className="mostem-pill mostem-pill-plain">댓글 {formatCount(stats.comments)}</span>
+          <span className="mostem-pill mostem-pill-plain">답글 {formatCount(stats.comments)}</span>
           <span className="mostem-pill mostem-pill-plain">리포스트 {formatCount(stats.reposts)}</span>
           <span className="mostem-pill mostem-pill-plain">공유 {formatCount(stats.shares)}</span>
+          <span className="mostem-pill mostem-pill-plain">인용 {formatCount(stats.quotes)}</span>
         </div>
       </div>
 
