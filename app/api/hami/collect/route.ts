@@ -12,6 +12,19 @@ type IncomingPost = {
   caption?: string
   thumbnailUrl?: string
   mediaUrl?: string
+  views?: number
+  followers?: number
+  likes?: number
+  comments?: number
+  shares?: number
+  reposts?: number
+  quotes?: number
+  engagementRate?: number
+  viewsPerHour?: number
+  spread?: number
+  multiplier?: number
+  performanceMultiplier?: number
+  grade?: string
   metrics?: {
     views?: number
     followers?: number
@@ -30,9 +43,27 @@ type IncomingPost = {
   collectedBy?: string
 }
 
+function num(...values: Array<number | null | undefined>) {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return 0
+}
+
+function optNum(...values: Array<number | null | undefined>) {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return null
+}
+
 function toRow(userId: string, post: IncomingPost, collectedBy?: string) {
   if (!post.platform || !post.postId) return null
   const m = post.metrics ?? {}
+  const caption =
+    post.caption && post.caption !== post.author && post.caption !== `@${post.author}`
+      ? post.caption
+      : null
   return {
     user_id: userId,
     platform: post.platform,
@@ -40,21 +71,21 @@ function toRow(userId: string, post: IncomingPost, collectedBy?: string) {
     url: post.url ?? null,
     author: post.author ?? null,
     author_id: post.authorId ?? null,
-    caption: post.caption ?? null,
+    caption,
     thumbnail_url: post.thumbnailUrl ?? null,
     media_url: post.mediaUrl ?? null,
-    views: m.views ?? 0,
-    likes: m.likes ?? 0,
-    comments: m.comments ?? 0,
-    shares: m.shares ?? 0,
-    reposts: m.reposts ?? 0,
-    quotes: m.quotes ?? 0,
-    followers: m.followers ?? 0,
-    engagement_rate: m.engagementRate ?? null,
-    views_per_hour: m.viewsPerHour ?? null,
-    spread: m.spread ?? null,
-    multiplier: m.multiplier ?? null,
-    grade: m.grade ?? null,
+    views: num(m.views, post.views),
+    likes: num(m.likes, post.likes),
+    comments: num(m.comments, post.comments),
+    shares: num(m.shares, post.shares),
+    reposts: num(m.reposts, post.reposts),
+    quotes: num(m.quotes, post.quotes),
+    followers: num(m.followers, post.followers),
+    engagement_rate: optNum(m.engagementRate, post.engagementRate),
+    views_per_hour: optNum(m.viewsPerHour, post.viewsPerHour),
+    spread: optNum(m.spread, post.spread),
+    multiplier: optNum(m.multiplier, post.performanceMultiplier, post.multiplier),
+    grade: m.grade ?? post.grade ?? null,
     status: 'collected',
     collected_by: (post.collectedBy ?? collectedBy ?? '').replace(/^@/, '').toLowerCase() || null,
     collected_at: post.collectedAt ?? new Date().toISOString(),

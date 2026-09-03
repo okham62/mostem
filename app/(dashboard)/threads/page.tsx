@@ -46,7 +46,7 @@ export default async function ThreadsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">수집된 스레드</h1>
           <p className="mt-1 text-sm text-white/45">
-            하미에서 수집한 스레드가 여기에 쌓입니다. mostem.kr에 로그인한 상태로 수집하세요.
+            Mostem에 로그인한 뒤 하미에서 수집하면 여기에 바로 쌓입니다. 스레드 아이디 연결은 따로 하지 않아도 됩니다.
           </p>
         </div>
         <div className="flex gap-2">
@@ -78,9 +78,7 @@ export default async function ThreadsPage() {
             </span>
           ))
         ) : (
-          <Link href="/settings" className="rounded-full bg-gold/15 px-2.5 py-1 text-gold">
-            설정에서 스레드 아이디 연결하기
-          </Link>
+          <span className="text-white/35">연결된 스레드 아이디는 선택 사항입니다</span>
         )}
       </div>
 
@@ -97,7 +95,7 @@ export default async function ThreadsPage() {
         <div className="rounded-2xl border border-dashed border-white/10 py-20 text-center">
           <p className="text-sm text-white/50">아직 수집된 스레드가 없습니다.</p>
           <p className="mt-2 text-xs text-white/30">
-            1) 설정에서 스레드 아이디 연결 → 2) mostem.kr 로그인 유지 → 3) 스레드에서 하미 수집
+            Mostem 로그인 유지 → 스레드에서 하미 수집 버튼 클릭
           </p>
         </div>
       ) : (
