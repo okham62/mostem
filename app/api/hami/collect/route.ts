@@ -57,13 +57,30 @@ function optNum(...values: Array<number | null | undefined>) {
   return null
 }
 
+function cleanCaption(caption?: string | null, author?: string | null) {
+  const text = caption?.trim()
+  if (!text) return null
+  if (author && (text === author || text === `@${author}`)) return null
+  return text
+}
+
+function gradeFromMultiplier(multiplier: number) {
+  if (multiplier >= 30) return 'explosion'
+  if (multiplier >= 10) return 'strong'
+  if (multiplier >= 3) return 'excellent'
+  if (multiplier >= 1) return 'normal'
+  return 'weak'
+}
+
 function toRow(userId: string, post: IncomingPost, collectedBy?: string) {
   if (!post.platform || !post.postId) return null
   const m = post.metrics ?? {}
-  const caption =
-    post.caption && post.caption !== post.author && post.caption !== `@${post.author}`
-      ? post.caption
-      : null
+  const views = num(m.views, post.views)
+  const followers = num(m.followers, post.followers)
+  const multiplier =
+    optNum(m.multiplier, post.performanceMultiplier, post.multiplier) ??
+    (views > 0 && followers > 0 ? views / followers : null)
+  const grade = m.grade ?? post.grade ?? (multiplier != null ? gradeFromMultiplier(multiplier) : null)
   return {
     user_id: userId,
     platform: post.platform,
@@ -71,24 +88,71 @@ function toRow(userId: string, post: IncomingPost, collectedBy?: string) {
     url: post.url ?? null,
     author: post.author ?? null,
     author_id: post.authorId ?? null,
-    caption,
+    caption: cleanCaption(post.caption, post.author),
     thumbnail_url: post.thumbnailUrl ?? null,
     media_url: post.mediaUrl ?? null,
-    views: num(m.views, post.views),
+    views,
     likes: num(m.likes, post.likes),
     comments: num(m.comments, post.comments),
     shares: num(m.shares, post.shares),
     reposts: num(m.reposts, post.reposts),
     quotes: num(m.quotes, post.quotes),
-    followers: num(m.followers, post.followers),
+    followers,
     engagement_rate: optNum(m.engagementRate, post.engagementRate),
     views_per_hour: optNum(m.viewsPerHour, post.viewsPerHour),
     spread: optNum(m.spread, post.spread),
-    multiplier: optNum(m.multiplier, post.performanceMultiplier, post.multiplier),
-    grade: m.grade ?? post.grade ?? null,
+    multiplier,
+    grade,
     status: 'collected',
     collected_by: (post.collectedBy ?? collectedBy ?? '').replace(/^@/, '').toLowerCase() || null,
     collected_at: post.collectedAt ?? new Date().toISOString(),
+  }
+}
+
+type CollectRow = NonNullable<ReturnType<typeof toRow>>
+
+function keepText(next: string | null, prev: string | null | undefined) {
+  return next || prev || null
+}
+
+function keepCount(next: number, prev: number | null | undefined) {
+  return next > 0 ? next : prev ?? 0
+}
+
+function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): CollectRow {
+  if (!prev) return next
+  const views = keepCount(next.views, prev.views as number)
+  const followers = keepCount(next.followers, prev.followers as number)
+  const multiplier =
+    next.multiplier ??
+    (typeof prev.multiplier === 'number' ? prev.multiplier : null) ??
+    (views > 0 && followers > 0 ? views / followers : null)
+  const grade =
+    next.grade ??
+    (typeof prev.grade === 'string' ? prev.grade : null) ??
+    (multiplier != null ? gradeFromMultiplier(multiplier) : null)
+  const prevStatus = typeof prev.status === 'string' ? prev.status : 'collected'
+  return {
+    ...next,
+    caption: keepText(next.caption, prev.caption as string | null),
+    thumbnail_url: keepText(next.thumbnail_url, prev.thumbnail_url as string | null),
+    media_url: keepText(next.media_url, prev.media_url as string | null),
+    url: keepText(next.url, prev.url as string | null),
+    author: keepText(next.author, prev.author as string | null),
+    views,
+    likes: Math.max(next.likes, num(prev.likes as number)),
+    comments: Math.max(next.comments, num(prev.comments as number)),
+    shares: Math.max(next.shares, num(prev.shares as number)),
+    reposts: Math.max(next.reposts, num(prev.reposts as number)),
+    quotes: Math.max(next.quotes, num(prev.quotes as number)),
+    followers,
+    engagement_rate: next.engagement_rate ?? optNum(prev.engagement_rate as number),
+    views_per_hour: next.views_per_hour ?? optNum(prev.views_per_hour as number),
+    spread: next.spread ?? optNum(prev.spread as number),
+    multiplier,
+    grade,
+    status: prevStatus !== 'collected' ? prevStatus : next.status,
+    collected_at: (prev.collected_at as string) ?? next.collected_at,
   }
 }
 
@@ -121,7 +185,18 @@ export async function POST(req: Request) {
   }
 
   const supabase = createAdminClient()
-  const { error } = await supabase.from('collected_posts').upsert(rows, {
+  const { data: existing } = await supabase
+    .from('collected_posts')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .in('post_id', rows.map((row) => row.post_id))
+
+  const prevByKey = new Map(
+    (existing ?? []).map((row) => [`${row.platform}:${row.post_id}`, row])
+  )
+  const merged = rows.map((row) => mergeRow(row, prevByKey.get(`${row.platform}:${row.post_id}`)))
+
+  const { error } = await supabase.from('collected_posts').upsert(merged, {
     onConflict: 'user_id,platform,post_id',
   })
 

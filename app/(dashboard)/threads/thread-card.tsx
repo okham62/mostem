@@ -1,9 +1,15 @@
+'use client'
+
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import type { CollectedPost } from '@/types'
 
 export function ThreadCard({ post }: { post: CollectedPost }) {
+  const router = useRouter()
+  const [removing, setRemoving] = useState(false)
   const collected = post.collected_at ? new Date(post.collected_at) : null
   const date = collected ? collected.toISOString().slice(0, 10) : ''
   const shortDate = collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : ''
@@ -15,9 +21,31 @@ export function ThreadCard({ post }: { post: CollectedPost }) {
       : '본문 없음'
   const initial = (post.author?.[0] ?? 'U').toUpperCase()
 
+  async function remove() {
+    if (removing) return
+    if (!window.confirm('이 수집을 삭제할까요?')) return
+    setRemoving(true)
+    const res = await fetch(`/api/threads/posts/${post.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      setRemoving(false)
+      return
+    }
+    router.refresh()
+  }
+
   return (
-    <article className="flex flex-col rounded-2xl border border-[var(--card-border)] bg-[#141418] p-4">
-      <div className="mb-3 flex items-start justify-between gap-2">
+    <article className="relative flex flex-col rounded-2xl border border-[var(--card-border)] bg-[#141418] p-4">
+      <button
+        type="button"
+        onClick={remove}
+        disabled={removing}
+        aria-label="수집 삭제"
+        className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/55 text-sm text-white/70 hover:bg-red-500 hover:text-white disabled:opacity-50"
+      >
+        ✕
+      </button>
+
+      <div className="mb-3 flex items-start justify-between gap-2 pr-9">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
             {initial}
