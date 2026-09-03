@@ -4,13 +4,21 @@ function isVideoFile(url: string) {
   return /\.(mp4|m3u8|webm|mov)(\?|$)/i.test(url)
 }
 
+function isVideoItem(item: CollectMediaItem) {
+  return item.type === 'video' || !!item.videoUrl || isVideoFile(item.url)
+}
+
+export function sortMediaVideoLeft(items: CollectMediaItem[]) {
+  return [...items].sort((a, b) => Number(isVideoItem(b)) - Number(isVideoItem(a)))
+}
+
 export function parseMediaItems(post: CollectedPost): CollectMediaItem[] {
   const raw = post.media_url
   if (raw?.trim().startsWith('[')) {
     try {
       const parsed = JSON.parse(raw) as CollectMediaItem[]
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.filter((item) => item?.url)
+        return sortMediaVideoLeft(parsed.filter((item) => item?.url))
       }
     } catch {
       /* keep fallback */
@@ -28,7 +36,7 @@ export function parseMediaItems(post: CollectedPost): CollectMediaItem[] {
       videoUrl: isVideoFile(raw) ? raw : undefined,
     })
   }
-  return items
+  return sortMediaVideoLeft(items)
 }
 
 export function serializeMediaItems(items?: CollectMediaItem[] | null) {

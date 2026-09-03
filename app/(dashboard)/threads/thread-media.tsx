@@ -1,6 +1,7 @@
 'use client'
 
 import { mediaSrc } from '@/lib/collect-labels'
+import { sortMediaVideoLeft } from '@/lib/collect-media'
 import type { CollectMediaItem } from '@/types'
 
 function MuteIcon() {
@@ -45,13 +46,14 @@ function MediaTile({ item }: { item: CollectMediaItem }) {
 }
 
 export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
-  if (items.length === 0) return null
+  const ordered = sortMediaVideoLeft(items)
+  if (ordered.length === 0) return null
 
-  if (items.length === 1) {
+  if (ordered.length === 1) {
     return (
       <div className="w-full max-w-[280px] overflow-hidden rounded-2xl bg-black">
         <div className="aspect-[4/5]">
-          <MediaTile item={items[0]} />
+          <MediaTile item={ordered[0]} />
         </div>
       </div>
     )
@@ -59,7 +61,7 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
 
   return (
     <div className="grid w-full max-w-[420px] grid-cols-2 gap-1.5">
-      {items.slice(0, 4).map((item, index) => (
+      {ordered.slice(0, 4).map((item, index) => (
         <div key={`${item.url}-${index}`} className="aspect-[4/5] overflow-hidden rounded-2xl bg-black">
           <MediaTile item={item} />
         </div>
