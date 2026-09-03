@@ -19,6 +19,17 @@ export function sortMediaVideoLeft(items: CollectMediaItem[]) {
   return [...items].sort((a, b) => Number(isVideoItem(b)) - Number(isVideoItem(a)))
 }
 
+export function previewMedia(items: CollectMediaItem[]) {
+  const videos = items.filter(isVideoItem)
+  const photos = items.filter((item) => !isVideoItem(item))
+  const shown: CollectMediaItem[] = []
+  if (videos[0]) shown.push(videos[0])
+  if (photos[0]) shown.push(photos[0])
+  else if (videos[1] && shown.length === 1) shown.push(videos[1])
+  const hidden = Math.max(0, items.length - shown.length)
+  return { shown, hidden }
+}
+
 export function parseMediaItems(post: CollectedPost): CollectMediaItem[] {
   const raw = post.media_url
   if (raw?.trim().startsWith('[')) {

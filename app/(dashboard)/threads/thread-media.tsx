@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { mediaSrc } from '@/lib/collect-labels'
-import { cleanMediaUrl, sortMediaVideoLeft } from '@/lib/collect-media'
+import { cleanMediaUrl, previewMedia, sortMediaVideoLeft } from '@/lib/collect-media'
 import type { CollectMediaItem } from '@/types'
 
 function MuteIcon() {
@@ -41,7 +41,7 @@ function FallbackImage({ url }: { url: string }) {
   )
 }
 
-function MediaTile({ item }: { item: CollectMediaItem }) {
+function MediaTile({ item, extraCount }: { item: CollectMediaItem; extraCount?: number }) {
   const imageUrl = cleanMediaUrl(item.poster) ?? cleanMediaUrl(item.url)
   const videoUrl = cleanMediaUrl(item.videoUrl)
 
@@ -58,6 +58,11 @@ function MediaTile({ item }: { item: CollectMediaItem }) {
           className="h-full w-full object-cover"
         />
         <MuteIcon />
+        {extraCount ? (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-2xl font-bold text-white">
+            +{extraCount}
+          </span>
+        ) : null}
       </div>
     )
   }
@@ -68,21 +73,27 @@ function MediaTile({ item }: { item: CollectMediaItem }) {
     <div className="relative h-full w-full">
       <FallbackImage url={imageUrl} />
       {item.type === 'video' && <MuteIcon />}
+      {extraCount ? (
+        <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-2xl font-bold text-white">
+          +{extraCount}
+        </span>
+      ) : null}
     </div>
   )
 }
 
 export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
-  const ordered = sortMediaVideoLeft(items).filter(
+  const valid = sortMediaVideoLeft(items).filter(
     (item) => cleanMediaUrl(item.url) || cleanMediaUrl(item.poster) || cleanMediaUrl(item.videoUrl)
   )
-  if (ordered.length === 0) return null
+  const { shown, hidden } = previewMedia(valid)
+  if (shown.length === 0) return null
 
-  if (ordered.length === 1) {
+  if (shown.length === 1) {
     return (
       <div className="w-full overflow-hidden rounded-2xl">
         <div className="aspect-[4/5]">
-          <MediaTile item={ordered[0]} />
+          <MediaTile item={shown[0]} extraCount={hidden || undefined} />
         </div>
       </div>
     )
@@ -90,11 +101,12 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
 
   return (
     <div className="grid w-full grid-cols-2 gap-1.5">
-      {ordered.slice(0, 4).map((item, index) => (
-        <div key={`${item.url}-${index}`} className="aspect-[4/5] overflow-hidden rounded-2xl">
-          <MediaTile item={item} />
-        </div>
-      ))}
+      <div className="aspect-[4/5] overflow-hidden rounded-2xl">
+        <MediaTile item={shown[0]} />
+      </div>
+      <div className="aspect-[4/5] overflow-hidden rounded-2xl">
+        <MediaTile item={shown[1]} extraCount={hidden || undefined} />
+      </div>
     </div>
   )
 }
