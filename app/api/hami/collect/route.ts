@@ -245,7 +245,9 @@ export async function POST(req: Request) {
     onConflict: 'user_id,platform,post_id',
   })
   if (error && /posted_at/i.test(error.message)) {
-    const withoutPosted = merged.map(({ posted_at: _postedAt, ...row }) => row)
+    const withoutPosted = merged.map((row) =>
+      Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'posted_at'))
+    )
     const retry = await supabase.from('collected_posts').upsert(withoutPosted, {
       onConflict: 'user_id,platform,post_id',
     })
