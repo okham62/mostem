@@ -1,6 +1,6 @@
 export type UserStatus = 'pending' | 'approved' | 'rejected'
 export type UserRole = 'user' | 'admin'
-export type Platform = 'youtube' | 'tiktok' | 'instagram' | 'threads'
+export type Platform = 'youtube' | 'tiktok' | 'instagram'
 export type CollectPlatform = 'instagram' | 'threads' | 'tiktok' | 'douyin' | 'xiaohongshu'
 export type CollectStatus =
   | 'collected'
