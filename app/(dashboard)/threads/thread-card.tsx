@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
+import { MediaDownloadButtons } from './media-download-buttons'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
 
@@ -115,7 +116,8 @@ export function ThreadCard({
         <p className="truncate text-[11px] text-white/40">
           팔로워 {formatCount(post.followers)} 수집 {shortDate}
         </p>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex flex-wrap shrink-0 items-center justify-end gap-1.5">
+          <MediaDownloadButtons author={post.author} postId={post.post_id} items={mediaItems} />
           {post.url && (
             <a
               href={post.url}
