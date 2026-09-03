@@ -112,12 +112,15 @@ export function ThreadCard({
         </div>
       </div>
 
+      <div className="mb-2">
+        <MediaDownloadButtons author={post.author} postId={post.post_id} items={mediaItems} layout="stack" />
+      </div>
+
       <div className="mt-auto flex items-center justify-between gap-2">
         <p className="truncate text-[11px] text-white/40">
           팔로워 {formatCount(post.followers)} 수집 {shortDate}
         </p>
-        <div className="flex flex-wrap shrink-0 items-center justify-end gap-1.5">
-          <MediaDownloadButtons author={post.author} postId={post.post_id} items={mediaItems} />
+        <div className="flex shrink-0 items-center justify-end gap-1.5">
           {post.url && (
             <a
               href={post.url}

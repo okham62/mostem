@@ -13,6 +13,7 @@ import {
   mediaSrc,
 } from '@/lib/collect-labels'
 import { parseMediaItems } from '@/lib/collect-media'
+import { MediaDownloadButtons } from './media-download-buttons'
 import { ThreadCard } from './thread-card'
 import type { CollectedPost, CollectStatus, ConnectedAccount, PerformanceGrade } from '@/types'
 
@@ -316,7 +317,8 @@ function ListView({
                   {collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : '-'}
                 </td>
                 <td className="px-3 py-3">
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <MediaDownloadButtons author={post.author} postId={post.post_id} items={parseMediaItems(post)} />
                     {post.url && (
                       <a
                         href={post.url}
@@ -389,6 +391,9 @@ function KanbanView({
                           수집 {collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : '-'} · 조회{' '}
                           {formatCount(stats.views)} · 좋아요 {formatCount(stats.likes)}
                         </p>
+                        <div className="mt-2">
+                          <MediaDownloadButtons author={post.author} postId={post.post_id} items={parseMediaItems(post)} layout="stack" />
+                        </div>
                         <div className="mt-2 flex justify-end gap-1.5">
                           <Link
                             href={`/threads/${post.id}/edit?tab=rewrite`}

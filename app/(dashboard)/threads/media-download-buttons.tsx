@@ -32,10 +32,12 @@ export function MediaDownloadButtons({
   author,
   postId,
   items,
+  layout = 'row',
 }: {
   author?: string | null
   postId: string
   items: CollectMediaItem[]
+  layout?: 'row' | 'stack'
 }) {
   const [busy, setBusy] = useState<'video' | 'image' | null>(null)
   const base = `${safePart(author || 'user')}_${safePart(postId)}`
@@ -61,26 +63,31 @@ export function MediaDownloadButtons({
     window.setTimeout(() => setBusy(null), 400 + urls.length * 60)
   }
 
+  const buttonClass =
+    layout === 'stack'
+      ? 'inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-[#1b1b20] px-3 py-2 text-[12px] font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40'
+      : 'inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40'
+
   return (
-    <>
+    <div className={layout === 'stack' ? 'grid grid-cols-2 gap-1.5' : 'flex flex-wrap items-center gap-1.5'}>
       <button
         type="button"
         disabled={videos.length === 0 || busy !== null}
         onClick={() => download('video')}
-        className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+        className={buttonClass}
       >
-        <Download className="h-3 w-3" />
+        <Download className="h-3.5 w-3.5" />
         {busy === 'video' ? '받는 중' : '동영상 다운로드'}
       </button>
       <button
         type="button"
         disabled={images.length === 0 || busy !== null}
         onClick={() => download('image')}
-        className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+        className={buttonClass}
       >
-        <Download className="h-3 w-3" />
+        <Download className="h-3.5 w-3.5" />
         {busy === 'image' ? '받는 중' : '이미지 다운로드'}
       </button>
-    </>
+    </div>
   )
 }
