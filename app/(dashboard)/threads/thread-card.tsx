@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
-import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount } from '@/lib/collect-labels'
+import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
@@ -87,32 +87,27 @@ export function ThreadCard({
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {grade && (
-          <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold text-white">
-            {grade} {stats.multiplier != null ? `${Number(stats.multiplier).toFixed(1)}배` : ''}
+      <div className="mostem-metrics mb-4 space-y-1.5 overflow-visible">
+        <div className="flex flex-wrap gap-1.5">
+          <span className={`mostem-pill mostem-pill-grade-${stats.grade ?? 'aggregating'}`}>
+            {grade ? `${grade} ${formatMultiplier(stats.multiplier)}` : '집계중 …'}
           </span>
-        )}
-        <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold text-amber-300">
-          조회 {formatCount(stats.views)}
-        </span>
-        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white/80">
-          팔로워 {formatCount(stats.followers)}
-        </span>
-        <span className="rounded-full bg-violet-500/20 px-2.5 py-1 text-[11px] font-semibold text-violet-300">
-          참여율 {stats.engagement != null ? `${stats.engagement.toFixed(1)}%` : '0%'}
-        </span>
-        <span className="rounded-full bg-orange-500/20 px-2.5 py-1 text-[11px] font-semibold text-orange-300">
-          시간당 조회 {formatCount(stats.viewsPerHour)}
-        </span>
-        <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
-          확산 {stats.spread != null ? stats.spread.toFixed(1) : '0.0'}
-        </span>
-        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">좋아요 {formatCount(stats.likes)}</span>
-        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">답글 {formatCount(stats.comments)}</span>
-        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">리포스트 {formatCount(stats.reposts)}</span>
-        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">공유 {formatCount(stats.shares)}</span>
-        <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-white/70">인용 {formatCount(stats.quotes)}</span>
+          <span className="mostem-pill mostem-pill-views">조회 {formatCount(stats.views)}</span>
+          <span className="mostem-pill mostem-pill-followers">팔로워 {formatCount(stats.followers)}</span>
+          <span className="mostem-pill mostem-pill-engagement">
+            참여율 {stats.engagement != null ? `${stats.engagement.toFixed(1)}%` : '0%'}
+          </span>
+          <span className="mostem-pill mostem-pill-vph">시간당 조회 {formatCount(stats.viewsPerHour)}</span>
+          <span className="mostem-pill mostem-pill-spread">
+            확산 {stats.spread != null ? stats.spread.toFixed(1) : '0.0'}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="mostem-pill mostem-pill-plain">좋아요 {formatCount(stats.likes)}</span>
+          <span className="mostem-pill mostem-pill-plain">댓글 {formatCount(stats.comments)}</span>
+          <span className="mostem-pill mostem-pill-plain">리포스트 {formatCount(stats.reposts)}</span>
+          <span className="mostem-pill mostem-pill-plain">공유 {formatCount(stats.shares)}</span>
+        </div>
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-2">

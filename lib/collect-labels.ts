@@ -43,6 +43,15 @@ export function formatCount(value?: number | null) {
   return String(Math.round(value))
 }
 
+export function formatMultiplier(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return '…'
+  if (value >= 10000) return `${(value / 10000).toFixed(1)}만배`
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}천배`
+  const rounded = Math.round(value * 10) / 10
+  if (Number.isInteger(rounded)) return `${rounded}배`
+  return `${rounded.toFixed(1)}배`
+}
+
 function gradeFromMultiplier(multiplier: number): PerformanceGrade {
   if (multiplier >= 30) return 'explosion'
   if (multiplier >= 10) return 'strong'
