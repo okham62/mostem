@@ -6,10 +6,12 @@ import {
   formatKeywordTime,
   type KeywordState,
   type KeywordsPayload,
+  type RankingNews,
 } from '@/lib/keywords'
 import { cn } from '@/lib/utils'
 
-const NEWS_PER_PAGE = 4
+const NEWS_PER_PAGE = 12
+const NEWS_PAGES = 30
 const POLL_MS = 30_000
 
 const STATE_UI: Record<
@@ -24,6 +26,17 @@ const STATE_UI: Record<
 
 function naverSearch(keyword: string) {
   return `https://search.naver.com/search.naver?query=${encodeURIComponent(keyword)}`
+}
+
+function newsForPage(news: RankingNews[], page: number) {
+  if (news.length === 0) return []
+  if (news.length <= NEWS_PER_PAGE) {
+    return Array.from({ length: NEWS_PER_PAGE }, (_, i) => news[i % news.length])
+  }
+  const maxStart = news.length - NEWS_PER_PAGE
+  const start =
+    NEWS_PAGES <= 1 ? 0 : Math.round((page * maxStart) / (NEWS_PAGES - 1))
+  return news.slice(start, start + NEWS_PER_PAGE)
 }
 
 export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
@@ -55,9 +68,8 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
     }
   }, [])
 
-  const newsPages = Math.max(1, Math.ceil(data.news.length / NEWS_PER_PAGE))
-  const page = Math.min(newsPage, newsPages - 1)
-  const newsSlice = data.news.slice(page * NEWS_PER_PAGE, (page + 1) * NEWS_PER_PAGE)
+  const page = ((newsPage % NEWS_PAGES) + NEWS_PAGES) % NEWS_PAGES
+  const newsSlice = newsForPage(data.news, page)
   const left = data.keywords.slice(0, 5)
   const right = data.keywords.slice(5, 10)
 
@@ -109,22 +121,22 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
             <h2 className="text-sm font-semibold text-white">언론사별 가장 많이 본 뉴스</h2>
             <p className="mt-0.5 text-xs text-white/40">각 언론사의 가장 많이 본 기사 1건</p>
           </div>
-          {newsPages > 1 && (
+          {data.news.length > 0 && (
             <div className="flex items-center gap-2 text-xs text-white/50">
               <button
                 type="button"
-                onClick={() => setNewsPage((p) => (p - 1 + newsPages) % newsPages)}
+                onClick={() => setNewsPage((p) => (p - 1 + NEWS_PAGES) % NEWS_PAGES)}
                 className="rounded-md p-1 hover:bg-white/10 hover:text-white"
                 aria-label="이전 뉴스"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span>
-                {page + 1} / {newsPages}
+                {page + 1} / {NEWS_PAGES}
               </span>
               <button
                 type="button"
-                onClick={() => setNewsPage((p) => (p + 1) % newsPages)}
+                onClick={() => setNewsPage((p) => (p + 1) % NEWS_PAGES)}
                 className="rounded-md p-1 hover:bg-white/10 hover:text-white"
                 aria-label="다음 뉴스"
               >
@@ -133,10 +145,10 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
             </div>
           )}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {newsSlice.map((item) => (
+        <div className="grid grid-cols-3 gap-3">
+          {newsSlice.map((item, index) => (
             <a
-              key={item.link}
+              key={`${item.link}-${index}`}
               href={item.link}
               target="_blank"
               rel="noreferrer"
