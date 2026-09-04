@@ -190,7 +190,7 @@ function NewsFilterBar({
 
   function closeMenu() {
     if (closeTimer.current) window.clearTimeout(closeTimer.current)
-    closeTimer.current = window.setTimeout(() => setOpen(false), 60)
+    closeTimer.current = window.setTimeout(() => setOpen(false), 180)
   }
 
   useEffect(() => {
@@ -210,11 +210,15 @@ function NewsFilterBar({
 
   return (
     <section className="sticky top-0 z-20 -mx-3 md:-mx-0">
-      <div className="flex flex-col gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-2 sm:flex-row sm:items-center">
-        <div onMouseEnter={openMenu} onMouseLeave={closeMenu}>
+      <div
+        className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)]"
+        onMouseLeave={closeMenu}
+      >
+        <div className="flex flex-col gap-2 p-2 sm:flex-row sm:items-center">
           <button
             type="button"
             aria-expanded={open}
+            onMouseEnter={openMenu}
             onClick={() => {
               if (window.matchMedia('(hover: hover)').matches) return
               setOpen((value) => !value)
@@ -228,62 +232,58 @@ function NewsFilterBar({
             전체 언론사
             <ChevronDown className={cn('h-4 w-4 transition-transform duration-150', open && 'rotate-180')} />
           </button>
+          <label className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+            <input
+              value={query}
+              onChange={(event) => onQuery(event.target.value)}
+              placeholder="뉴스 제목 또는 내용 검색..."
+              className="h-10 w-full rounded-lg bg-black/35 pl-9 pr-3 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-white/30 focus:ring-gold/40"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              onQuery('')
+              setOpen(false)
+            }}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs text-white/50 transition hover:bg-white/5 hover:text-white"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            초기화
+          </button>
         </div>
-        <label className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-          <input
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-            placeholder="뉴스 제목 또는 내용 검색..."
-            className="h-10 w-full rounded-lg bg-black/35 pl-9 pr-3 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-white/30 focus:ring-gold/40"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => {
-            onQuery('')
-            setOpen(false)
-          }}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs text-white/50 transition hover:bg-white/5 hover:text-white"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          초기화
-        </button>
-      </div>
-      {open ? (
-        <div
-          onMouseEnter={openMenu}
-          onMouseLeave={closeMenu}
-          className="mostem-press-panel mt-1.5 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
-        >
-          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {PRESS_NAV_OUTLETS.map((outlet, index) => (
-              <a
-                key={outlet.url}
-                href={outlet.url}
-                target="_blank"
-                rel="noreferrer"
-                style={{ animationDelay: `${Math.min(index, 12) * 12}ms` }}
-                className="mostem-press-item flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-white/70 transition-colors duration-150 hover:bg-white/5 hover:text-white"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={outlet.logo}
-                  alt=""
-                  width={200}
-                  height={200}
-                  className="h-7 w-7 rounded-md object-cover"
-                  onError={(event) => {
-                    const host = new URL(outlet.url).hostname
-                    event.currentTarget.src = `https://www.google.com/s2/favicons?domain=${host}&sz=128`
-                  }}
-                />
-                <span className="truncate font-medium">{outlet.name}</span>
-              </a>
-            ))}
+        {open ? (
+          <div className="mostem-menu-panel border-t border-white/8 p-3">
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {PRESS_NAV_OUTLETS.map((outlet) => (
+                <a
+                  key={outlet.url}
+                  href={outlet.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mostem-menu-item flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-white/70 hover:bg-brand/25 hover:text-white hover:shadow-[inset_0_0_0_1px_rgba(245,197,24,0.35)]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={outlet.logo}
+                    alt=""
+                    width={200}
+                    height={200}
+                    className="h-7 w-7 rounded-md object-cover"
+                    onError={(event) => {
+                      const host = new URL(outlet.url).hostname
+                      event.currentTarget.src = `https://www.google.com/s2/favicons?domain=${host}&sz=128`
+                    }}
+                  />
+                  <span className="truncate font-medium">{outlet.name}</span>
+                </a>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </section>
   )
 }
+

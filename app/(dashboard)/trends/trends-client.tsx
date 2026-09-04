@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Calendar,
   Check,
@@ -304,28 +304,68 @@ function HoverSelect({
   onChange: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [highlight, setHighlight] = useState<{ top: number; height: number } | null>(null)
+  const closeTimer = useRef<number | null>(null)
+
+  function openMenu() {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+
+  function closeMenu() {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => {
+      setOpen(false)
+      setHighlight(null)
+    }, 180)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    }
+  }, [])
+
   return (
-    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div className={cn('relative', open ? 'z-50' : 'z-20')} onMouseEnter={openMenu} onMouseLeave={closeMenu}>
       <button
         type="button"
         className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-black/30 px-3 text-xs text-white/70 ring-1 ring-white/10"
       >
         {value}
-        <ChevronDown className="h-3.5 w-3.5" />
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180 text-gold')} />
       </button>
       {open ? (
-        <div className="mostem-press-panel absolute left-0 top-full z-30 mt-1 min-w-[180px] rounded-xl border border-[var(--card-border)] bg-[#16161b] py-1 shadow-2xl">
-          {options.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onChange(option.id)}
-              className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-white/70 hover:bg-white/5 hover:text-white"
-            >
-              {option.label}
-              {option.label === value ? <Check className="h-3.5 w-3.5 text-gold" /> : null}
-            </button>
-          ))}
+        <div className="absolute left-0 top-full z-50 min-w-[200px] pt-2">
+          <div className="mostem-menu-panel relative overflow-hidden rounded-xl border border-white/10 bg-[#16161b] py-1 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
+            {highlight ? (
+              <div
+                className="mostem-menu-highlight"
+                style={{ top: highlight.top, height: highlight.height }}
+              />
+            ) : null}
+            {options.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onMouseEnter={(event) => {
+                  const el = event.currentTarget
+                  setHighlight({ top: el.offsetTop, height: el.offsetHeight })
+                }}
+                onClick={() => {
+                  onChange(option.id)
+                  setOpen(false)
+                }}
+                className={cn(
+                  'mostem-menu-item relative z-[1] flex w-full items-center justify-between px-3 py-2.5 text-left text-xs',
+                  option.label === value ? 'text-gold' : 'text-white/70'
+                )}
+              >
+                {option.label}
+                {option.label === value ? <Check className="h-3.5 w-3.5 text-gold" /> : null}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>

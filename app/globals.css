@@ -299,9 +299,53 @@ html {
   }
 
   .mostem-press-panel,
-  .mostem-press-item {
+  .mostem-press-item,
+  .mostem-menu-panel,
+  .mostem-menu-highlight,
+  .mostem-menu-item {
     animation: none;
+    transition: none;
+    transform: none;
   }
+}
+
+.mostem-menu-panel {
+  animation: mostem-menu-in 120ms ease-out both;
+}
+
+@keyframes mostem-menu-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mostem-menu-highlight {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.42), rgba(245, 197, 24, 0.2));
+  box-shadow:
+    0 0 0 1px rgba(245, 197, 24, 0.28),
+    0 8px 18px rgba(139, 92, 246, 0.18);
+  transition:
+    top 140ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.mostem-menu-item {
+  transition:
+    color 120ms ease,
+    transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mostem-menu-item:hover {
+  color: #fff;
+  transform: translateX(4px);
 }
 
 @keyframes mostem-press-in {
