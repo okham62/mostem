@@ -37,6 +37,10 @@ export interface KeywordsPayload {
 
 const SIGNAL_URL = 'https://api.signal.bz/news/realtime'
 const GOOGLE_RSS_URL = 'https://trends.google.com/trending/rss?geo=KR'
+const GOOGLE_TRENDING_URL = 'https://trends.google.com/trending?geo=KR&hl=ko'
+const NATE_URL = 'https://www.nate.com/js/data/jsonLiveKeywordDataV1.js'
+const ZUM_URL = 'https://zum.com/'
+const KEYWORD_LIMIT = 30
 const CACHE_MS = 20_000
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
@@ -146,18 +150,50 @@ function parseNews(raw: SignalPayload): RankingNews[] {
     .filter((item): item is RankingNews => item != null)
 }
 
+function keywordKey(value: string) {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function mergeKeywords(groups: RealtimeKeyword[][], limit = KEYWORD_LIMIT) {
+  const seen = new Set<string>()
+  const out: RealtimeKeyword[] = []
+  for (const group of groups) {
+    for (const item of group) {
+      const key = keywordKey(item.keyword)
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      out.push({ ...item, rank: out.length + 1 })
+      if (out.length >= limit) return out
+    }
+  }
+  return out
+}
+
+function toKeyword(
+  keyword: string,
+  extra: Partial<RealtimeKeyword> = {}
+): RealtimeKeyword {
+  return {
+    rank: extra.rank ?? 0,
+    keyword,
+    state: extra.state ?? 'same',
+    summaryUrl: extra.summaryUrl ?? '',
+    searchUrl: extra.searchUrl ?? naverSearch(keyword),
+    ...(extra.traffic ? { traffic: extra.traffic } : {}),
+  }
+}
+
 function parseSignalKeywords(raw: SignalPayload): RealtimeKeyword[] {
   return (raw.top10 ?? raw.keywords ?? [])
     .map((item, index) => {
       const keyword = item.keyword?.trim()
       if (!keyword) return null
-      return {
+      return toKeyword(keyword, {
         rank: item.rank ?? index + 1,
-        keyword,
         state: mapState(item.state),
         summaryUrl: item.summaryUrl || item.summary || '',
         searchUrl: naverSearch(keyword),
-      } satisfies RealtimeKeyword
+      })
     })
     .filter((item): item is RealtimeKeyword => item != null)
     .sort((a, b) => a.rank - b.rank)
@@ -171,54 +207,182 @@ function parseGoogleRss(xml: string): RealtimeKeyword[] {
   for (const block of blocks) {
     const title = decodeXml(block.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? '')
     if (!title || title.toLowerCase().includes('daily search trends')) continue
-    const key = title.toLowerCase()
+    const key = keywordKey(title)
     if (seen.has(key)) continue
     seen.add(key)
-    const traffic = decodeXml(block.match(/<ht:approx_traffic>([\s\S]*?)<\/ht:approx_traffic>/i)?.[1] ?? '')
-    keywords.push({
-      rank: keywords.length + 1,
-      keyword: title,
-      state: 'same',
-      summaryUrl: googleTrends(title),
-      searchUrl: googleSearch(title),
-      ...(traffic ? { traffic } : {}),
-    })
-    if (keywords.length >= 10) break
+    const traffic = decodeXml(
+      block.match(/<ht:approx_traffic>([\s\S]*?)<\/ht:approx_traffic>/i)?.[1] ?? ''
+    )
+    keywords.push(
+      toKeyword(title, {
+        rank: keywords.length + 1,
+        summaryUrl: googleTrends(title),
+        searchUrl: googleSearch(title),
+        traffic: traffic || undefined,
+      })
+    )
+    if (keywords.length >= KEYWORD_LIMIT) break
   }
   return keywords
 }
 
+function parseGoogleTrendingHtml(html: string): RealtimeKeyword[] {
+  const rows = Array.from(
+    html.matchAll(/\["([^"]{1,80})",null,"KR",\[\d+\](?:,\[\d+\])?,null,(\d+)/g)
+  )
+  const seen = new Set<string>()
+  const items: { keyword: string; volume: number }[] = []
+  for (const row of rows) {
+    const keyword = decodeXml(row[1]).trim()
+    const volume = Number(row[2])
+    const key = keywordKey(keyword)
+    if (!keyword || !key || seen.has(key) || !Number.isFinite(volume)) continue
+    seen.add(key)
+    items.push({ keyword, volume })
+  }
+  items.sort((a, b) => b.volume - a.volume)
+  return items.slice(0, KEYWORD_LIMIT).map((item, index) =>
+    toKeyword(item.keyword, {
+      rank: index + 1,
+      summaryUrl: googleTrends(item.keyword),
+      searchUrl: googleSearch(item.keyword),
+      traffic: String(item.volume),
+    })
+  )
+}
+
+function parseNateKeywords(text: string): RealtimeKeyword[] {
+  const data = JSON.parse(text) as Array<Array<string | number>>
+  return data
+    .map((row, index) => {
+      const keyword = String(row?.[1] ?? '').trim()
+      if (!keyword) return null
+      return toKeyword(keyword, {
+        rank: Number(row?.[0]) || index + 1,
+        state: mapState(String(row?.[2] ?? '')),
+        searchUrl: naverSearch(keyword),
+      })
+    })
+    .filter((item): item is RealtimeKeyword => item != null)
+}
+
+function parseZumKeywords(html: string): RealtimeKeyword[] {
+  const matches = [
+    ...Array.from(html.matchAll(/issue-word-list__keyword">([^<]+)</g)),
+    ...Array.from(html.matchAll(/\\"keyword\\":\\"([^\\"]+)/g)),
+  ]
+  const seen = new Set<string>()
+  const keywords: RealtimeKeyword[] = []
+  for (const match of matches) {
+    const keyword = decodeXml(match[1]).replace(/\\"/g, '"').trim()
+    if (!keyword || keyword.length < 2 || keyword === 'H') continue
+    const key = keywordKey(keyword)
+    if (seen.has(key)) continue
+    seen.add(key)
+    keywords.push(
+      toKeyword(keyword, {
+        rank: keywords.length + 1,
+        searchUrl: naverSearch(keyword),
+      })
+    )
+  }
+  return keywords
+}
+
+function decodeMaybeEucKr(buf: ArrayBuffer) {
+  const bytes = Buffer.from(buf)
+  try {
+    return new TextDecoder('euc-kr').decode(bytes)
+  } catch {
+    return bytes.toString('utf8')
+  }
+}
+
 async function fetchSignal(): Promise<{ now: number; keywords: RealtimeKeyword[]; news: RankingNews[] }> {
-  const res = await fetch(SIGNAL_URL, {
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': BROWSER_UA,
-    },
-    cache: 'no-store',
-  })
+  const [res, nate, zum] = await Promise.all([
+    fetch(SIGNAL_URL, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': BROWSER_UA,
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    }),
+    fetchNateKeywords(),
+    fetchZumKeywords(),
+  ])
   if (!res.ok) throw new Error(`signal ${res.status}`)
   const raw = (await res.json()) as SignalPayload
   return {
     now: raw.now ?? Date.now(),
-    keywords: parseSignalKeywords(raw),
+    keywords: mergeKeywords([parseSignalKeywords(raw), nate, zum]),
     news: parseNews(raw),
   }
 }
 
-async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
-  const res = await fetch(GOOGLE_RSS_URL, {
-    headers: {
-      Accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
-      'User-Agent': BROWSER_UA,
-    },
-    cache: 'no-store',
-  })
-  if (!res.ok) throw new Error(`google ${res.status}`)
-  const xml = await res.text()
-  return {
-    now: Date.now(),
-    keywords: parseGoogleRss(xml),
+async function fetchNateKeywords(): Promise<RealtimeKeyword[]> {
+  try {
+    const res = await fetch(`${NATE_URL}?v=${Date.now()}`, {
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Referer: 'https://www.nate.com/',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return []
+    return parseNateKeywords(decodeMaybeEucKr(await res.arrayBuffer()))
+  } catch {
+    return []
   }
+}
+
+async function fetchZumKeywords(): Promise<RealtimeKeyword[]> {
+  try {
+    const res = await fetch(ZUM_URL, {
+      headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return []
+    return parseZumKeywords(await res.text())
+  } catch {
+    return []
+  }
+}
+
+async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
+  const [rssRes, htmlRes] = await Promise.allSettled([
+    fetch(GOOGLE_RSS_URL, {
+      headers: {
+        Accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+        'User-Agent': BROWSER_UA,
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    }),
+    fetch(GOOGLE_TRENDING_URL, {
+      headers: {
+        Accept: 'text/html',
+        'User-Agent': BROWSER_UA,
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10000),
+    }),
+  ])
+
+  const rssKeywords =
+    rssRes.status === 'fulfilled' && rssRes.value.ok
+      ? parseGoogleRss(await rssRes.value.text())
+      : []
+  const htmlKeywords =
+    htmlRes.status === 'fulfilled' && htmlRes.value.ok
+      ? parseGoogleTrendingHtml(await htmlRes.value.text())
+      : []
+
+  const keywords = mergeKeywords([rssKeywords, htmlKeywords])
+  if (keywords.length === 0) throw new Error('google empty')
+  return { now: Date.now(), keywords }
 }
 
 export async function getRealtimeKeywords(): Promise<KeywordsPayload> {

@@ -123,12 +123,16 @@ function KeywordPanel({
     <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
       <div className="mb-4 flex items-end justify-between gap-3">
         <h2 className="text-lg font-bold text-white">{source?.label ?? '검색어'}</h2>
-        <span className="text-[11px] text-white/35">{source?.hint} · 1~10위</span>
+        <span className="text-[11px] text-white/35">
+          {source?.hint} · 1~{Math.max(keywords.length, 1)}위
+        </span>
       </div>
       {source?.error && keywords.length === 0 ? (
         <div className="py-10 text-center text-sm text-white/40">{source.error || empty}</div>
       ) : (
-        <KeywordColumn items={keywords} />
+        <div className="max-h-[70vh] overflow-y-auto scrollbar-thin pr-1">
+          <KeywordColumn items={keywords} />
+        </div>
       )}
     </section>
   )
@@ -149,7 +153,7 @@ function KeywordColumn({
             <div className="flex items-center gap-3 py-2.5">
               <span
                 className={cn(
-                  'w-6 shrink-0 text-center text-sm font-bold tabular-nums',
+                  'w-7 shrink-0 text-center text-sm font-bold tabular-nums',
                   item.rank <= 3 ? 'text-gold' : 'text-white/40'
                 )}
               >
