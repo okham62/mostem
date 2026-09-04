@@ -62,3 +62,7 @@ export const PRESS_GROUPS: PressGroup[] = [
     ],
   },
 ]
+
+export const PRESS_NAV_GROUPS = PRESS_GROUPS.filter(
+  (group) => group.title === '방송' || group.title === '종합일간' || group.title === '경제'
+)
