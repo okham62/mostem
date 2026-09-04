@@ -1,15 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ACTION_LABELS, pageLabel } from '@/lib/activity-labels'
+import { workBlocks, workSummary, type WorkLog } from '@/lib/work-log-display'
 import { deviceIcon, formatDateTime } from './login-history'
-
-type ActivityLog = {
-  id: string
-  action: string
-  detail: Record<string, unknown> | null
-  created_at: string
-}
 
 const RANGES = [
   { id: 'today', label: '오늘' },
@@ -30,23 +23,7 @@ function startOfRange(range: RangeId) {
   return new Date(Date.now() - (range === '7d' ? 7 : 30) * 24 * 60 * 60 * 1000)
 }
 
-function detailText(action: string, detail: Record<string, unknown> | null) {
-  if (!detail) return ''
-  if (action === 'page_view') {
-    const path = typeof detail.path === 'string' ? detail.path : ''
-    const title = typeof detail.title === 'string' ? detail.title : pageLabel(path)
-    return title + (path ? ` · ${path}` : '')
-  }
-  const parts: string[] = []
-  if (typeof detail.title === 'string') parts.push(detail.title)
-  if (typeof detail.channelName === 'string') parts.push(`채널 ${detail.channelName}`)
-  if (typeof detail.count === 'number') parts.push(`${detail.count}건`)
-  if (typeof detail.platform === 'string') parts.push(detail.platform)
-  if (typeof detail.username === 'string') parts.push(`@${detail.username}`)
-  return parts.join(' · ')
-}
-
-export function UserLogs({ activityLogs }: { activityLogs: ActivityLog[] }) {
+export function UserLogs({ activityLogs }: { activityLogs: WorkLog[] }) {
   const [range, setRange] = useState<RangeId>('7d')
   const since = startOfRange(range)
   const activities = useMemo(
@@ -74,30 +51,42 @@ export function UserLogs({ activityLogs }: { activityLogs: ActivityLog[] }) {
       </div>
 
       <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
-        <h2 className="mb-4 text-sm font-semibold text-white">활동 기록 ({activities.length})</h2>
+        <h2 className="mb-4 text-sm font-semibold text-white">작업 기록 ({activities.length})</h2>
         {activities.length === 0 ? (
           <p className="py-6 text-center text-sm text-[var(--muted)]">해당 기간 활동 기록이 없습니다.</p>
         ) : (
           <div className="divide-y divide-[var(--card-border)]">
             {activities.map((log) => {
-              const info = ACTION_LABELS[log.action] ?? { label: log.action, icon: '•' }
-              const extra = detailText(log.action, log.detail)
+              const info = workSummary(log)
+              const blocks = workBlocks(log.detail)
               const deviceType = typeof log.detail?.device_type === 'string' ? log.detail.device_type : ''
               const deviceModel = typeof log.detail?.device_model === 'string' ? log.detail.device_model : ''
               return (
-                <div key={log.id} className="flex items-start justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-white">
-                      {info.icon} {info.label}
-                    </p>
-                    {extra ? <p className="text-xs text-white/45">{extra}</p> : null}
-                    {deviceType || deviceModel ? (
-                      <p className="text-xs text-white/35">
-                        {deviceIcon(deviceType)} {[deviceType, deviceModel].filter(Boolean).join(' · ')}
+                <div key={log.id} className="py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white">
+                        {info.icon} {info.label}
                       </p>
-                    ) : null}
+                      {info.line ? <p className="mt-0.5 text-xs text-white/45">{info.line}</p> : null}
+                    </div>
+                    <p className="shrink-0 text-xs text-white/40">{formatDateTime(log.created_at)}</p>
                   </div>
-                  <p className="shrink-0 text-xs text-white/40">{formatDateTime(log.created_at)}</p>
+                  {blocks.length > 0 ? (
+                    <div className="mt-2 space-y-1.5 rounded-xl bg-white/5 p-3">
+                      {blocks.map((block, index) => (
+                        <div key={`${log.id}-${index}`}>
+                          <p className="text-[10px] font-semibold text-white/35">{block.label}</p>
+                          <p className="whitespace-pre-wrap break-words text-xs leading-5 text-white/75">{block.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {deviceType || deviceModel ? (
+                    <p className="mt-1 text-xs text-white/35">
+                      {deviceIcon(deviceType)} {[deviceType, deviceModel].filter(Boolean).join(' · ')}
+                    </p>
+                  ) : null}
                 </div>
               )
             })}

@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { Platform } from '@/types'
+import { logActivity } from '@/lib/log'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -53,6 +54,18 @@ JSON만 반환하고 다른 설명은 하지 마세요.`,
 
   try {
     const parsed = JSON.parse(content.text)
+    void logActivity(
+      session.user.id,
+      'ai_generate',
+      {
+        title,
+        type,
+        platforms,
+        description: typeof parsed.description === 'string' ? parsed.description : '',
+        tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      },
+      req
+    )
     return NextResponse.json(parsed)
   } catch {
     return NextResponse.json({ error: 'Parse error' }, { status: 500 })

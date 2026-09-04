@@ -6,6 +6,7 @@ import { AdminActions } from './admin-actions'
 import { AdminCredentials } from './admin-credentials'
 import { LoginHistoryButton } from './login-history-modal'
 import { MemberActivityButton } from './member-activity-modal'
+import { WorkHistoryButton } from './work-history-modal'
 import { formatDate } from '@/lib/utils'
 import type { User } from '@/types'
 
@@ -92,6 +93,7 @@ export function AdminUserRow({
         <span className="hidden text-xs text-[var(--muted)] sm:block">{formatDate(user.created_at)}</span>
         <Badge variant={s.variant}>{s.label}</Badge>
         <LoginHistoryButton userId={user.id} userName={userName} />
+        <WorkHistoryButton userId={user.id} userName={userName} />
         <AdminCredentials userId={user.id} username={user.username ?? ''} />
         {showActions ? (
           <AdminActions

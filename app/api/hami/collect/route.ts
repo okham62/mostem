@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { CollectPlatform } from '@/types'
+import { logActivity } from '@/lib/log'
 
 type IncomingPost = {
   platform?: CollectPlatform
@@ -267,6 +268,21 @@ export async function POST(req: Request) {
     .select('*')
     .eq('user_id', session.user.id)
     .in('post_id', rows.map((row) => row.post_id))
+
+  void logActivity(
+    session.user.id,
+    'hami_collect',
+    {
+      count: merged.length,
+      posts: merged.slice(0, 12).map((row) => ({
+        platform: row.platform,
+        author: row.author,
+        caption: String(row.caption || '').slice(0, 240),
+        url: row.url,
+      })),
+    },
+    req
+  )
 
   return NextResponse.json(
     { ok: true, count: merged.length, posts: (saved ?? merged).map(toClientPost) },

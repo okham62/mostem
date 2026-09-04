@@ -11,7 +11,9 @@ import { AdminActions } from '../../admin-actions'
 import { UserLogs } from '../../user-logs'
 import { MemberStats } from '../../member-stats'
 import { LoginHistoryButton } from '../../login-history-modal'
+import { WorkHistoryButton } from '../../work-history-modal'
 import type { LoginLog } from '../../login-history'
+import type { WorkLog } from '@/lib/work-log-display'
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('ko-KR', {
@@ -38,7 +40,7 @@ export default async function UserDetailPage({
   const [userRes, loginLogsRes, activityLogsRes, postsRes, uploadsRes, channelsRes, threadsRes] = await Promise.all([
     supabase.from('users').select('*').eq('id', id).single(),
     supabase.from('login_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(500),
-    supabase.from('activity_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(200),
+    supabase.from('activity_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(400),
     supabase.from('collected_posts').select('id', { count: 'exact', head: true }).eq('user_id', id),
     supabase.from('uploads').select('id', { count: 'exact', head: true }).eq('user_id', id),
     supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('user_id', id),
@@ -49,7 +51,7 @@ export default async function UserDetailPage({
   if (!user) redirect('/admin')
 
   const loginLogs = (loginLogsRes.data ?? []) as LoginLog[]
-  const activityLogs = activityLogsRes.data ?? []
+  const activityLogs = (activityLogsRes.data ?? []) as WorkLog[]
   const collectCount = postsRes.count ?? 0
   const uploadCount = uploadsRes.count ?? 0
   const channelCount = (channelsRes.count ?? 0) + (threadsRes.count ?? 0)
@@ -91,6 +93,11 @@ export default async function UserDetailPage({
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <LoginHistoryButton userId={user.id} userName={user.name || user.username || '회원'} logs={loginLogs} />
+            <WorkHistoryButton
+              userId={user.id}
+              userName={user.name || user.username || '회원'}
+              logs={activityLogs}
+            />
             <AdminCredentials userId={user.id} username={user.username ?? ''} />
             {showActions ? (
               <AdminActions

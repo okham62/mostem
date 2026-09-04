@@ -1,5 +1,10 @@
 export const ACTION_LABELS: Record<string, { label: string; icon: string }> = {
   page_view: { label: '페이지 방문', icon: '👁' },
+  news_open: { label: '실시간 뉴스 열람', icon: '📰' },
+  news_search: { label: '실시간 뉴스 검색', icon: '🔍' },
+  keyword_open: { label: '실시간 키워드 열람', icon: '🔥' },
+  keyword_search: { label: '실시간 키워드 검색', icon: '🔍' },
+  trend_open: { label: '키워드 상세 확인', icon: '📈' },
   youtube_connect: { label: 'YouTube 채널 연결', icon: '📺' },
   youtube_upload: { label: 'YouTube 업로드', icon: '⬆️' },
   youtube_disconnect: { label: 'YouTube 채널 해제', icon: '🔌' },

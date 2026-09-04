@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { logActivity } from '@/lib/log'
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -11,13 +12,18 @@ export async function POST(req: Request) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey || apiKey.includes('your_')) {
-    return NextResponse.json({
-      drafts: [
-        caption,
-        `${caption}\n\n같은 포인트로 내 톤에 맞게 다시 쓴 초안입니다.`,
-        `훅부터 다시: ${caption.split('\n')[0] ?? caption}`,
-      ],
-    })
+    const drafts = [
+      caption,
+      `${caption}\n\n같은 포인트로 내 톤에 맞게 다시 쓴 초안입니다.`,
+      `훅부터 다시: ${caption.split('\n')[0] ?? caption}`,
+    ]
+    void logActivity(
+      session.user.id,
+      'threads_rewrite',
+      { caption: String(caption).slice(0, 800), instruction: instruction || '', persona: persona || '', drafts },
+      req
+    )
+    return NextResponse.json({ drafts })
   }
 
   const anthropic = new Anthropic({ apiKey })
@@ -46,8 +52,26 @@ JSON만 반환:
 
   try {
     const parsed = JSON.parse(content.text)
-    return NextResponse.json({ drafts: parsed.drafts ?? [caption] })
+    const drafts = parsed.drafts ?? [caption]
+    void logActivity(
+      session.user.id,
+      'threads_rewrite',
+      {
+        caption: String(caption).slice(0, 800),
+        instruction: instruction || '',
+        persona: persona || '',
+        drafts,
+      },
+      req
+    )
+    return NextResponse.json({ drafts })
   } catch {
+    void logActivity(
+      session.user.id,
+      'threads_rewrite',
+      { caption: String(caption).slice(0, 800), instruction: instruction || '', drafts: [content.text] },
+      req
+    )
     return NextResponse.json({ drafts: [content.text] })
   }
 }

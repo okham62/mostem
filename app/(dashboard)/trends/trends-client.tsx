@@ -28,6 +28,7 @@ import {
   type TrendTab,
 } from '@/lib/trends'
 import { cn } from '@/lib/utils'
+import { logWork } from '@/lib/client-log'
 
 const POLL_MS = 5 * 60_000
 
@@ -229,7 +230,10 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
                 setQuery(value)
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') void reload({ q: query })
+                if (event.key === 'Enter') {
+                  if (query.trim()) logWork('keyword_search', { query: query.trim() })
+                  void reload({ q: query })
+                }
               }}
               placeholder="키워드 검색"
               className="h-9 w-full rounded-lg bg-black/30 pl-8 pr-3 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-white/30"
@@ -245,7 +249,14 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
               <button
                 key={`${item.cid}-${item.keyword}`}
                 type="button"
-                onClick={() => setSelected(item)}
+                onClick={() => {
+                  logWork('trend_open', {
+                    keyword: item.keyword,
+                    category: item.category,
+                    searchTotal: item.searchTotal,
+                  })
+                  setSelected(item)
+                }}
                 className="flex w-full items-center gap-4 py-3.5 text-left hover:bg-white/[0.03]"
               >
                 <span className="w-8 shrink-0 text-xl font-bold text-brand-400">{index + 1}</span>
@@ -412,38 +423,48 @@ function KeywordModal({
   item: TrendKeyword
   onClose: () => void
 }) {
-  const [detail, setDetail] = useState<TrendDetail | null>(null)
-  const [monthlyReady, setMonthlyReady] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [detail, setDetail] = useState<TrendDetail | null>(null)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     let alive = true
-    setMonthlyReady(false)
-    fetch(`/api/trends/detail?keyword=${encodeURIComponent(item.keyword)}&cid=${item.cid}`)
+    setReady(false)
+    fetch(`/api/trends/detail?keyword=${encodeURIComponent(item.keyword)}&cid=${encodeURIComponent(item.cid)}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((next) => {
-        if (alive) setDetail(next as TrendDetail | null)
+      .then((next: TrendDetail | null) => {
+        if (alive) setDetail(next)
       })
       .catch(() => {
         if (alive) setDetail(null)
       })
       .finally(() => {
-        if (alive) setMonthlyReady(true)
+        if (alive) setReady(true)
       })
     return () => {
       alive = false
     }
   }, [item.keyword, item.cid])
 
-  const daily = detail?.daily?.length ? detail.daily : item.daily
   const monthly = detail?.monthly ?? []
+  const daily = detail?.daily?.length ? detail.daily : item.daily
+  const peakMonth = detail?.peakMonth || item.peakMonth
+  const searchTotal = detail?.searchTotal || item.searchTotal
+  const productCount = detail?.productCount || item.productCount
+  const clickRate = detail?.clickRate || item.clickRate
+  const adPrice = detail?.adPrice || item.adPrice
   const advice =
     detail?.advice ||
     (item.peakNow
       ? `성수기가 바로 지금 ${item.peakMonth}월이에요. 지금 올리면 딱 좋아요.`
       : `검색이 가장 몰리는 달은 ${item.peakMonth}월입니다. 미리 올려 두면 좋아요.`)
-  const changePct =
-    item.prevTotal > 0 ? ((item.searchTotal - item.prevTotal) / item.prevTotal) * 100 : item.growth
+  const oceanHint =
+    detail?.oceanHint ||
+    (productCount > 0 && productCount <= 30
+      ? '아직 경쟁이 적어요. 지금 선점하기 좋아요.'
+      : daily.length >= 2 && (daily.at(-1)?.value ?? 0) >= (daily[0]?.value ?? 0)
+        ? '관심이 빠르게 커지고 있어요. 지금 선점하기 좋아요.'
+        : '아직 경쟁이 적어요. 지금 선점하기 좋아요.')
 
   async function copyKeyword() {
     await navigator.clipboard.writeText(item.keyword)
@@ -452,18 +473,22 @@ function KeywordModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div
+      className="mostem-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[10px]"
+      onClick={onClose}
+    >
       <div
-        className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-[#121218] p-5 shadow-2xl scrollbar-thin"
+        className="mostem-sheet max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-[#121218] p-5 shadow-2xl scrollbar-thin"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <WandSparkles className="h-4 w-4 text-brand-400" />
-              <h2 className="text-lg font-bold text-white">{item.keyword}</h2>
-              <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-black">
-                {formatGrowth(item.multiplier)}
+              <h2 className="text-xl font-bold text-white">{item.keyword}</h2>
+              <span className="inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-black">
+                <Flame className="h-3 w-3" />
+                30일 {formatGrowth(item.multiplier)}
               </span>
             </div>
           </div>
@@ -473,19 +498,17 @@ function KeywordModal({
         </div>
 
         <div className="mt-4 rounded-xl bg-[#1b1530] p-4">
-          <p className="flex items-center gap-2 text-xs text-brand-300">
+          <p className="flex items-center gap-2 text-sm font-semibold text-brand-300">
             <Calendar className="h-3.5 w-3.5" />
             언제 올리면 좋을까요?
           </p>
-          <p className="mt-2 text-sm font-semibold text-white">
-            {advice}
-          </p>
+          <p className="mt-2 text-sm font-semibold text-white">{advice}</p>
         </div>
 
         <ChartBlock title="1년 중 언제 많이 찾나요 (월별 검색량)">
-          <BarChart data={monthly} peakMonth={detail?.peakMonth ?? item.peakMonth} ready={monthlyReady} />
+          <BarChart data={monthly} peakMonth={peakMonth} ready={ready} />
         </ChartBlock>
-        <ChartBlock title="최근 검색 추이">
+        <ChartBlock title="최근 30일 검색 추이">
           <LineChart data={daily} />
         </ChartBlock>
 
@@ -493,23 +516,19 @@ function KeywordModal({
           <InfoCard
             icon={<ShoppingBag className="h-4 w-4 text-brand-300" />}
             title="구매글"
-            text={detail?.contentHint || '상품 추천·리뷰 글에 잘 맞아요.'}
+            text={detail?.contentHint || (item.contentType === 'info' ? '정보·이슈 글에 잘 맞아요.' : '상품 추천·리뷰 글에 잘 맞아요.')}
           />
-          <InfoCard
-            icon={<Target className="h-4 w-4 text-white/50" />}
-            title="블루오션"
-            text={detail?.oceanHint || '관심 흐름을 보고 선점해 보세요.'}
-          />
+          <InfoCard icon={<Target className="h-4 w-4 text-white/50" />} title="블루오션" text={oceanHint} />
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-          <StatCard label="검색량" value={String(detail?.index ?? item.searchTotal)} />
+          <StatCard label="한 달 검색량" value={searchTotal ? `${formatSearchVolume(searchTotal)}회` : ready ? '0회' : '불러오는 중'} />
           <StatCard
-            label="1주 변화"
-            value={detail?.change || `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`}
+            label="경쟁 상품 수"
+            value={productCount > 0 ? `${productCount.toLocaleString('ko-KR')}개` : '-'}
           />
-          <StatCard label="성수기" value={`${detail?.peakMonth ?? item.peakMonth}월`} />
-          <StatCard label="분야" value={item.category} />
+          <StatCard label="클릭률(모바일)" value={clickRate ? `${clickRate.toFixed(2)}%` : '-'} />
+          <StatCard label="광고 단가" value={adPrice > 0 ? `${adPrice.toLocaleString('ko-KR')}원` : '-'} />
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
@@ -517,7 +536,7 @@ function KeywordModal({
             href={`https://www.threads.com/search?q=${encodeURIComponent(item.keyword)}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-2 text-xs font-semibold text-white"
+            className="mostem-threads-btn inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-white"
           >
             스레드에서 반응 보기
           </a>
@@ -525,7 +544,7 @@ function KeywordModal({
             href={`https://search.naver.com/search.naver?query=${encodeURIComponent(item.keyword)}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-3 py-2 text-xs text-white/80"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-3 py-2 text-sm font-semibold text-white/80"
           >
             네이버 검색
           </a>
@@ -533,7 +552,7 @@ function KeywordModal({
             href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(item.keyword)}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-3 py-2 text-xs text-white/80"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-3 py-2 text-sm font-semibold text-white/80"
           >
             쇼핑 검색
             <ExternalLink className="h-3 w-3" />
@@ -541,7 +560,7 @@ function KeywordModal({
           <button
             type="button"
             onClick={() => void copyKeyword()}
-            className="ml-auto inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white"
+            className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-white/50 hover:text-white"
           >
             <Copy className="h-3.5 w-3.5" />
             {copied ? '복사됨' : '키워드 복사'}
@@ -555,8 +574,8 @@ function KeywordModal({
 function ChartBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mt-4">
-      <p className="mb-2 text-xs text-white/40">{title}</p>
-      <div className="h-36 rounded-xl bg-black/30 px-3 py-3">{children}</div>
+      <p className="mb-2 text-sm font-semibold text-white">{title}</p>
+      <div className="h-44 rounded-xl bg-[#0d0d12] px-3 py-3">{children}</div>
     </div>
   )
 }
@@ -567,54 +586,172 @@ function BarChart({
   ready,
 }: {
   data: { month: number; value: number }[]
-  peakMonth?: number
-  ready?: boolean
+  peakMonth: number
+  ready: boolean
 }) {
   const months = Array.from({ length: 12 }, (_, i) => i + 1)
   const map = new Map(data.map((row) => [row.month, row.value]))
   const max = Math.max(1, ...data.map((row) => row.value))
-  if (!data.length) {
-    return (
-      <div className="flex h-full items-center justify-center text-xs text-white/30">
-        {ready ? '월별 검색량이 없습니다' : '월별 검색량을 불러오는 중'}
-      </div>
-    )
+  const hasValue = data.some((row) => row.value > 0)
+  if (!ready && !hasValue) {
+    return <div className="flex h-full items-center justify-center text-xs text-white/30">월별 검색량을 불러오는 중</div>
+  }
+  if (ready && !hasValue) {
+    return <div className="flex h-full items-center justify-center text-xs text-white/30">월별 검색량이 없습니다</div>
   }
   return (
-    <div className="flex h-full items-end gap-1">
-      {months.map((month) => {
-        const value = map.get(month) ?? 0
-        const peak = month === peakMonth
-        return (
-          <div key={month} className="flex flex-1 flex-col items-center justify-end gap-1">
+    <div className="relative h-full">
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 top-1 flex flex-col justify-between">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="border-t border-dashed border-white/10" />
+        ))}
+      </div>
+      <div className="absolute inset-x-0 bottom-6 top-1 flex items-end gap-2 px-1">
+        {months.map((month) => {
+          const value = map.get(month) ?? 0
+          const peak = month === peakMonth
+          return (
             <div
-              className={cn('w-full rounded-sm', peak ? 'bg-gold' : 'bg-brand-500')}
-              style={{ height: `${value <= 0 ? 3 : Math.max(8, (value / max) * 100)}%` }}
-            />
-            <span className="text-[9px] text-white/30">{month}</span>
-          </div>
-        )
-      })}
+              key={month}
+              className="flex h-full flex-1 flex-col items-center justify-end"
+              title={`${month}월 ${value.toLocaleString('ko-KR')}회`}
+            >
+              <div
+                className={cn(
+                  'w-full rounded-t-[8px] transition-[filter] duration-150 hover:brightness-125',
+                  peak ? 'bg-[#FFD240]' : 'bg-[#5E4B8B]'
+                )}
+                style={{
+                  height: `${value <= 0 ? 0 : Math.max(8, (value / max) * 100)}%`,
+                }}
+              />
+            </div>
+          )
+        })}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 flex px-1">
+        {months.map((month) => (
+          <span key={month} className="flex-1 text-center text-[10px] text-[#6B7280]">
+            {month}월
+          </span>
+        ))}
+      </div>
     </div>
   )
+}
+
+function formatKoMd(date: string) {
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return date
+  return `${Number(match[2])}월 ${Number(match[3])}일`
+}
+
+function monotonePath(points: { x: number; y: number }[]) {
+  if (points.length < 2) return ''
+  const n = points.length
+  const dx: number[] = []
+  const dy: number[] = []
+  const m: number[] = []
+  for (let i = 0; i < n - 1; i += 1) {
+    dx[i] = points[i + 1].x - points[i].x
+    dy[i] = points[i + 1].y - points[i].y
+    m[i] = dx[i] === 0 ? 0 : dy[i] / dx[i]
+  }
+  const t = Array(n).fill(0)
+  t[0] = m[0]
+  t[n - 1] = m[n - 2]
+  for (let i = 1; i < n - 1; i += 1) {
+    t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2
+  }
+  for (let i = 0; i < n - 1; i += 1) {
+    if (Math.abs(m[i]) < 1e-8) {
+      t[i] = 0
+      t[i + 1] = 0
+    } else {
+      const a = t[i] / m[i]
+      const b = t[i + 1] / m[i]
+      const s = a * a + b * b
+      if (s > 9) {
+        const k = 3 / Math.sqrt(s)
+        t[i] = k * a * m[i]
+        t[i + 1] = k * b * m[i]
+      }
+    }
+  }
+  let d = `M ${points[0].x} ${points[0].y}`
+  for (let i = 0; i < n - 1; i += 1) {
+    const p0 = points[i]
+    const p1 = points[i + 1]
+    const c1x = p0.x + dx[i] / 3
+    const c1y = p0.y + (t[i] * dx[i]) / 3
+    const c2x = p1.x - dx[i] / 3
+    const c2y = p1.y - (t[i + 1] * dx[i]) / 3
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p1.x} ${p1.y}`
+  }
+  return d
 }
 
 function LineChart({ data }: { data: { date: string; value: number }[] }) {
   if (data.length < 2) {
     return <div className="flex h-full items-center justify-center text-xs text-white/30">추이를 불러오는 중</div>
   }
-  const w = 560
-  const h = 110
+  const w = 640
+  const h = 148
+  const left = 4
+  const right = 4
+  const top = 8
+  const bottom = 28
   const max = Math.max(...data.map((row) => row.value))
   const min = Math.min(...data.map((row) => row.value))
-  const pts = data.map((row, index) => {
-    const x = (index / (data.length - 1)) * w
-    const y = h - ((row.value - min) / (max - min || 1)) * (h - 8) - 4
-    return `${x},${y}`
-  })
+  const span = max - min || 1
+  const points = data.map((row, index) => ({
+    x: left + (index / (data.length - 1)) * (w - left - right),
+    y: top + (1 - (row.value - min) / span) * (h - top - bottom),
+  }))
+  const line = monotonePath(points)
+  const area = `${line} L ${points[points.length - 1].x} ${h - bottom} L ${points[0].x} ${h - bottom} Z`
+  const ticks = 7
+  const labels = Array.from({ length: ticks }, (_, index) => {
+    const i = Math.round((index / (ticks - 1)) * (data.length - 1))
+    return { i, x: points[i].x, text: formatKoMd(data[i].date) }
+  }).filter((row, index, rows) => rows.findIndex((item) => item.i === row.i) === index)
+
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-full w-full overflow-visible">
-      <polyline points={pts.join(' ')} fill="none" stroke="#a78bfa" strokeWidth="2.2" />
+      <defs>
+        <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.42" />
+          <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[0, 1, 2, 3].map((index) => {
+        const y = top + ((h - top - bottom) * index) / 3
+        return (
+          <line
+            key={index}
+            x1={left}
+            x2={w - right}
+            y1={y}
+            y2={y}
+            stroke="rgba(255,255,255,0.1)"
+            strokeDasharray="4 6"
+          />
+        )
+      })}
+      <path d={area} fill="url(#trendFill)" />
+      <path d={line} fill="none" stroke="#8B5CF6" strokeWidth="2.4" strokeLinecap="round" />
+      {labels.map((label) => (
+        <text
+          key={`${label.i}-${label.text}`}
+          x={label.x}
+          y={h - 6}
+          textAnchor="middle"
+          fill="#6B7280"
+          fontSize="10"
+        >
+          {label.text}
+        </text>
+      ))}
     </svg>
   )
 }
@@ -642,8 +779,8 @@ function InfoCard({
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-white/5 px-3 py-2.5">
-      <p className="text-[11px] text-white/40">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-white">{value}</p>
+      <p className="text-xs text-white/40">{label}</p>
+      <p className="mt-1 text-sm font-bold text-white">{value}</p>
     </div>
   )
 }

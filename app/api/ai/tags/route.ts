@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 3500,
+      max_tokens: 5000,
       messages: [
         {
           role: 'user',
@@ -52,24 +52,25 @@ export async function POST(req: Request) {
 실제 유튜브 연관 검색어:
 ${related.length ? related.map((item) => `- ${item}`).join('\n') : '(없음)'}
 
-위 주제로 6개 플랫폼 태그를 생성하세요.
+위 주제로 7개 플랫폼 태그를 생성하세요.
 ${platformGuide}
 
 규칙:
 - 검색 노출에 강한 핵심어 + 롱테일 + 연관 검색어를 섞을 것
 - 중복·무의미한 나열 금지
 - 한국어 위주, 검색에 쓰이는 영어 표기는 포함 가능
-- 인스타/틱톡도 태그 텍스트만 주고 #는 붙이지 말 것
+- 인스타/틱톡/스레드도 태그 텍스트만 주고 #는 붙이지 말 것
 - JSON만 반환
 
 {
   "platforms": [
     {"platform":"youtube","tags":["..."]},
+    {"platform":"threads","tags":["..."]},
+    {"platform":"instagram","tags":["..."]},
+    {"platform":"tiktok","tags":["..."]},
     {"platform":"naver","tags":["..."]},
     {"platform":"tistory","tags":["..."]},
-    {"platform":"blogger","tags":["..."]},
-    {"platform":"instagram","tags":["..."]},
-    {"platform":"tiktok","tags":["..."]}
+    {"platform":"blogger","tags":["..."]}
   ]
 }`,
         },
@@ -84,7 +85,21 @@ ${platformGuide}
     return NextResponse.json({ error: '태그를 만들지 못했습니다. 주제를 바꿔 다시 시도하세요.' }, { status: 502 })
   }
 
-  void logActivity(session.user.id, 'ai_tags', { topic, count: platforms.reduce((sum, row) => sum + row.tags.length, 0) }, req)
+  void logActivity(
+    session.user.id,
+    'ai_tags',
+    {
+      topic,
+      related: related.slice(0, 20),
+      count: platforms.reduce((sum, row) => sum + row.tags.length, 0),
+      platforms: platforms.map((row) => ({
+        platform: row.platform,
+        name: row.displayName,
+        tags: row.tags,
+      })),
+    },
+    req
+  )
 
   return NextResponse.json({ topic, related, platforms })
 }

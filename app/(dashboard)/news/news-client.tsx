@@ -13,6 +13,7 @@ import {
 import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
 import { PRESS_NAV_OUTLETS } from '@/lib/press'
 import { cn } from '@/lib/utils'
+import { logWork } from '@/lib/client-log'
 
 const NEWS_PER_PAGE = 20
 const NEWS_PAGES = 30
@@ -72,6 +73,15 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   const newsSlice = searching
     ? filteredNews.slice(0, NEWS_PER_PAGE)
     : newsForPage(data.news, page)
+
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) return
+    const id = window.setTimeout(() => {
+      logWork('news_search', { query: q })
+    }, 800)
+    return () => window.clearTimeout(id)
+  }, [query])
 
   return (
     <div className="space-y-4">
@@ -134,6 +144,7 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
                 href={item.link}
                 target="_blank"
                 rel="noreferrer"
+                onClick={() => logWork('news_open', { title: item.title, press: item.press, url: item.link })}
                 className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20"
               >
                 <div className="relative aspect-[16/9] bg-black/40">

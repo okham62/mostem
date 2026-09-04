@@ -329,7 +329,8 @@ html {
   .mostem-menu-highlight,
   .mostem-menu-item,
   .mostem-overlay,
-  .mostem-sheet {
+  .mostem-sheet,
+  .mostem-threads-btn {
     animation: none;
     transition: none;
     transform: none;
@@ -434,4 +435,28 @@ html {
 
 .mostem-sheet {
   animation: mostem-sheet-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mostem-threads-btn {
+  background: linear-gradient(180deg, #9b7dff 0%, #7c5cff 100%);
+  box-shadow:
+    0 4px 0 #4c2fd4,
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.mostem-threads-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 #4c2fd4,
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.mostem-threads-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 1px 0 #4c2fd4,
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }

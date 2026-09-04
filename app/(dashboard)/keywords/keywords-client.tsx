@@ -11,6 +11,7 @@ import {
   type RealtimeKeyword,
 } from '@/lib/keywords'
 import { cn } from '@/lib/utils'
+import { logWork } from '@/lib/client-log'
 
 const POLL_MS = 30_000
 
@@ -131,7 +132,7 @@ function KeywordPanel({
         <div className="py-10 text-center text-sm text-white/40">{source.error || empty}</div>
       ) : (
         <div className="max-h-[70vh] overflow-y-auto scrollbar-thin pr-1">
-          <KeywordColumn items={keywords} />
+          <KeywordColumn items={keywords} source={source?.label || ''} />
         </div>
       )}
     </section>
@@ -140,8 +141,10 @@ function KeywordPanel({
 
 function KeywordColumn({
   items,
+  source,
 }: {
   items: RealtimeKeyword[]
+  source: string
 }) {
   return (
     <ol className="divide-y divide-white/5">
@@ -163,6 +166,14 @@ function KeywordColumn({
                 href={item.searchUrl || naverSearch(item.keyword)}
                 target="_blank"
                 rel="noreferrer"
+                onClick={() =>
+                  logWork('keyword_open', {
+                    keyword: item.keyword,
+                    rank: item.rank,
+                    source,
+                    url: item.searchUrl || naverSearch(item.keyword),
+                  })
+                }
                 className="min-w-0 flex-1 truncate text-sm font-medium text-white hover:text-gold"
                 title={item.keyword}
               >

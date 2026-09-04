@@ -30,6 +30,9 @@ export interface TrendKeyword {
   multiplier: number
   isBrand: boolean
   categoryPath: string
+  productCount: number
+  clickRate: number
+  adPrice: number
   spark: number[]
   daily: TrendPoint[]
 }
@@ -43,6 +46,10 @@ export interface TrendDetail {
   peakMonth: number
   peakNow: boolean
   index: number
+  searchTotal: number
+  productCount: number
+  clickRate: number
+  adPrice: number
   change: string
   advice: string
   contentHint: string
@@ -63,12 +70,10 @@ export interface TrendsPayload {
 
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-const TREND_URL = 'https://datalab.naver.com/shoppingInsight/getKeywordClickTrend.naver'
 const HD_URL = 'https://www.hypeduck.ai/api/trend-keywords'
+const HD_DETAIL_URL = 'https://www.hypeduck.ai/api/trend-keywords/detail'
 const CACHE_MS = 5 * 60_000
 const SERIES_MS = 60 * 60_000
-const KEYWORD_REFERER = 'https://datalab.naver.com/shoppingInsight/sKeyword.naver'
-const CATEGORY_REFERER = 'https://datalab.naver.com/shoppingInsight/sCategory.naver'
 
 export const SHOP_CATEGORIES: ShopCategory[] = [
   { id: 'all', label: '전체 분야', cid: null },
@@ -92,14 +97,8 @@ const PRODUCT_RE =
 let cache: { at: number; key: string; data: TrendsPayload } | null = null
 let inflight: Promise<TrendsPayload> | null = null
 let inflightKey: string | null = null
-const seriesCache = new Map<
-  string,
-  { at: number; monthly: { month: number; value: number }[]; daily: TrendPoint[] }
->()
-const seriesInflight = new Map<
-  string,
-  Promise<{ at: number; monthly: { month: number; value: number }[]; daily: TrendPoint[] }>
->()
+const detailCache = new Map<string, { at: number; data: TrendDetail }>()
+const detailInflight = new Map<string, Promise<TrendDetail>>()
 let itemCache = new Map<string, TrendKeyword>()
 
 function seoulYmd(date = new Date()) {
@@ -115,44 +114,29 @@ function padDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-function seoulMonthStart(monthsAgo: number) {
-  const { year, month } = seoulParts()
-  const date = new Date(Date.UTC(year, month - 1 - monthsAgo, 1))
-  return padDate(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)
-}
-
-async function postForm<T>(
-  url: string,
-  body: Record<string, string>,
-  referer = CATEGORY_REFERER,
-  ms = 8000
-): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'User-Agent': BROWSER_UA,
-      Accept: 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Referer: referer,
-    },
-    body: new URLSearchParams(body).toString(),
-    cache: 'no-store',
-    signal: AbortSignal.timeout(ms),
-  })
-  if (!res.ok) throw new Error(`datalab ${res.status}`)
-  return (await res.json()) as T
-}
-
-type TrendPayload = {
-  result?: { data?: { period: string; value: number }[] }[]
-}
-
 function cidFromCategory(label: string) {
   return SHOP_CATEGORIES.find((item) => item.label === label)?.cid || '50000000'
 }
 
-function sparkToDaily(spark: number[]): TrendPoint[] {
-  return spark.map((value, index) => ({ date: String(index), value }))
+function sparkToDaily(spark: number[], endYmd = seoulYmd()): TrendPoint[] {
+  const [year, month, day] = endYmd.split('-').map(Number)
+  return spark.map((value, index) => {
+    const offset = spark.length - 1 - index
+    const date = new Date(Date.UTC(year, month - 1, day - offset))
+    return {
+      date: padDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()),
+      value,
+    }
+  })
+}
+
+export function seasonMonthly(peakMonth: number) {
+  const peak = Math.min(12, Math.max(1, peakMonth || seoulParts().month))
+  const prev = peak === 1 ? 12 : peak - 1
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1
+    return { month, value: month === peak ? 100 : month === prev ? 46 : 0 }
+  })
 }
 
 export function isLikelyBrand(keyword: string, isBrand = false) {
@@ -170,6 +154,7 @@ type HdRow = {
   isBrand: boolean
   contentType: string
   categoryPath: string
+  productCount?: number
   spark: number[]
   season: { peakMonth: number; timing: string; strength: number } | null
 }
@@ -211,7 +196,7 @@ async function fetchHypeDuck(page: number, query: TrendQuery = {}): Promise<HdPa
   return (await res.json()) as HdPayload
 }
 
-function mapHdRow(row: HdRow, rank: number): TrendKeyword {
+function mapHdRow(row: HdRow, rank: number, endYmd: string): TrendKeyword {
   const categoryPath = row.categoryPath || '쇼핑'
   const category = categoryPath.split('>')[0].trim() || '쇼핑'
   const spark = Array.isArray(row.spark) ? row.spark : []
@@ -238,8 +223,11 @@ function mapHdRow(row: HdRow, rank: number): TrendKeyword {
     prevTotal,
     multiplier,
     isBrand: Boolean(row.isBrand),
+    productCount: Number(row.productCount) || 0,
+    clickRate: Number((row as { clickRate?: number }).clickRate) || 0,
+    adPrice: Number((row as { adPrice?: number }).adPrice) || 0,
     spark,
-    daily: sparkToDaily(spark),
+    daily: sparkToDaily(spark, endYmd),
   }
 }
 
@@ -271,7 +259,7 @@ export async function getShoppingTrends(
       for (const row of page.rows ?? []) {
         if (!row?.keyword || seen.has(row.keyword)) continue
         seen.add(row.keyword)
-        items.push(mapHdRow(row, items.length + 1))
+        items.push(mapHdRow(row, items.length + 1, first.meta?.latestDate || seoulYmd()))
       }
     }
 
@@ -297,98 +285,112 @@ export async function getShoppingTrends(
   return inflight
 }
 
-async function fetchClickRange(
-  keyword: string,
-  cid: string,
-  timeUnit: 'month' | 'date',
-  startDate: string,
-  endDate: string
-) {
-  const raw = await postForm<TrendPayload>(
-    TREND_URL,
-    {
-      cid,
-      timeUnit,
-      startDate,
-      endDate,
-      age: '',
-      gender: '',
-      device: '',
-      keyword,
-    },
-    KEYWORD_REFERER,
-    4500
-  )
-  return raw.result?.[0]?.data ?? []
+type HdDetail = {
+  trend?: { date: string; searchTotal: number }[]
+  seasonMonths?: { month: number; searchTotal: number }[]
+  season?: { peakMonth: number; strength: number; timing: string } | null
+  contentType?: string
+  competition?: string
+  productCount?: number
+  bidPc?: number
+  bidMobile?: number
+  clickRatePc?: number
+  clickRateMobile?: number
 }
 
-async function loadMonthly(keyword: string, cid: string) {
-  const key = `${cid}:${keyword}:month`
-  const cached = seriesCache.get(key)
-  if (cached && Date.now() - cached.at < SERIES_MS && cached.monthly.length) return cached.monthly
-
-  const pending = seriesInflight.get(key)
-  if (pending) return (await pending).monthly
-
-  const task = (async () => {
-    const end = seoulYmd()
-    const monthStart = seoulMonthStart(11)
-    const monthlyRaw = await fetchClickRange(keyword, cid, 'month', monthStart, end).catch(() => [])
-    const monthly = monthlyRaw.map((row) => ({
-      month: Number(row.period.slice(4, 6)),
-      value: row.value,
-    }))
-    const data = { monthly, daily: [] as TrendPoint[], at: Date.now() }
-    seriesCache.set(key, data)
-    return data
-  })().finally(() => {
-    seriesInflight.delete(key)
+async function fetchHypeDuckDetail(keyword: string): Promise<HdDetail> {
+  const params = new URLSearchParams({ keyword })
+  const res = await fetch(`${HD_DETAIL_URL}?${params.toString()}`, {
+    headers: hdHeaders(),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10000),
   })
+  if (!res.ok) throw new Error(`hypeduck detail ${res.status}`)
+  return (await res.json()) as HdDetail
+}
 
-  seriesInflight.set(key, task)
-  return (await task).monthly
+function monthlyFromHd(rows: HdDetail['seasonMonths']) {
+  const byMonth = new Map<number, number>()
+  for (const row of rows ?? []) {
+    const month = Number(row.month)
+    if (month >= 1 && month <= 12) byMonth.set(month, Number(row.searchTotal) || 0)
+  }
+  return Array.from({ length: 12 }, (_, index) => ({
+    month: index + 1,
+    value: byMonth.get(index + 1) ?? 0,
+  }))
 }
 
 export async function getTrendDetail(keyword: string, cid: string): Promise<TrendDetail> {
-  const cachedItem = itemCache.get(keyword)
-  const category = cachedItem?.category || SHOP_CATEGORIES.find((item) => item.cid === cid)?.label || '쇼핑'
-  const daily = cachedItem?.daily?.length ? cachedItem.daily : sparkToDaily(cachedItem?.spark ?? [])
-  const monthly = await loadMonthly(keyword, cid || cachedItem?.cid || '50000000')
-  const { month: currentMonth } = seoulParts()
-  const peak = monthly.reduce(
-    (best, row) => (row.value > best.value ? row : best),
-    monthly[0] ?? { month: cachedItem?.peakMonth || currentMonth, value: 0 }
-  )
-  const peakMonth = monthly.length ? peak.month : cachedItem?.peakMonth || currentMonth
-  const peakNow = peakMonth === currentMonth || Boolean(cachedItem?.peakNow)
-  const last = daily.at(-1)?.value ?? peak.value
-  const first = daily[0]?.value ?? last
-  const rising = last >= first
-  const changePct =
-    cachedItem && cachedItem.prevTotal > 0
-      ? ((cachedItem.searchTotal - cachedItem.prevTotal) / cachedItem.prevTotal) * 100
-      : first > 0
-        ? ((last - first) / first) * 100
-        : 0
+  const cached = detailCache.get(keyword)
+  if (cached && Date.now() - cached.at < SERIES_MS) return cached.data
+  const pending = detailInflight.get(keyword)
+  if (pending) return pending
 
-  return {
-    keyword,
-    category,
-    cid,
-    monthly,
-    daily,
-    peakMonth,
-    peakNow,
-    index: Math.round(cachedItem?.searchTotal || last),
-    change: `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`,
-    advice: peakNow
-      ? `성수기가 바로 지금 ${peakMonth}월이에요. 지금 올리면 딱 좋아요.`
-      : `검색이 가장 몰리는 달은 ${peakMonth}월입니다. 미리 올려 두면 좋아요.`,
-    contentHint: cachedItem?.contentType === 'info' ? '정보·이슈 글에 잘 맞아요.' : '상품 추천·리뷰·구매 유도 글에 잘 맞아요.',
-    oceanHint: rising
-      ? '관심이 빠르게 커지고 있어요. 지금 선점하기 좋아요.'
-      : '아직 경쟁이 적어요. 지금 선점하기 좋아요.',
-  }
+  const task = (async () => {
+    const cachedItem = itemCache.get(keyword)
+    const hd = await fetchHypeDuckDetail(keyword).catch(() => null)
+    const monthly = monthlyFromHd(hd?.seasonMonths)
+    const daily = (hd?.trend ?? [])
+      .filter((row) => row?.date)
+      .map((row) => ({ date: row.date, value: Number(row.searchTotal) || 0 }))
+    const sparkDaily = cachedItem?.daily?.length
+      ? cachedItem.daily
+      : sparkToDaily(cachedItem?.spark ?? [])
+    const points = daily.length ? daily : sparkDaily
+    const searchTotal =
+      Number(points.at(-1)?.value) || Number(cachedItem?.searchTotal) || 0
+    const { month: currentMonth } = seoulParts()
+    const peakMonth = hd?.season?.peakMonth || cachedItem?.peakMonth || currentMonth
+    const peakNow = hd?.season?.timing === 'now' || peakMonth === currentMonth
+    const productCount = Number(hd?.productCount) || cachedItem?.productCount || 0
+    const clickRate =
+      Number(hd?.clickRateMobile) || Number(hd?.clickRatePc) || cachedItem?.clickRate || 0
+    const adPrice = Number(hd?.bidMobile) || Number(hd?.bidPc) || cachedItem?.adPrice || 0
+    const first = points[0]?.value ?? searchTotal
+    const last = points.at(-1)?.value ?? searchTotal
+    const changePct =
+      cachedItem && cachedItem.prevTotal > 0
+        ? ((searchTotal - cachedItem.prevTotal) / cachedItem.prevTotal) * 100
+        : first > 0
+          ? ((last - first) / first) * 100
+          : 0
+    const contentType =
+      hd?.contentType === 'info' || cachedItem?.contentType === 'info' ? 'info' : 'purchase'
+    const data: TrendDetail = {
+      keyword,
+      category: cachedItem?.category || SHOP_CATEGORIES.find((item) => item.cid === cid)?.label || '쇼핑',
+      cid: cid || cachedItem?.cid || '',
+      monthly,
+      daily: points,
+      peakMonth,
+      peakNow,
+      index: Math.round(searchTotal),
+      searchTotal,
+      productCount,
+      clickRate,
+      adPrice,
+      change: `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`,
+      advice: peakNow
+        ? `성수기가 바로 지금 ${peakMonth}월이에요. 지금 올리면 딱 좋아요.`
+        : `검색이 가장 몰리는 달은 ${peakMonth}월입니다. 미리 올려 두면 좋아요.`,
+      contentHint:
+        contentType === 'info' ? '정보·이슈 글에 잘 맞아요.' : '상품 추천·리뷰·구매 유도 글에 잘 맞아요.',
+      oceanHint:
+        hd?.competition === 'blue' || productCount <= 30
+          ? '아직 경쟁이 적어요. 지금 선점하기 좋아요.'
+          : last >= first
+            ? '관심이 빠르게 커지고 있어요. 지금 선점하기 좋아요.'
+            : '아직 경쟁이 적어요. 지금 선점하기 좋아요.',
+    }
+    detailCache.set(keyword, { at: Date.now(), data })
+    return data
+  })().finally(() => {
+    detailInflight.delete(keyword)
+  })
+
+  detailInflight.set(keyword, task)
+  return task
 }
 
 export function formatTrendDate(now: number) {
