@@ -17,7 +17,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     .select('*')
     .eq('user_id', id)
     .order('created_at', { ascending: false })
-    .limit(200)
+    .limit(500)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ logs: data ?? [] }, { headers: { 'Cache-Control': 'no-store' } })

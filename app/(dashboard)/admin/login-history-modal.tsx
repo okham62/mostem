@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Monitor, X } from 'lucide-react'
 import { LoginHistoryBody, type LoginLog } from './login-history'
+import { cn } from '@/lib/utils'
 
 export function LoginHistoryModal({
   open,
@@ -86,5 +87,42 @@ export function LoginHistoryModal({
         </div>
       </div>
     </div>
+  )
+}
+
+export function LoginHistoryButton({
+  userId,
+  userName,
+  logs,
+  className,
+}: {
+  userId?: string
+  userName: string
+  logs?: LoginLog[]
+  className?: string
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/70 hover:bg-white/5 hover:text-white',
+          className
+        )}
+      >
+        <Monitor className="h-3.5 w-3.5" />
+        로그인 기록
+      </button>
+      <LoginHistoryModal
+        open={open}
+        onClose={() => setOpen(false)}
+        userName={userName}
+        userId={userId}
+        logs={logs}
+      />
+    </>
   )
 }

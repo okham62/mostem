@@ -36,6 +36,44 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true })
   }
 
+  if (action === 'delete') {
+    if (userId === session.user.id) {
+      return NextResponse.json({ error: '본인 계정은 삭제할 수 없습니다.' }, { status: 400 })
+    }
+
+    const { data: target } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('id', userId)
+      .maybeSingle()
+    if (!target) return NextResponse.json({ error: '회원을 찾을 수 없습니다.' }, { status: 404 })
+    if (target.role === 'admin') {
+      return NextResponse.json({ error: '관리자 계정은 삭제할 수 없습니다.' }, { status: 400 })
+    }
+
+    const relatedTables = [
+      'login_logs',
+      'activity_logs',
+      'uploads',
+      'collected_posts',
+      'platform_connections',
+      'connected_accounts',
+      'description_presets',
+      'tag_presets',
+      'templates',
+    ]
+    for (const table of relatedTables) {
+      const { error } = await supabase.from(table).delete().eq('user_id', userId)
+      if (error && error.code !== 'PGRST205' && error.code !== '42P01') {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    }
+
+    const { error } = await supabase.from('users').delete().eq('id', userId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
   if (action === 'set-username') {
     const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : ''
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {

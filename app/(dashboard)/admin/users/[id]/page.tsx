@@ -7,8 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import type { User } from '@/types'
 import { AdminCredentials } from '../../admin-credentials'
+import { AdminActions } from '../../admin-actions'
 import { UserLogs } from '../../user-logs'
 import { MemberStats } from '../../member-stats'
+import { LoginHistoryButton } from '../../login-history-modal'
 import type { LoginLog } from '../../login-history'
 
 function formatDate(dateStr: string) {
@@ -35,7 +37,7 @@ export default async function UserDetailPage({
 
   const [userRes, loginLogsRes, activityLogsRes, uploadsRes, channelsRes, threadsRes] = await Promise.all([
     supabase.from('users').select('*').eq('id', id).single(),
-    supabase.from('login_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(200),
+    supabase.from('login_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(500),
     supabase.from('activity_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(200),
     supabase.from('uploads').select('id', { count: 'exact', head: true }).eq('user_id', id),
     supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('user_id', id),
@@ -49,6 +51,9 @@ export default async function UserDetailPage({
   const activityLogs = activityLogsRes.data ?? []
   const uploadCount = uploadsRes.count ?? 0
   const channelCount = (channelsRes.count ?? 0) + (threadsRes.count ?? 0)
+  const isSelf = user.id === session.user.id
+  const canDelete = !isSelf && user.role !== 'admin'
+  const showActions = !isSelf && (user.role !== 'admin' || user.status !== 'approved')
 
   const statusMap = {
     pending: { label: '대기', variant: 'warning' as const },
@@ -82,9 +87,21 @@ export default async function UserDetailPage({
             <p className="text-sm text-[var(--muted)]">아이디: {user.username ?? '-'}</p>
             <p className="text-xs text-[var(--muted)]">가입일: {formatDate(user.created_at)}</p>
           </div>
-          <AdminCredentials userId={user.id} username={user.username ?? ''} />
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <LoginHistoryButton userId={user.id} userName={user.name || user.username || '회원'} logs={loginLogs} />
+            <AdminCredentials userId={user.id} username={user.username ?? ''} />
+            {showActions ? (
+              <AdminActions
+                userId={user.id}
+                userName={user.name || user.username || '회원'}
+                currentStatus={user.status}
+                canDelete={canDelete}
+              />
+            ) : null}
+          </div>
         </div>
         <MemberStats
+          userId={user.id}
           userName={user.name || user.username || '회원'}
           loginCount={loginLogs.length}
           uploadCount={uploadCount}

@@ -93,7 +93,7 @@ export default async function AdminPage() {
       <div>
         <h1 className="text-2xl font-bold text-[var(--foreground)]">회원 관리</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          가입 승인, 로그인/작업 기록, 아이디와 비밀번호 변경은 관리자만 볼 수 있습니다.
+          가입 승인·삭제, 로그인 기록, 아이디와 비밀번호 변경은 관리자만 볼 수 있습니다.
         </p>
       </div>
 
@@ -120,7 +120,12 @@ export default async function AdminPage() {
           </div>
           <div className="divide-y divide-[var(--card-border)]">
             {pending.map((user) => (
-              <AdminUserRow key={user.id} user={user} stats={statsByUser.get(user.id) ?? emptyStats()} />
+              <AdminUserRow
+                key={user.id}
+                user={user}
+                stats={statsByUser.get(user.id) ?? emptyStats()}
+                currentUserId={session.user.id}
+              />
             ))}
           </div>
         </Card>
@@ -136,7 +141,12 @@ export default async function AdminPage() {
         ) : (
           <div className="divide-y divide-[var(--card-border)]">
             {all.map((user) => (
-              <AdminUserRow key={user.id} user={user} stats={statsByUser.get(user.id) ?? emptyStats()} />
+              <AdminUserRow
+                key={user.id}
+                user={user}
+                stats={statsByUser.get(user.id) ?? emptyStats()}
+                currentUserId={session.user.id}
+              />
             ))}
           </div>
         )}
