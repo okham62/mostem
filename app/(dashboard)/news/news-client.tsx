@@ -243,13 +243,12 @@ function NewsFilterBar({
               setOpen((value) => !value)
             }}
             className={cn(
-              'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
-              open ? 'bg-gold/15 text-gold' : 'text-white/70 hover:bg-white/5 hover:text-white'
+              'mostem-filter-btn inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors duration-150 hover:bg-gold/20 hover:text-gold'
             )}
           >
             <Filter className="h-3.5 w-3.5" />
             전체 언론사
-            <ChevronDown className={cn('h-4 w-4 transition-transform duration-150', open && 'rotate-180')} />
+            <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', open && 'rotate-180')} />
           </button>
           <label className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
