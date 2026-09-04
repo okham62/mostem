@@ -34,8 +34,8 @@ function defaultSources(data: KeywordsPayload) {
   return [
     {
       id: 'signal' as const,
-      label: '시그널',
-      hint: '네이버 실검 대체',
+      label: '네이버',
+      hint: '실시간 검색어',
       now: data.now,
       keywords: data.keywords,
       error: data.error,
@@ -101,7 +101,7 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
             <h1 className="text-xl font-bold text-white md:text-2xl">실시간 키워드</h1>
           </div>
           <p className="mt-1 text-sm text-white/45">
-            네이버는 실시간 순위를 공개하지 않아 시그널로 대체하고, 구글은 급상승 검색어를 가져옵니다 ·{' '}
+            지금 많이 검색되는 말을 네이버·구글 순위로 보여 줍니다 ·{' '}
             {formatKeywordTime(current?.now ?? data.now)}
           </p>
         </div>
@@ -149,7 +149,7 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
       )}
 
       <p className="pb-2 text-[11px] text-white/30">
-        데이터 출처: 시그널(네이버 실검 대체) · 구글 트렌드
+        데이터 출처: 네이버 검색어 · 구글 트렌드
       </p>
     </div>
   )
@@ -177,7 +177,7 @@ function KeywordColumn({
                 {item.rank}
               </span>
               <a
-                href={item.summaryUrl || item.searchUrl || naverSearch(item.keyword)}
+                href={item.searchUrl || naverSearch(item.keyword)}
                 target="_blank"
                 rel="noreferrer"
                 className="min-w-0 flex-1 truncate text-sm font-medium text-white hover:text-gold"

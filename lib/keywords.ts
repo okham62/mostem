@@ -233,11 +233,11 @@ export async function getRealtimeKeywords(): Promise<KeywordsPayload> {
     const sources: KeywordSource[] = [
       {
         id: 'signal',
-        label: '시그널',
-        hint: '네이버 실검 대체',
+        label: '네이버',
+        hint: '실시간 검색어',
         now: signal?.now ?? Date.now(),
         keywords: signal?.keywords ?? [],
-        ...(signal ? {} : { error: '시그널 순위를 불러오지 못했습니다.' }),
+        ...(signal ? {} : { error: '네이버 순위를 불러오지 못했습니다.' }),
       },
       {
         id: 'google',
