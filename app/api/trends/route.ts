@@ -10,11 +10,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const compare = Number(new URL(request.url).searchParams.get('compare') || '1')
+  const url = new URL(request.url)
+  const compare = Number(url.searchParams.get('compare') || '1')
   const weeks = compare === 2 || compare === 4 ? compare : 1
 
   try {
-    const data = await getShoppingTrends(weeks)
+    const data = await getShoppingTrends(weeks, {
+      cat: url.searchParams.get('cat') || undefined,
+      q: url.searchParams.get('q') || undefined,
+      timing: url.searchParams.get('timing') || undefined,
+    })
     return NextResponse.json(data, {
       headers: { 'Cache-Control': 'no-store' },
     })

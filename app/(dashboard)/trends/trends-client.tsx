@@ -19,8 +19,8 @@ import {
 } from 'lucide-react'
 import {
   formatGrowth,
+  formatSearchVolume,
   formatTrendDate,
-  isLikelyBrand,
   type CompareWeeks,
   type TrendDetail,
   type TrendKeyword,
@@ -67,13 +67,27 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<TrendKeyword | null>(null)
 
-  async function reload(nextCompare = compare) {
+  async function reload(next?: {
+    compare?: CompareWeeks
+    cat?: string
+    q?: string
+    timing?: (typeof TIMINGS)[number]['id']
+  }) {
     setRefreshing(true)
+    const nextCompare = next?.compare ?? compare
+    const nextCat = next?.cat ?? category
+    const nextQ = next?.q ?? query
+    const nextTiming = next?.timing ?? timing
     try {
-      const res = await fetch(`/api/trends?compare=${nextCompare}`, { cache: 'no-store' })
+      const params = new URLSearchParams()
+      params.set('compare', String(nextCompare))
+      if (nextCat !== 'all') params.set('cat', nextCat)
+      if (nextQ.trim()) params.set('q', nextQ.trim())
+      if (nextTiming === 'now') params.set('timing', 'now')
+      const res = await fetch(`/api/trends?${params.toString()}`, { cache: 'no-store' })
       if (!res.ok) return
-      const next = (await res.json()) as TrendsPayload
-      setData(next)
+      const nextData = (await res.json()) as TrendsPayload
+      setData(nextData)
     } finally {
       setRefreshing(false)
     }
@@ -93,21 +107,24 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
 
   const filtered = useMemo(() => {
     let rows = data.items
-    if (category !== 'all') rows = rows.filter((item) => item.cid === category)
+    if (category !== 'all') {
+      const label = data.categories.find((item) => item.id === category)?.label
+      if (label) rows = rows.filter((item) => item.categoryPath.startsWith(label) || item.category === label)
+    }
     if (content === 'purchase') rows = rows.filter((item) => item.contentType === 'purchase')
     if (content === 'info') rows = rows.filter((item) => item.contentType === 'info')
     if (timing === 'now') rows = rows.filter((item) => item.peakNow)
-    if (timing === 'steady') rows = rows.filter((item) => !item.isNew && item.growth >= 0 && item.growth < 25)
-    if (excludeBrand) rows = rows.filter((item) => !item.isBrand && !isLikelyBrand(item.keyword, item.isBrand))
+    if (timing === 'steady') rows = rows.filter((item) => !item.isNew && item.growth >= 0 && item.growth < 80)
+    if (excludeBrand) rows = rows.filter((item) => !item.isBrand)
     if (query.trim()) {
       const q = query.trim().toLowerCase()
       rows = rows.filter((item) => item.keyword.toLowerCase().includes(q))
     }
-    if (tab === 'rising') rows = [...rows].sort((a, b) => b.growth - a.growth || b.searchTotal - a.searchTotal)
+    if (tab === 'rising') rows = [...rows]
     if (tab === 'popular') rows = [...rows].sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth)
-    if (tab === 'new') rows = rows.filter((item) => item.isNew).sort((a, b) => b.growth - a.growth)
-    return rows.slice(0, 50)
-  }, [data.items, category, content, timing, excludeBrand, query, tab])
+    if (tab === 'new') rows = rows.filter((item) => item.isNew)
+    return rows
+  }, [data.items, data.categories, category, content, timing, excludeBrand, query, tab])
 
   const tabMeta = TABS.find((item) => item.id === tab)!
 
@@ -132,8 +149,8 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
           <p className="mt-2 text-[11px] text-white/35">
             키워드 {data.stats.total}개 · 급상승 {data.stats.rising}개 · 신규 {data.stats.fresh}개
           </p>
-          <p className="text-[11px] text-white/30">
-            데이터 기준 {formatTrendDate(data.now)} · 5분마다 자동 확인
+          <p className="mt-2 text-[11px] text-white/30">
+            데이터 기준 {data.latestDate || formatTrendDate(data.now)} · 5분마다 자동 확인
           </p>
         </div>
       </div>
@@ -166,7 +183,10 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
           <HoverSelect
             value={data.categories.find((item) => item.id === category)?.label || '전체 분야'}
             options={data.categories.map((item) => ({ id: item.id, label: item.label }))}
-            onChange={setCategory}
+            onChange={(id) => {
+              setCategory(id)
+              void reload({ cat: id })
+            }}
           />
           <HoverSelect
             value={CONTENTS.find((item) => item.id === content)?.label || '모든 콘텐츠'}
@@ -176,7 +196,11 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
           <HoverSelect
             value={TIMINGS.find((item) => item.id === timing)?.label || '모든 타이밍'}
             options={TIMINGS.map((item) => ({ id: item.id, label: item.label }))}
-            onChange={(id) => setTiming(id as typeof timing)}
+            onChange={(id) => {
+              const next = id as typeof timing
+              setTiming(next)
+              void reload({ timing: next })
+            }}
           />
           <HoverSelect
             value={COMPARES.find((item) => item.id === compare)?.label || '1주 전과 비교'}
@@ -184,7 +208,7 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
             onChange={(id) => {
               const next = Number(id) as CompareWeeks
               setCompare(next)
-              void reload(next)
+              void reload({ compare: next })
             }}
           />
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-xs text-white/55">
@@ -200,7 +224,13 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value
+                setQuery(value)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void reload({ q: query })
+              }}
               placeholder="키워드 검색"
               className="h-9 w-full rounded-lg bg-black/30 pl-8 pr-3 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-white/30"
             />
@@ -220,35 +250,38 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
               >
                 <span className="w-8 shrink-0 text-xl font-bold text-brand-400">{index + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[15px] font-semibold text-white">{item.keyword}</span>
+                  <p className="truncate text-[15px] font-semibold text-white">{item.keyword}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-white/35">{item.categoryPath}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-[13px] font-bold text-gold">
+                      <Flame className="h-3.5 w-3.5" />
+                      {formatGrowth(item.multiplier)}
+                    </span>
                     {item.peakNow ? (
                       <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
-                        성수기 지금!
+                        성수기 지금! ({item.peakMonth}월)
                       </span>
                     ) : null}
                     {item.isNew ? (
-                      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/60">
+                      <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] text-orange-200">
                         이번 달 신규
                       </span>
-                    ) : (
-                      <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
-                        {formatGrowth(item.growth, item.isNew)}
-                      </span>
-                    )}
+                    ) : null}
                   </div>
-                  <p className="mt-1 text-[11px] text-white/35">
-                    {item.category} · {item.intent}
-                  </p>
                 </div>
-                <Sparkline
-                  points={item.spark}
-                  up={
-                    item.daily.length >= 2
-                      ? item.daily[item.daily.length - 1].value >= item.daily[0].value
-                      : item.growth >= 0
-                  }
-                />
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="w-[4.5rem] text-right text-sm font-semibold text-white/80">
+                    {formatSearchVolume(item.searchTotal)}
+                  </span>
+                  <Sparkline
+                    points={item.spark}
+                    up={
+                      item.spark.length >= 2
+                        ? item.spark[item.spark.length - 1] >= item.spark[0]
+                        : item.growth >= 0
+                    }
+                  />
+                </div>
               </button>
             ))
           )}
@@ -430,7 +463,7 @@ function KeywordModal({
               <WandSparkles className="h-4 w-4 text-brand-400" />
               <h2 className="text-lg font-bold text-white">{item.keyword}</h2>
               <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-black">
-                {formatGrowth(item.growth, item.isNew)}
+                {formatGrowth(item.multiplier)}
               </span>
             </div>
           </div>

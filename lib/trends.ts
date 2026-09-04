@@ -27,7 +27,9 @@ export interface TrendKeyword {
   peakMonth: number
   searchTotal: number
   prevTotal: number
+  multiplier: number
   isBrand: boolean
+  categoryPath: string
   spark: number[]
   daily: TrendPoint[]
 }
@@ -49,6 +51,7 @@ export interface TrendDetail {
 
 export interface TrendsPayload {
   now: number
+  latestDate: string
   categories: ShopCategory[]
   items: TrendKeyword[]
   stats: {
@@ -86,9 +89,9 @@ export const SHOP_CATEGORIES: ShopCategory[] = [
 const PRODUCT_RE =
   /원피스|자켓|티셔츠|팬티|신발|가방|크림|마스크|라면|꽃게|캐리어|패딩|니트|코트|바지|스커트|후드|맨투맨|운동화|골프|캠핑|블라우스|드로즈|트위드|바람막이/
 
-let cache: { at: number; compare: CompareWeeks; data: TrendsPayload } | null = null
+let cache: { at: number; key: string; data: TrendsPayload } | null = null
 let inflight: Promise<TrendsPayload> | null = null
-let inflightCompare: CompareWeeks | null = null
+let inflightKey: string | null = null
 const seriesCache = new Map<
   string,
   { at: number; monthly: { month: number; value: number }[]; daily: TrendPoint[] }
@@ -171,25 +174,56 @@ type HdRow = {
   season: { peakMonth: number; timing: string; strength: number } | null
 }
 
-async function fetchHypeDuck(page: number): Promise<HdRow[]> {
-  const res = await fetch(`${HD_URL}?page=${page}`, {
-    headers: { 'User-Agent': BROWSER_UA, Accept: 'application/json' },
+type HdPayload = {
+  rows?: HdRow[]
+  categories?: { id: number; name: string }[]
+  total?: number
+  meta?: { latestDate?: string }
+}
+
+export type TrendQuery = {
+  cat?: string
+  q?: string
+  timing?: string
+}
+
+function hdHeaders() {
+  return {
+    'User-Agent': BROWSER_UA,
+    Accept: 'application/json',
+    Referer: 'https://www.hypeduck.ai/dashboard/trend-keywords',
+    Origin: 'https://www.hypeduck.ai',
+  }
+}
+
+async function fetchHypeDuck(page: number, query: TrendQuery = {}): Promise<HdPayload> {
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  if (query.cat && query.cat !== 'all') params.set('cat', query.cat)
+  if (query.q?.trim()) params.set('q', query.q.trim())
+  if (query.timing === 'now') params.set('timing', 'now')
+  const res = await fetch(`${HD_URL}?${params.toString()}`, {
+    headers: hdHeaders(),
     cache: 'no-store',
     signal: AbortSignal.timeout(8000),
   })
   if (!res.ok) throw new Error(`hypeduck ${res.status}`)
-  const json = (await res.json()) as { rows?: HdRow[] }
-  return json.rows ?? []
+  return (await res.json()) as HdPayload
 }
 
 function mapHdRow(row: HdRow, rank: number): TrendKeyword {
-  const category = (row.categoryPath || '쇼핑').split('>')[0].trim() || '쇼핑'
+  const categoryPath = row.categoryPath || '쇼핑'
+  const category = categoryPath.split('>')[0].trim() || '쇼핑'
   const spark = Array.isArray(row.spark) ? row.spark : []
-  const daily = sparkToDaily(spark)
+  const searchTotal = Number(row.searchTotal) || 0
+  const prevTotal = Number(row.prevTotal) || 0
   const growth = Number(row.growthPct) || 0
+  const multiplier =
+    Number(row.season?.strength) || (prevTotal > 0 ? searchTotal / prevTotal : growth / 100 + 1)
   return {
     keyword: row.keyword,
     category,
+    categoryPath,
     cid: cidFromCategory(category),
     rank,
     prevRank: null,
@@ -200,46 +234,64 @@ function mapHdRow(row: HdRow, rank: number): TrendKeyword {
     contentType: row.contentType === 'info' ? 'info' : 'purchase',
     peakNow: row.season?.timing === 'now',
     peakMonth: row.season?.peakMonth || seoulParts().month,
-    searchTotal: Number(row.searchTotal) || 0,
-    prevTotal: Number(row.prevTotal) || 0,
+    searchTotal,
+    prevTotal,
+    multiplier,
     isBrand: Boolean(row.isBrand),
     spark,
-    daily,
+    daily: sparkToDaily(spark),
   }
 }
 
-export async function getShoppingTrends(compareWeeks: CompareWeeks = 1): Promise<TrendsPayload> {
-  if (cache && cache.compare === compareWeeks && Date.now() - cache.at < CACHE_MS) return cache.data
-  if (inflight && inflightCompare === compareWeeks) return inflight
+function hdCategories(rows: { id: number; name: string }[] | undefined): ShopCategory[] {
+  const cats = (rows ?? []).map((item) => ({
+    id: String(item.id),
+    label: item.name,
+    cid: String(item.id),
+  }))
+  return [{ id: 'all', label: '전체 분야', cid: null }, ...cats]
+}
 
-  inflightCompare = compareWeeks
+export async function getShoppingTrends(
+  compareWeeks: CompareWeeks = 1,
+  query: TrendQuery = {}
+): Promise<TrendsPayload> {
+  const cacheKey = `${compareWeeks}|${query.cat || 'all'}|${query.q || ''}|${query.timing || 'all'}`
+  if (cache && cache.key === cacheKey && Date.now() - cache.at < CACHE_MS) return cache.data
+  if (inflight && inflightKey === cacheKey) return inflight
+
+  inflightKey = cacheKey
   inflight = (async () => {
-    const pages = await Promise.all([1, 2, 3].map((page) => fetchHypeDuck(page).catch(() => [] as HdRow[])))
+    const pages = await Promise.all([1, 2].map((page) => fetchHypeDuck(page, query)))
+    const first = pages[0]
+    if (!pages.some((page) => page.rows?.length)) throw new Error('hypeduck empty')
     const seen = new Set<string>()
     const items: TrendKeyword[] = []
-    for (const row of pages.flat()) {
-      if (!row?.keyword || seen.has(row.keyword)) continue
-      seen.add(row.keyword)
-      items.push(mapHdRow(row, items.length + 1))
+    for (const page of pages) {
+      for (const row of page.rows ?? []) {
+        if (!row?.keyword || seen.has(row.keyword)) continue
+        seen.add(row.keyword)
+        items.push(mapHdRow(row, items.length + 1))
+      }
     }
 
-    items.sort((a, b) => b.growth - a.growth || b.searchTotal - a.searchTotal)
     itemCache = new Map(items.map((item) => [item.keyword, item]))
     const data: TrendsPayload = {
       now: Date.now(),
-      categories: SHOP_CATEGORIES,
+      latestDate: first.meta?.latestDate || seoulYmd(),
+      categories: hdCategories(first.categories),
       items,
       stats: {
-        total: items.length,
+        total: first.total || items.length,
         fresh: items.filter((item) => item.isNew).length,
         rising: items.filter((item) => item.growth > 0).length,
       },
     }
-    cache = { at: Date.now(), compare: compareWeeks, data }
+    cache = { at: Date.now(), key: cacheKey, data }
     return data
   })().finally(() => {
     inflight = null
-    inflightCompare = null
+    inflightKey = null
   })
 
   return inflight
@@ -347,11 +399,18 @@ export function formatTrendDate(now: number) {
   }).format(new Date(now))
 }
 
-export function formatGrowth(value: number, isNew: boolean) {
-  if (isNew) return '이번 달 신규'
-  const multiplier = value / 100 + 1
-  if (multiplier >= 2) return `${multiplier.toFixed(1)}배`
-  if (value > 0) return `+${value.toFixed(1)}%`
-  if (value < 0) return `${value.toFixed(1)}%`
+export function formatGrowth(value: number, isNew = false) {
+  if (isNew && value < 2) return '이번 달 신규'
+  if (value >= 2) return `${value.toFixed(1)}배`
+  if (value > 1) return `+${((value - 1) * 100).toFixed(1)}%`
+  if (value > 0 && value < 1) return `${((value - 1) * 100).toFixed(1)}%`
   return '보합'
+}
+
+export function formatSearchVolume(value: number) {
+  if (value >= 10000) {
+    const man = value / 10000
+    return `${man >= 10 ? man.toFixed(1) : man.toFixed(1)}만`
+  }
+  return value.toLocaleString('ko-KR')
 }
