@@ -1,10 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, LineChart, Newspaper, Radio, RefreshCw } from 'lucide-react'
 import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
-import { PRESS_NAV_GROUPS } from '@/lib/press'
+import { PRESS_NAV_GROUPS, type PressOutlet } from '@/lib/press'
 import { cn } from '@/lib/utils'
+
+const PRESS_TAB_META = [
+  { title: '방송', icon: Radio, caption: '방송사' },
+  { title: '종합일간', icon: Newspaper, caption: '일간지' },
+  { title: '경제', icon: LineChart, caption: '경제지' },
+] as const
 
 const NEWS_PER_PAGE = 12
 const NEWS_PAGES = 30
@@ -147,51 +153,109 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   )
 }
 
+function PressLogo({ outlet }: { outlet: PressOutlet }) {
+  const [src, setSrc] = useState(outlet.logo)
+  const fallbackUsed = useRef(false)
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className="h-full w-full object-contain"
+      onError={() => {
+        if (fallbackUsed.current) return
+        fallbackUsed.current = true
+        try {
+          const host = new URL(outlet.url).hostname
+          setSrc(`https://www.google.com/s2/favicons?domain=${host}&sz=64`)
+        } catch {
+          /* keep broken image */
+        }
+      }}
+    />
+  )
+}
+
 function PressHoverBar() {
   const [openTitle, setOpenTitle] = useState<string | null>(null)
-  const openGroup = PRESS_NAV_GROUPS.find((group) => group.title === openTitle) ?? null
+  const openIndex = PRESS_NAV_GROUPS.findIndex((group) => group.title === openTitle)
+  const openGroup = openIndex >= 0 ? PRESS_NAV_GROUPS[openIndex] : null
 
   return (
     <section
-      className="sticky top-0 z-20 -mx-3 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)]/95 backdrop-blur md:-mx-0"
+      className="mostem-press-bar sticky top-0 z-20 -mx-3 rounded-2xl border border-gold/20 bg-[var(--card-bg)]/95 shadow-[0_0_0_1px_rgba(245,197,24,0.06),0_12px_32px_rgba(0,0,0,0.28)] backdrop-blur md:-mx-0"
       onMouseLeave={() => setOpenTitle(null)}
     >
-      <div className="grid grid-cols-3">
-        {PRESS_NAV_GROUPS.map((group) => {
+      <div className="mostem-press-sheen z-0" />
+      <div className="relative z-10 grid grid-cols-3">
+        {PRESS_NAV_GROUPS.map((group, index) => {
+          const meta = PRESS_TAB_META.find((item) => item.title === group.title)
+          const Icon = meta?.icon ?? Newspaper
           const active = openTitle === group.title
           return (
             <div
               key={group.title}
               onMouseEnter={() => setOpenTitle(group.title)}
               className={cn(
-                'flex h-11 cursor-default items-center justify-center text-sm font-semibold transition',
-                active ? 'bg-gold text-black' : 'text-white/70 hover:bg-white/5 hover:text-white'
+                'relative flex h-[4.25rem] cursor-default flex-col items-center justify-center gap-1 transition-colors duration-200',
+                active ? 'bg-gold/[0.08]' : 'hover:bg-white/[0.03]'
               )}
             >
-              {group.title}
+              <Icon
+                className={cn(
+                  'h-3.5 w-3.5 transition-colors duration-200',
+                  active ? 'text-gold' : 'text-gold/55'
+                )}
+                strokeWidth={1.75}
+              />
+              <span
+                className={cn(
+                  'text-[15px] font-semibold tracking-tight transition-colors duration-200',
+                  active ? 'text-gold' : 'text-white'
+                )}
+              >
+                {group.title}
+              </span>
+              <span className={cn('text-[10px] transition-colors', active ? 'text-gold/70' : 'text-white/35')}>
+                {group.outlets.length}개 {meta?.caption}
+              </span>
+              {index < PRESS_NAV_GROUPS.length - 1 ? (
+                <span className="pointer-events-none absolute right-0 top-1/2 h-8 w-px -translate-y-1/2 bg-white/8" />
+              ) : null}
             </div>
           )
         })}
+        <div
+          className={cn(
+            'pointer-events-none absolute bottom-0 h-[2px] bg-gold transition-all duration-300 ease-out',
+            openIndex >= 0 ? 'mostem-press-indicator w-1/3' : 'w-full bg-gold/35'
+          )}
+          style={openIndex >= 0 ? { left: `${(openIndex / 3) * 100}%` } : { left: 0 }}
+        />
       </div>
       <div
         className={cn(
-          'grid transition-all duration-200 ease-out',
-          openGroup ? 'grid-rows-[1fr] border-t border-white/10' : 'grid-rows-[0fr]'
+          'relative z-10 grid transition-all duration-300 ease-out',
+          openGroup ? 'grid-rows-[1fr] border-t border-gold/15' : 'grid-rows-[0fr]'
         )}
       >
         <div className="overflow-hidden">
           {openGroup && (
-            <div className="flex flex-wrap gap-2 px-3 py-3">
+            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-5">
               {openGroup.outlets.map((outlet) => (
                 <a
                   key={outlet.url}
                   href={outlet.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-xs font-medium text-white transition hover:-translate-y-0.5 hover:border-gold/50 hover:text-gold"
+                  className="group flex items-center gap-2.5 rounded-xl border border-white/8 bg-black/25 px-2.5 py-2 transition duration-200 hover:-translate-y-0.5 hover:border-gold/40 hover:bg-gold/[0.06]"
                 >
-                  {outlet.name}
-                  <ExternalLink className="h-3 w-3 text-white/25 group-hover:text-gold" />
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5">
+                    <PressLogo outlet={outlet} />
+                  </span>
+                  <span className="truncate text-[13px] font-medium text-white/90 group-hover:text-white">
+                    {outlet.name}
+                  </span>
                 </a>
               ))}
             </div>
