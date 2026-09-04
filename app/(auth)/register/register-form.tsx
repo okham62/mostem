@@ -49,7 +49,7 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="w-full max-w-sm px-4">
+    <div className="w-full max-w-sm px-4 pointer-events-auto">
       <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-8 shadow-sm">
         {/* 로고 */}
         <div className="mb-6 flex flex-col items-center gap-3">

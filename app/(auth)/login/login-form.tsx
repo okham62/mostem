@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Zap, Eye, EyeOff } from 'lucide-react'
-import { LoginBg } from './login-bg'
 
 export function LoginForm() {
   const router = useRouter()
@@ -38,10 +37,8 @@ export function LoginForm() {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 w-full items-center justify-center bg-[#080b14]">
-      <LoginBg />
-
-      <div className="relative z-10 w-full max-w-sm px-4">
+    <div className="relative flex h-full min-h-0 w-full items-center justify-center">
+      <div className="relative z-10 w-full max-w-sm px-4 pointer-events-auto">
         <div
           className="rounded-2xl p-8"
           style={{

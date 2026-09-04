@@ -10,7 +10,7 @@ export default async function RegisterPage({
 
   if (status === 'pending') {
     return (
-      <div className="w-full max-w-sm px-4">
+      <div className="w-full max-w-sm px-4 pointer-events-auto">
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-8 text-center shadow-sm">
           <div className="mb-4 flex justify-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
@@ -37,7 +37,7 @@ export default async function RegisterPage({
 
   if (status === 'rejected') {
     return (
-      <div className="w-full max-w-sm px-4">
+      <div className="w-full max-w-sm px-4 pointer-events-auto">
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-8 text-center shadow-sm">
           <div className="mb-4 flex justify-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
