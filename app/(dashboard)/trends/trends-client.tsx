@@ -13,7 +13,7 @@ import {
   ShoppingBag,
   Sprout,
   Target,
-  TrendingUp,
+  Users,
   WandSparkles,
   X,
 } from 'lucide-react'
@@ -33,7 +33,7 @@ const POLL_MS = 5 * 60_000
 
 const TABS: { id: TrendTab; label: string; hint: string }[] = [
   { id: 'rising', label: '지금 뜨는 키워드', hint: '최근 검색이 빠르게 오른 키워드예요.' },
-  { id: 'popular', label: '많이 찾는 키워드', hint: '지금 가장 많이 찾는 쇼핑 검색어예요.' },
+  { id: 'popular', label: '많이 찾는 키워드', hint: '늘 꾸준히 많이 찾는 큰 주제예요. 안정적으로 반응이 나와요.' },
   { id: 'new', label: '새로 뜬 키워드', hint: '이번에 처음 오른 키워드예요. 남들보다 먼저 쓸 수 있어요.' },
 ]
 
@@ -98,47 +98,16 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
     if (content === 'info') rows = rows.filter((item) => item.contentType === 'info')
     if (timing === 'now') rows = rows.filter((item) => item.peakNow)
     if (timing === 'steady') rows = rows.filter((item) => !item.isNew && item.growth >= 0 && item.growth < 25)
-    if (excludeBrand) rows = rows.filter((item) => !isLikelyBrand(item.keyword))
+    if (excludeBrand) rows = rows.filter((item) => !item.isBrand && !isLikelyBrand(item.keyword, item.isBrand))
     if (query.trim()) {
       const q = query.trim().toLowerCase()
       rows = rows.filter((item) => item.keyword.toLowerCase().includes(q))
     }
-    if (tab === 'rising') rows = [...rows].sort((a, b) => b.growth - a.growth || b.score - a.score)
-    if (tab === 'popular') rows = [...rows].sort((a, b) => a.rank - b.rank || b.score - a.score)
-    if (tab === 'new') rows = rows.filter((item) => item.isNew)
-    return rows.slice(0, 40)
+    if (tab === 'rising') rows = [...rows].sort((a, b) => b.growth - a.growth || b.searchTotal - a.searchTotal)
+    if (tab === 'popular') rows = [...rows].sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth)
+    if (tab === 'new') rows = rows.filter((item) => item.isNew).sort((a, b) => b.growth - a.growth)
+    return rows.slice(0, 50)
   }, [data.items, category, content, timing, excludeBrand, query, tab])
-
-  const sparkQuery = filtered.map((item) => `${item.cid}:${item.keyword}`).join('|')
-
-  useEffect(() => {
-    if (!sparkQuery) return
-    let alive = true
-    const items = sparkQuery.split('|').map((key) => {
-      const [cid, ...rest] = key.split(':')
-      return { cid, keyword: rest.join(':') }
-    })
-    fetch('/api/trends/sparks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((next: { series?: Record<string, { spark: number[]; daily: { date: string; value: number }[] }> } | null) => {
-        if (!alive || !next?.series) return
-        setData((prev) => ({
-          ...prev,
-          items: prev.items.map((item) => {
-            const series = next.series?.[`${item.cid}:${item.keyword}`]
-            return series ? { ...item, spark: series.spark, daily: series.daily } : item
-          }),
-        }))
-      })
-      .catch(() => null)
-    return () => {
-      alive = false
-    }
-  }, [sparkQuery])
 
   const tabMeta = TABS.find((item) => item.id === tab)!
 
@@ -170,7 +139,7 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
       </div>
 
       <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
-        <div className="flex flex-wrap gap-2">
+        <div className="inline-flex max-w-full flex-wrap rounded-full bg-black/35 p-1 ring-1 ring-white/10">
           {TABS.map((item) => {
             const active = tab === item.id
             return (
@@ -180,14 +149,11 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
                 onClick={() => setTab(item.id)}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition',
-                  item.id === 'rising' && active && 'bg-gold/15 text-gold',
-                  item.id === 'popular' && active && 'bg-brand/25 text-white',
-                  item.id === 'new' && active && 'bg-emerald-500/15 text-emerald-300',
-                  !active && 'text-white/45 hover:bg-white/5 hover:text-white'
+                  active ? 'bg-brand text-white shadow-[0_0_0_1px_rgba(139,92,246,0.35)]' : 'text-white/55 hover:text-white'
                 )}
               >
                 {item.id === 'rising' ? <Flame className="h-3.5 w-3.5" /> : null}
-                {item.id === 'popular' ? <TrendingUp className="h-3.5 w-3.5" /> : null}
+                {item.id === 'popular' ? <Users className="h-3.5 w-3.5" /> : null}
                 {item.id === 'new' ? <Sprout className="h-3.5 w-3.5" /> : null}
                 {item.label}
               </button>
@@ -414,10 +380,12 @@ function KeywordModal({
   onClose: () => void
 }) {
   const [detail, setDetail] = useState<TrendDetail | null>(null)
+  const [monthlyReady, setMonthlyReady] = useState(false)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let alive = true
+    setMonthlyReady(false)
     fetch(`/api/trends/detail?keyword=${encodeURIComponent(item.keyword)}&cid=${item.cid}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((next) => {
@@ -426,6 +394,9 @@ function KeywordModal({
       .catch(() => {
         if (alive) setDetail(null)
       })
+      .finally(() => {
+        if (alive) setMonthlyReady(true)
+      })
     return () => {
       alive = false
     }
@@ -433,6 +404,13 @@ function KeywordModal({
 
   const daily = detail?.daily?.length ? detail.daily : item.daily
   const monthly = detail?.monthly ?? []
+  const advice =
+    detail?.advice ||
+    (item.peakNow
+      ? `성수기가 바로 지금 ${item.peakMonth}월이에요. 지금 올리면 딱 좋아요.`
+      : `검색이 가장 몰리는 달은 ${item.peakMonth}월입니다. 미리 올려 두면 좋아요.`)
+  const changePct =
+    item.prevTotal > 0 ? ((item.searchTotal - item.prevTotal) / item.prevTotal) * 100 : item.growth
 
   async function copyKeyword() {
     await navigator.clipboard.writeText(item.keyword)
@@ -467,14 +445,14 @@ function KeywordModal({
             언제 올리면 좋을까요?
           </p>
           <p className="mt-2 text-sm font-semibold text-white">
-            {detail?.advice || '검색 추이를 불러오는 중입니다.'}
+            {advice}
           </p>
         </div>
 
         <ChartBlock title="1년 중 언제 많이 찾나요 (월별 검색량)">
-          <BarChart data={monthly} peakMonth={detail?.peakMonth} />
+          <BarChart data={monthly} peakMonth={detail?.peakMonth ?? item.peakMonth} ready={monthlyReady} />
         </ChartBlock>
-        <ChartBlock title="최근 30일 검색 추이">
+        <ChartBlock title="최근 검색 추이">
           <LineChart data={daily} />
         </ChartBlock>
 
@@ -492,9 +470,12 @@ function KeywordModal({
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-          <StatCard label="검색지수" value={detail ? String(detail.index) : '…'} />
-          <StatCard label="30일 변화" value={detail?.change || '…'} />
-          <StatCard label="성수기" value={detail ? `${detail.peakMonth}월` : '…'} />
+          <StatCard label="검색량" value={String(detail?.index ?? item.searchTotal)} />
+          <StatCard
+            label="1주 변화"
+            value={detail?.change || `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`}
+          />
+          <StatCard label="성수기" value={`${detail?.peakMonth ?? item.peakMonth}월`} />
           <StatCard label="분야" value={item.category} />
         </div>
 
@@ -550,15 +531,21 @@ function ChartBlock({ title, children }: { title: string; children: React.ReactN
 function BarChart({
   data,
   peakMonth,
+  ready,
 }: {
   data: { month: number; value: number }[]
   peakMonth?: number
+  ready?: boolean
 }) {
   const months = Array.from({ length: 12 }, (_, i) => i + 1)
   const map = new Map(data.map((row) => [row.month, row.value]))
   const max = Math.max(1, ...data.map((row) => row.value))
   if (!data.length) {
-    return <div className="flex h-full items-center justify-center text-xs text-white/30">월별 검색량을 불러오는 중</div>
+    return (
+      <div className="flex h-full items-center justify-center text-xs text-white/30">
+        {ready ? '월별 검색량이 없습니다' : '월별 검색량을 불러오는 중'}
+      </div>
+    )
   }
   return (
     <div className="flex h-full items-end gap-1">
