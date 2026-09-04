@@ -181,40 +181,54 @@ function NewsFilterBar({
   onQuery: (value: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLElement>(null)
+  const closeTimer = useRef<number | null>(null)
+
+  function openMenu() {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+
+  function closeMenu() {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => setOpen(false), 60)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) return
-    const onPointer = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('pointerdown', onPointer)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
   return (
-    <section ref={rootRef} className="sticky top-0 z-20 -mx-3 md:-mx-0">
+    <section className="sticky top-0 z-20 -mx-3 md:-mx-0">
       <div className="flex flex-col gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-2 sm:flex-row sm:items-center">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          className={cn(
-            'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition',
-            open ? 'bg-gold/15 text-gold' : 'text-white/70 hover:bg-white/5 hover:text-white'
-          )}
-        >
-          <Filter className="h-3.5 w-3.5" />
-          전체 언론사
-          <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
-        </button>
+        <div onMouseEnter={openMenu} onMouseLeave={closeMenu}>
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => {
+              if (window.matchMedia('(hover: hover)').matches) return
+              setOpen((value) => !value)
+            }}
+            className={cn(
+              'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
+              open ? 'bg-gold/15 text-gold' : 'text-white/70 hover:bg-white/5 hover:text-white'
+            )}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            전체 언론사
+            <ChevronDown className={cn('h-4 w-4 transition-transform duration-150', open && 'rotate-180')} />
+          </button>
+        </div>
         <label className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
           <input
@@ -237,15 +251,20 @@ function NewsFilterBar({
         </button>
       </div>
       {open ? (
-        <div className="mt-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+        <div
+          onMouseEnter={openMenu}
+          onMouseLeave={closeMenu}
+          className="mostem-press-panel mt-1.5 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+        >
           <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {PRESS_NAV_OUTLETS.map((outlet) => (
+            {PRESS_NAV_OUTLETS.map((outlet, index) => (
               <a
                 key={outlet.url}
                 href={outlet.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-white/70 transition hover:bg-white/5 hover:text-white"
+                style={{ animationDelay: `${Math.min(index, 12) * 12}ms` }}
+                className="mostem-press-item flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-white/70 transition-colors duration-150 hover:bg-white/5 hover:text-white"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
