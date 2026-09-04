@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { logActivity } from '@/lib/log'
 import {
   TAG_PLATFORMS,
+  TAGS_PER_PLATFORM,
   buildResults,
   collectRelatedSearches,
   parseTagJson,
@@ -56,6 +57,7 @@ ${related.length ? related.map((item) => `- ${item}`).join('\n') : '(없음)'}
 ${platformGuide}
 
 규칙:
+- 각 플랫폼마다 태그를 빠짐없이 정확히 ${TAGS_PER_PLATFORM}개 만들 것
 - 검색 노출에 강한 핵심어 + 롱테일 + 연관 검색어를 섞을 것
 - 중복·무의미한 나열 금지
 - 한국어 위주, 검색에 쓰이는 영어 표기는 포함 가능
@@ -81,8 +83,8 @@ ${platformGuide}
   }
 
   const platforms = buildResults(topic, byId, related)
-  if (platforms.every((row) => row.tags.length <= 1) && related.length === 0) {
-    return NextResponse.json({ error: '태그를 만들지 못했습니다. 주제를 바꿔 다시 시도하세요.' }, { status: 502 })
+  if (platforms.some((row) => row.tags.length < TAGS_PER_PLATFORM)) {
+    return NextResponse.json({ error: '태그를 20개까지 만들지 못했습니다. 다시 시도하세요.' }, { status: 502 })
   }
 
   void logActivity(

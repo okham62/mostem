@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Copy, Download, LoaderCircle, RefreshCw, Sparkles, Tags } from 'lucide-react'
 import type { PlatformTagResult } from '@/lib/tag-generator'
+import { PlatformLogo } from '@/components/platform-logos'
 import { cn } from '@/lib/utils'
 
 const YOUTUBE_TAG_LIMIT = 500
@@ -105,7 +106,7 @@ export function TagGeneratorClient() {
         </div>
         <h1 className="text-2xl font-bold text-white md:text-3xl">AI 태그 생성기</h1>
         <p className="mt-2 text-sm text-white/50">
-          태그 하나만 입력하면 유튜브·블로그·인스타·틱톡용 태그를 한 번에 만듭니다.
+          태그 하나만 입력하면 유튜브·스레드·인스타·틱톡·블로그용 태그를 한 번에 만듭니다.
         </p>
       </div>
 
@@ -191,8 +192,9 @@ export function TagGeneratorClient() {
                 className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4"
               >
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-white">
-                    {row.icon} {row.displayName}
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <PlatformLogo id={row.platform} className="h-5 w-5 shrink-0" />
+                    {row.displayName}
                   </h3>
                   <button
                     type="button"
@@ -207,7 +209,7 @@ export function TagGeneratorClient() {
                     {copied === row.platform ? '복사됨' : '복사'}
                   </button>
                 </div>
-                <p className="min-h-[88px] whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-xs leading-relaxed text-white/75">
+                <p className="min-h-[168px] whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-xs leading-relaxed text-white/75">
                   {row.formattedOutput}
                 </p>
                 <p className="mt-2 text-[11px] text-white/35">{row.tags.length}개 태그</p>
