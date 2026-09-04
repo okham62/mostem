@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react'
 import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
-import { PRESS_GROUPS } from '@/lib/press'
+import { PRESS_GROUPS, type PressOutlet } from '@/lib/press'
 import { cn } from '@/lib/utils'
 
 const NEWS_PER_PAGE = 12
 const NEWS_PAGES = 30
 const POLL_MS = 30_000
+const PRESS_TABS = ['전체', ...PRESS_GROUPS.map((group) => group.title)] as const
 
 function newsForPage(news: RankingNews[], page: number) {
   if (news.length === 0) return []
@@ -21,10 +22,16 @@ function newsForPage(news: RankingNews[], page: number) {
   return news.slice(start, start + NEWS_PER_PAGE)
 }
 
+function outletsForTab(tab: string): Array<PressOutlet & { group: string }> {
+  const groups = tab === '전체' ? PRESS_GROUPS : PRESS_GROUPS.filter((group) => group.title === tab)
+  return groups.flatMap((group) => group.outlets.map((outlet) => ({ ...outlet, group: group.title })))
+}
+
 export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   const [data, setData] = useState(initial)
   const [newsPage, setNewsPage] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [pressTab, setPressTab] = useState<(typeof PRESS_TABS)[number]>('전체')
 
   async function reload() {
     setRefreshing(true)
@@ -52,16 +59,14 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
 
   const page = ((newsPage % NEWS_PAGES) + NEWS_PAGES) % NEWS_PAGES
   const newsSlice = newsForPage(data.news, page)
+  const outlets = useMemo(() => outletsForTab(pressTab), [pressTab])
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-white md:text-2xl">실시간 뉴스</h1>
-          <p className="mt-1 text-sm text-white/45">
-            한국 대표 언론사로 바로 이동하고, 지금 가장 많이 본 기사를 모았습니다 ·{' '}
-            {formatKeywordTime(data.now)}
-          </p>
+          <p className="mt-1 text-sm text-white/45">{formatKeywordTime(data.now)}</p>
         </div>
         <button
           type="button"
@@ -73,33 +78,7 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
         </button>
       </div>
 
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-white">대표 언론사</h2>
-          <p className="mt-0.5 text-xs text-white/40">클릭하면 해당 언론사 홈으로 이동합니다</p>
-        </div>
-        {PRESS_GROUPS.map((group) => (
-          <div key={group.title}>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/35">
-              {group.title}
-            </p>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-              {group.outlets.map((outlet) => (
-                <a
-                  key={outlet.url}
-                  href={outlet.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group flex items-center justify-between gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2.5 text-sm font-medium text-white transition hover:border-gold/40 hover:bg-white/5"
-                >
-                  <span className="truncate">{outlet.name}</span>
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-white/25 group-hover:text-gold" />
-                </a>
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
+      <PressDock tab={pressTab} onTabChange={setPressTab} outlets={outlets} />
 
       <section>
         <div className="mb-3 flex items-end justify-between">
@@ -173,5 +152,62 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
 
       <p className="pb-2 text-[11px] text-white/30">데이터 출처: 네이버 뉴스 랭킹</p>
     </div>
+  )
+}
+
+function PressDock({
+  tab,
+  onTabChange,
+  outlets,
+}: {
+  tab: string
+  onTabChange: (tab: (typeof PRESS_TABS)[number]) => void
+  outlets: Array<PressOutlet & { group: string }>
+}) {
+  const loop = outlets.length > 0 ? [...outlets, ...outlets] : []
+
+  return (
+    <section className="sticky top-0 z-20 -mx-3 border-b border-white/5 bg-[var(--background)]/92 px-3 py-2 backdrop-blur md:-mx-4 md:px-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 gap-1 overflow-x-auto scrollbar-thin">
+          {PRESS_TABS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onTabChange(item)}
+              className={cn(
+                'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition',
+                tab === item
+                  ? 'bg-gold text-black'
+                  : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'
+              )}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        <p className="hidden shrink-0 text-[11px] text-white/35 sm:block">클릭하면 언론사 홈으로 이동합니다</p>
+      </div>
+      <div className="mostem-marquee overflow-hidden">
+        <div key={tab} className="mostem-marquee-track gap-2 pr-2">
+          {loop.map((outlet, index) => (
+            <a
+              key={`${outlet.url}-${index}`}
+              href={outlet.url}
+              target="_blank"
+              rel="noreferrer"
+              className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-[var(--card-bg)] px-3 py-1.5 text-xs font-medium text-white transition hover:-translate-y-0.5 hover:border-gold/50 hover:text-gold"
+              title={`${outlet.group} · ${outlet.name}`}
+            >
+              {tab === '전체' && (
+                <span className="text-[10px] text-white/30">{outlet.group}</span>
+              )}
+              <span>{outlet.name}</span>
+              <ExternalLink className="h-3 w-3 text-white/25 group-hover:text-gold" />
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
