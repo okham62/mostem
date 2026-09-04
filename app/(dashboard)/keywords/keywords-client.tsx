@@ -4,15 +4,19 @@ import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react'
 import {
   formatKeywordTime,
+  formatSearchTraffic,
+  type KeywordSourceId,
   type KeywordState,
   type KeywordsPayload,
   type RankingNews,
+  type RealtimeKeyword,
 } from '@/lib/keywords'
 import { cn } from '@/lib/utils'
 
 const NEWS_PER_PAGE = 12
 const NEWS_PAGES = 30
 const POLL_MS = 30_000
+const SOURCE_KEY = 'mostem-keyword-source'
 
 const STATE_UI: Record<
   KeywordState,
@@ -26,6 +30,20 @@ const STATE_UI: Record<
 
 function naverSearch(keyword: string) {
   return `https://search.naver.com/search.naver?query=${encodeURIComponent(keyword)}`
+}
+
+function defaultSources(data: KeywordsPayload) {
+  if (data.sources?.length) return data.sources
+  return [
+    {
+      id: 'signal' as const,
+      label: '시그널',
+      hint: '네이버 실검 대체',
+      now: data.now,
+      keywords: data.keywords,
+      error: data.error,
+    },
+  ]
 }
 
 function newsForPage(news: RankingNews[], page: number) {
@@ -43,6 +61,11 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
   const [data, setData] = useState(initial)
   const [newsPage, setNewsPage] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [sourceId, setSourceId] = useState<KeywordSourceId>('signal')
+
+  const sources = defaultSources(data)
+  const current = sources.find((s) => s.id === sourceId) ?? sources[0]
+  const keywords = current?.keywords ?? []
 
   async function reload() {
     setRefreshing(true)
@@ -55,6 +78,11 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
       setRefreshing(false)
     }
   }
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(SOURCE_KEY)
+    if (saved === 'signal' || saved === 'google') setSourceId(saved)
+  }, [])
 
   useEffect(() => {
     const tick = () => {
@@ -70,8 +98,13 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
 
   const page = ((newsPage % NEWS_PAGES) + NEWS_PAGES) % NEWS_PAGES
   const newsSlice = newsForPage(data.news, page)
-  const left = data.keywords.slice(0, 5)
-  const right = data.keywords.slice(5, 10)
+  const left = keywords.slice(0, 5)
+  const right = keywords.slice(5, 10)
+
+  function pickSource(id: KeywordSourceId) {
+    setSourceId(id)
+    window.localStorage.setItem(SOURCE_KEY, id)
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -85,7 +118,8 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
             <h1 className="text-xl font-bold text-white md:text-2xl">실시간 키워드</h1>
           </div>
           <p className="mt-1 text-sm text-white/45">
-            지금 포털에서 많이 검색되는 말 · {formatKeywordTime(data.now)}
+            네이버는 실시간 순위를 공개하지 않아 시그널로 대체하고, 구글은 급상승 검색어를 가져옵니다 ·{' '}
+            {formatKeywordTime(current?.now ?? data.now)}
           </p>
         </div>
         <button
@@ -98,15 +132,31 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
         </button>
       </div>
 
-      {data.error && data.keywords.length === 0 ? (
+      {current?.error && keywords.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/10 py-16 text-center text-sm text-white/40">
-          {data.error}
+          {current.error}
         </div>
       ) : (
         <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">실시간 검색어</h2>
-            <span className="text-[11px] text-white/35">시그널 기준 1~10위</span>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex rounded-lg bg-white/5 p-0.5">
+              {sources.map((source) => (
+                <button
+                  key={source.id}
+                  type="button"
+                  onClick={() => pickSource(source.id)}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-xs font-semibold',
+                    source.id === current?.id
+                      ? 'bg-gold text-black'
+                      : 'text-white/50 hover:text-white'
+                  )}
+                >
+                  {source.label}
+                </button>
+              ))}
+            </div>
+            <span className="text-[11px] text-white/35">{current?.hint} · 1~10위</span>
           </div>
           <div className="grid gap-x-8 md:grid-cols-2">
             <KeywordColumn items={left} />
@@ -186,7 +236,7 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
       </section>
 
       <p className="pb-2 text-[11px] text-white/30">
-        데이터 출처: 시그널 실시간 검색어 · 네이버 뉴스 랭킹
+        데이터 출처: 시그널(네이버 실검 대체) · 구글 트렌드 · 네이버 뉴스 랭킹
       </p>
     </div>
   )
@@ -195,12 +245,13 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
 function KeywordColumn({
   items,
 }: {
-  items: KeywordsPayload['keywords']
+  items: RealtimeKeyword[]
 }) {
   return (
     <ol className="divide-y divide-white/5">
       {items.map((item) => {
         const ui = STATE_UI[item.state]
+        const traffic = formatSearchTraffic(item.traffic)
         return (
           <li key={item.rank}>
             <div className="flex items-center gap-3 py-2.5">
@@ -213,7 +264,7 @@ function KeywordColumn({
                 {item.rank}
               </span>
               <a
-                href={item.summaryUrl || naverSearch(item.keyword)}
+                href={item.summaryUrl || item.searchUrl || naverSearch(item.keyword)}
                 target="_blank"
                 rel="noreferrer"
                 className="min-w-0 flex-1 truncate text-sm font-medium text-white hover:text-gold"
@@ -224,17 +275,17 @@ function KeywordColumn({
               <span
                 className={cn(
                   'inline-flex min-w-[2.25rem] justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-                  ui.className
+                  traffic ? 'bg-gold/15 text-gold' : ui.className
                 )}
               >
-                {ui.label}
+                {traffic || ui.label}
               </span>
               <a
-                href={naverSearch(item.keyword)}
+                href={item.searchUrl || naverSearch(item.keyword)}
                 target="_blank"
                 rel="noreferrer"
                 className="hidden text-white/25 hover:text-white/70 sm:inline-flex"
-                aria-label={`${item.keyword} 네이버 검색`}
+                aria-label={`${item.keyword} 검색`}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
