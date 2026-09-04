@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
+import { warmShoppingCache } from '@/lib/shopping-cache'
 import type { Session } from 'next-auth'
 
 const explore = [
@@ -64,9 +65,11 @@ function NavGroup({
                 href={item.href}
                 onMouseEnter={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
+                  if (item.href === '/shopping') warmShoppingCache()
                 }}
                 onFocus={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
+                  if (item.href === '/shopping') warmShoppingCache()
                 }}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
