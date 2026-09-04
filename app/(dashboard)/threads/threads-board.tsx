@@ -12,7 +12,7 @@ import {
   formatCount,
   mediaSrc,
 } from '@/lib/collect-labels'
-import { parseMediaItems } from '@/lib/collect-media'
+import { imagePosterUrl, parseMediaItems } from '@/lib/collect-media'
 import { MediaDownloadButtons } from './media-download-buttons'
 import { ThreadCard } from './thread-card'
 import type { CollectedPost, CollectStatus, ConnectedAccount, PerformanceGrade } from '@/types'
@@ -55,7 +55,7 @@ function captionOf(post: CollectedPost) {
 
 function thumbOf(post: CollectedPost) {
   const items = parseMediaItems(post)
-  return mediaSrc(items[0]?.poster ?? items[0]?.url ?? post.thumbnail_url)
+  return mediaSrc(imagePosterUrl(items[0]?.poster, items[0]?.url, post.thumbnail_url))
 }
 
 function GradePill({ post }: { post: CollectedPost }) {

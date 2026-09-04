@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown,
   ChevronLeft,
@@ -11,9 +11,11 @@ import {
   Search,
 } from 'lucide-react'
 import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
+import { fetchRealtime, peekRealtimeCache } from '@/lib/realtime-cache'
 import { PRESS_NAV_OUTLETS } from '@/lib/press'
 import { cn } from '@/lib/utils'
 import { logWork } from '@/lib/client-log'
+import { NewsSkeleton } from './news-skeleton'
 
 const NEWS_PER_PAGE = 20
 const NEWS_PAGES = 30
@@ -30,8 +32,8 @@ function newsForPage(news: RankingNews[], page: number) {
   return news.slice(start, start + NEWS_PER_PAGE)
 }
 
-export function NewsClient({ initial }: { initial: KeywordsPayload }) {
-  const [data, setData] = useState(initial)
+export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
+  const [data, setData] = useState<KeywordsPayload | null>(initial ?? null)
   const [newsPage, setNewsPage] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [query, setQuery] = useState('')
@@ -39,16 +41,20 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   async function reload() {
     setRefreshing(true)
     try {
-      const res = await fetch('/api/keywords', { cache: 'no-store' })
-      if (!res.ok) return
-      const next = (await res.json()) as KeywordsPayload
+      const next = await fetchRealtime('news')
       setData(next)
     } finally {
       setRefreshing(false)
     }
   }
 
+  useLayoutEffect(() => {
+    const cached = peekRealtimeCache()
+    if (cached) setData(cached)
+  }, [])
+
   useEffect(() => {
+    void reload()
     const tick = () => {
       if (document.visibilityState === 'visible') void reload()
     }
@@ -63,16 +69,16 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   const page = ((newsPage % NEWS_PAGES) + NEWS_PAGES) % NEWS_PAGES
   const searching = query.trim().length > 0
   const filteredNews = useMemo(() => {
+    const news = data?.news ?? []
     const q = query.trim().toLowerCase()
-    if (!q) return data.news
-    return data.news.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) || (item.press || '').toLowerCase().includes(q)
+    if (!q) return news
+    return news.filter(
+      item => item.title.toLowerCase().includes(q) || (item.press || '').toLowerCase().includes(q)
     )
-  }, [data.news, query])
+  }, [data?.news, query])
   const newsSlice = searching
     ? filteredNews.slice(0, NEWS_PER_PAGE)
-    : newsForPage(data.news, page)
+    : newsForPage(data?.news ?? [], page)
 
   useEffect(() => {
     const q = query.trim()
@@ -82,6 +88,8 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
     }, 800)
     return () => window.clearTimeout(id)
   }, [query])
+
+  if (!data) return <NewsSkeleton />
 
   return (
     <div className="space-y-4">

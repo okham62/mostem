@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react'
 import { mediaSrc } from '@/lib/collect-labels'
-import { cleanMediaUrl, isVideoItem, previewMedia, sortMediaVideoLeft } from '@/lib/collect-media'
+import { cleanMediaUrl, imagePosterUrl, isVideoItem, previewMedia, sortMediaVideoLeft } from '@/lib/collect-media'
 import type { CollectMediaItem } from '@/types'
 
 type Viewer =
@@ -35,7 +35,7 @@ function FallbackImage({
 }) {
   const direct = cleanMediaUrl(url)
   const proxied = direct ? mediaSrc(direct) : null
-  const [src, setSrc] = useState(direct ?? proxied ?? '')
+  const [src, setSrc] = useState(proxied ?? direct ?? '')
   const [hidden, setHidden] = useState(!src)
 
   if (hidden || !src) return null
@@ -47,8 +47,8 @@ function FallbackImage({
       referrerPolicy="no-referrer"
       className={fit === 'contain' ? 'max-h-full max-w-full object-contain' : 'h-full w-full object-cover'}
       onError={() => {
-        if (direct && src === direct && proxied) {
-          setSrc(proxied)
+        if (proxied && src === proxied && direct && direct !== proxied) {
+          setSrc(direct)
           return
         }
         setHidden(true)
@@ -66,23 +66,44 @@ function MediaTile({
   extraCount?: number
   onOpen: () => void
 }) {
-  const imageUrl = cleanMediaUrl(item.poster) ?? cleanMediaUrl(item.url)
-  const videoUrl = cleanMediaUrl(item.videoUrl)
+  const imageUrl = imagePosterUrl(item.poster, item.url)
+  const videoUrl = cleanMediaUrl(item.videoUrl) ?? (item.type === 'video' ? cleanMediaUrl(item.url) : null)
+  const tileRef = useRef<HTMLButtonElement>(null)
+  const [inView, setInView] = useState(false)
+  const [videoReady, setVideoReady] = useState(false)
+
+  useEffect(() => {
+    const node = tileRef.current
+    if (!node || !videoUrl) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setInView(true)
+      },
+      { rootMargin: '200px', threshold: 0.01 }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [videoUrl])
 
   return (
-    <button type="button" onClick={onOpen} className="relative h-full w-full cursor-pointer">
-      {item.type === 'video' && videoUrl ? (
+    <button ref={tileRef} type="button" onClick={onOpen} className="relative h-full w-full cursor-pointer bg-black">
+      {imageUrl ? (
+        <div className={`absolute inset-0 ${videoReady ? 'opacity-0' : 'opacity-100'} transition-opacity duration-150`}>
+          <FallbackImage url={imageUrl} />
+        </div>
+      ) : null}
+      {videoUrl && inView ? (
         <video
           src={mediaSrc(videoUrl) ?? videoUrl}
-          poster={imageUrl ?? undefined}
+          poster={imageUrl ? mediaSrc(imageUrl) ?? imageUrl : undefined}
           muted
           loop
           playsInline
           autoPlay
-          className="h-full w-full object-cover"
+          preload="auto"
+          onLoadedData={() => setVideoReady(true)}
+          className="absolute inset-0 h-full w-full object-cover"
         />
-      ) : imageUrl ? (
-        <FallbackImage url={imageUrl} />
       ) : null}
       {(item.type === 'video' || videoUrl) && <MuteIcon />}
       {extraCount ? (
@@ -100,7 +121,7 @@ function stopBubble(event: { stopPropagation: () => void }) {
 
 function VideoViewer({ item, onClose }: { item: CollectMediaItem; onClose: () => void }) {
   const [muted, setMuted] = useState(false)
-  const imageUrl = cleanMediaUrl(item.poster) ?? cleanMediaUrl(item.url)
+  const imageUrl = imagePosterUrl(item.poster, item.url)
   const videoUrl = cleanMediaUrl(item.videoUrl) ?? cleanMediaUrl(item.url)
 
   return (
@@ -109,7 +130,7 @@ function VideoViewer({ item, onClose }: { item: CollectMediaItem; onClose: () =>
         <video
           key={videoUrl}
           src={mediaSrc(videoUrl) ?? videoUrl}
-          poster={imageUrl ?? undefined}
+          poster={imageUrl ? mediaSrc(imageUrl) ?? imageUrl : undefined}
           autoPlay
           controls
           playsInline

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
@@ -18,6 +19,7 @@ import {
   Tags,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { warmRealtimeCache } from '@/lib/realtime-cache'
 import type { Session } from 'next-auth'
 
 const explore = [
@@ -60,6 +62,12 @@ function NavGroup({
             <li key={item.href}>
               <Link
                 href={item.href}
+                onMouseEnter={() => {
+                  if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
+                }}
+                onFocus={() => {
+                  if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
+                }}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isActive
@@ -81,6 +89,11 @@ function NavGroup({
 export function Sidebar({ session }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = session?.user?.role === 'admin'
+
+  useEffect(() => {
+    const id = window.setTimeout(() => warmRealtimeCache(), 300)
+    return () => window.clearTimeout(id)
+  }, [])
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">

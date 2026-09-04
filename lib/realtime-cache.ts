@@ -1,0 +1,52 @@
+import type { KeywordsPayload } from '@/lib/keywords'
+
+const STORAGE_KEY = 'mostem:realtime-v1'
+let memory: KeywordsPayload | null = null
+let warming = false
+
+export function peekRealtimeCache(): KeywordsPayload | null {
+  if (memory) return memory
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    memory = JSON.parse(raw) as KeywordsPayload
+    return memory
+  } catch {
+    return null
+  }
+}
+
+export function writeRealtimeCache(data: KeywordsPayload) {
+  memory = data
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch {
+    /* ignore quota */
+  }
+}
+
+export async function fetchRealtime(scope: 'fast' | 'full' | 'news' = 'full') {
+  const query = scope === 'full' ? '' : `?scope=${scope}`
+  const res = await fetch(`/api/keywords${query}`, { cache: 'no-store' })
+  if (!res.ok) throw new Error('realtime fetch failed')
+  const data = (await res.json()) as KeywordsPayload
+  if (scope === 'news' && memory) {
+    writeRealtimeCache({ ...memory, news: data.news, now: data.now })
+    return peekRealtimeCache() ?? data
+  }
+  writeRealtimeCache(data)
+  return data
+}
+
+export function warmRealtimeCache() {
+  if (typeof window === 'undefined' || warming) return
+  warming = true
+  void fetchRealtime('fast')
+    .then(() => fetchRealtime('full'))
+    .catch(() => {})
+    .finally(() => {
+      warming = false
+    })
+}

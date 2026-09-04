@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
   formatKeywordTime,
@@ -10,8 +10,10 @@ import {
   type KeywordsPayload,
   type RealtimeKeyword,
 } from '@/lib/keywords'
+import { fetchRealtime, peekRealtimeCache } from '@/lib/realtime-cache'
 import { cn } from '@/lib/utils'
 import { logWork } from '@/lib/client-log'
+import { KeywordsSkeleton } from './keywords-skeleton'
 
 const POLL_MS = 30_000
 
@@ -43,29 +45,37 @@ function defaultSources(data: KeywordsPayload): KeywordSource[] {
   ]
 }
 
-export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
-  const [data, setData] = useState(initial)
+export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }) {
+  const [data, setData] = useState<KeywordsPayload | null>(initial ?? null)
   const [refreshing, setRefreshing] = useState(false)
 
-  const sources = defaultSources(data)
-  const naver = sources.find((s) => s.id === 'signal')
-  const google = sources.find((s) => s.id === 'google')
+  const sources = data ? defaultSources(data) : []
+  const naver = sources.find(s => s.id === 'signal')
+  const google = sources.find(s => s.id === 'google')
 
-  async function reload() {
+  async function reload(scope: 'fast' | 'full' = 'full') {
     setRefreshing(true)
     try {
-      const res = await fetch('/api/keywords', { cache: 'no-store' })
-      if (!res.ok) return
-      const next = (await res.json()) as KeywordsPayload
+      const next = await fetchRealtime(scope)
       setData(next)
     } finally {
       setRefreshing(false)
     }
   }
 
+  useLayoutEffect(() => {
+    const cached = peekRealtimeCache()
+    if (cached) setData(cached)
+  }, [])
+
   useEffect(() => {
+    const boot = async () => {
+      if (!peekRealtimeCache()) await reload('fast')
+      await reload('full')
+    }
+    void boot()
     const tick = () => {
-      if (document.visibilityState === 'visible') void reload()
+      if (document.visibilityState === 'visible') void reload('full')
     }
     const id = window.setInterval(tick, POLL_MS)
     document.addEventListener('visibilitychange', tick)
@@ -74,6 +84,8 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
       document.removeEventListener('visibilitychange', tick)
     }
   }, [])
+
+  if (!data) return <KeywordsSkeleton />
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -92,7 +104,7 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
         </div>
         <button
           type="button"
-          onClick={() => void reload()}
+          onClick={() => void reload('full')}
           className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />

@@ -41,7 +41,8 @@ const GOOGLE_TRENDING_URL = 'https://trends.google.com/trending?geo=KR&hl=ko'
 const NATE_URL = 'https://www.nate.com/js/data/jsonLiveKeywordDataV1.js'
 const ZUM_URL = 'https://zum.com/'
 const KEYWORD_LIMIT = 30
-const CACHE_MS = 20_000
+const FRESH_MS = 45_000
+const STALE_MS = 15 * 60_000
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
@@ -298,25 +299,30 @@ function decodeMaybeEucKr(buf: ArrayBuffer) {
   }
 }
 
-async function fetchSignal(): Promise<{ now: number; keywords: RealtimeKeyword[]; news: RankingNews[] }> {
-  const [res, nate, zum] = await Promise.all([
-    fetch(SIGNAL_URL, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': BROWSER_UA,
-      },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
-    }),
-    fetchNateKeywords(),
-    fetchZumKeywords(),
-  ])
+async function fetchSignalCore(): Promise<{ now: number; keywords: RealtimeKeyword[]; news: RankingNews[] }> {
+  const res = await fetch(SIGNAL_URL, {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': BROWSER_UA,
+    },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(4000),
+  })
   if (!res.ok) throw new Error(`signal ${res.status}`)
   const raw = (await res.json()) as SignalPayload
   return {
     now: raw.now ?? Date.now(),
-    keywords: mergeKeywords([parseSignalKeywords(raw), nate, zum]),
+    keywords: parseSignalKeywords(raw),
     news: parseNews(raw),
+  }
+}
+
+async function fetchSignal(): Promise<{ now: number; keywords: RealtimeKeyword[]; news: RankingNews[] }> {
+  const [core, nate, zum] = await Promise.all([fetchSignalCore(), fetchNateKeywords(), fetchZumKeywords()])
+  return {
+    now: core.now,
+    keywords: mergeKeywords([core.keywords, nate, zum]),
+    news: core.news,
   }
 }
 
@@ -359,7 +365,7 @@ async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[]
         'User-Agent': BROWSER_UA,
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(5000),
     }),
     fetch(GOOGLE_TRENDING_URL, {
       headers: {
@@ -367,7 +373,7 @@ async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[]
         'User-Agent': BROWSER_UA,
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(5000),
     }),
   ])
 
@@ -385,49 +391,99 @@ async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[]
   return { now: Date.now(), keywords }
 }
 
-export async function getRealtimeKeywords(): Promise<KeywordsPayload> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.data
-  if (inflight) return inflight
-
-  inflight = (async () => {
-    const [signalRes, googleRes] = await Promise.allSettled([fetchSignal(), fetchGoogle()])
-    const signal = signalRes.status === 'fulfilled' ? signalRes.value : null
-    const google = googleRes.status === 'fulfilled' ? googleRes.value : null
-
-    const sources: KeywordSource[] = [
-      {
-        id: 'signal',
-        label: '네이버',
-        hint: '실시간 검색어',
-        now: signal?.now ?? Date.now(),
-        keywords: signal?.keywords ?? [],
-        ...(signal ? {} : { error: '네이버 순위를 불러오지 못했습니다.' }),
-      },
-      {
-        id: 'google',
-        label: '구글',
-        hint: '한국 급상승 검색어',
-        now: google?.now ?? Date.now(),
-        keywords: google?.keywords ?? [],
-        ...(google ? {} : { error: '구글 트렌드를 불러오지 못했습니다.' }),
-      },
-    ]
-
-    const data: KeywordsPayload = {
-      now: signal?.now ?? google?.now ?? Date.now(),
+function payloadFromSources(
+  signal: { now: number; keywords: RealtimeKeyword[]; news?: RankingNews[] } | null,
+  google: { now: number; keywords: RealtimeKeyword[] } | null
+): KeywordsPayload {
+  const sources: KeywordSource[] = [
+    {
+      id: 'signal',
+      label: '네이버',
+      hint: '실시간 검색어',
+      now: signal?.now ?? Date.now(),
       keywords: signal?.keywords ?? [],
-      sources,
-      news: signal?.news ?? cache?.data.news ?? [],
-      ...(!signal && !google ? { error: '실시간 키워드를 불러오지 못했습니다.' } : {}),
+      ...(signal ? {} : { error: '네이버 순위를 불러오지 못했습니다.' }),
+    },
+    {
+      id: 'google',
+      label: '구글',
+      hint: '한국 급상승 검색어',
+      now: google?.now ?? cache?.data.sources?.find(s => s.id === 'google')?.now ?? Date.now(),
+      keywords: google?.keywords ?? cache?.data.sources?.find(s => s.id === 'google')?.keywords ?? [],
+      ...(google || cache?.data.sources?.find(s => s.id === 'google')?.keywords?.length
+        ? {}
+        : { error: '구글 트렌드를 불러오지 못했습니다.' }),
+    },
+  ]
+
+  return {
+    now: signal?.now ?? google?.now ?? Date.now(),
+    keywords: signal?.keywords ?? [],
+    sources,
+    news: signal?.news ?? cache?.data.news ?? [],
+    ...(!signal && !google ? { error: '실시간 키워드를 불러오지 못했습니다.' } : {}),
+  }
+}
+
+async function refreshKeywords(mode: 'fast' | 'full' = 'full'): Promise<KeywordsPayload> {
+  if (mode === 'fast') {
+    try {
+      const signal = await fetchSignalCore()
+      const data = payloadFromSources(signal, null)
+      cache = { at: Date.now(), data }
+      return data
+    } catch {
+      return (
+        cache?.data ??
+        payloadFromSources(null, null)
+      )
     }
-    if (signal || google) cache = { at: Date.now(), data }
-    return data
-  })().finally(() => {
+  }
+
+  const [signalRes, googleRes] = await Promise.allSettled([fetchSignal(), fetchGoogle()])
+  const signal = signalRes.status === 'fulfilled' ? signalRes.value : null
+  const google = googleRes.status === 'fulfilled' ? googleRes.value : null
+  const data = payloadFromSources(signal, google)
+  if (signal || google) cache = { at: Date.now(), data }
+  return data
+}
+
+export async function getRealtimeKeywords(mode: 'fast' | 'full' | 'news' = 'full'): Promise<KeywordsPayload> {
+  const age = cache ? Date.now() - cache.at : Infinity
+  if (mode === 'news') {
+    if (cache && age < FRESH_MS) return cache.data
+    if (cache && age < STALE_MS) {
+      if (!inflight) {
+        inflight = refreshKeywords('fast').finally(() => {
+          inflight = null
+        })
+      }
+      return cache.data
+    }
+    if (inflight) return inflight
+    inflight = refreshKeywords('fast').finally(() => {
+      inflight = null
+    })
+    return inflight
+  }
+
+  if (cache && age < FRESH_MS) return cache.data
+  if (cache && age < STALE_MS) {
+    if (!inflight) {
+      inflight = refreshKeywords(mode === 'fast' ? 'fast' : 'full').finally(() => {
+        inflight = null
+      })
+    }
+    return cache.data
+  }
+  if (inflight) return inflight
+  inflight = refreshKeywords(mode === 'fast' ? 'fast' : 'full').finally(() => {
     inflight = null
   })
-
   return inflight
 }
+
+export const getRealtimeNews = () => getRealtimeKeywords('news')
 
 export function formatKeywordTime(now: number) {
   return new Intl.DateTimeFormat('ko-KR', {
