@@ -204,14 +204,16 @@ function NewsFilterBar({
       <div className="flex flex-col gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-2 sm:flex-row sm:items-center">
         <button
           type="button"
-          onClick={() => {
-            onQuery('')
-            setOpen(false)
-          }}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs text-white/50 transition hover:bg-white/5 hover:text-white"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className={cn(
+            'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition',
+            open ? 'bg-gold/15 text-gold' : 'text-white/70 hover:bg-white/5 hover:text-white'
+          )}
         >
-          <RotateCcw className="h-3.5 w-3.5" />
-          초기화
+          <Filter className="h-3.5 w-3.5" />
+          전체 방송사
+          <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
         </button>
         <label className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
@@ -224,16 +226,14 @@ function NewsFilterBar({
         </label>
         <button
           type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          className={cn(
-            'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition',
-            open ? 'bg-gold/15 text-gold' : 'text-white/70 hover:bg-white/5 hover:text-white'
-          )}
+          onClick={() => {
+            onQuery('')
+            setOpen(false)
+          }}
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs text-white/50 transition hover:bg-white/5 hover:text-white"
         >
-          <Filter className="h-3.5 w-3.5" />
-          전체 방송사
-          <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
+          <RotateCcw className="h-3.5 w-3.5" />
+          초기화
         </button>
       </div>
       {open ? (
