@@ -53,19 +53,11 @@ export function ShoppingClient() {
   const coupang = data.platforms.find((item) => item.id === 'coupang')
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-gold" />
-            </span>
-            <h1 className="text-xl font-bold text-white md:text-2xl">쇼핑 베스트</h1>
-          </div>
-          <p className="mt-1 text-sm text-white/45">
-            네이버쇼핑 · 쿠팡 실시간 판매급상승 / 판매인기 상품 · {formatKeywordTime(data.now)}
-          </p>
+          <h1 className="text-xl font-bold text-white md:text-2xl">쇼핑 베스트</h1>
+          <p className="mt-1 text-sm text-white/45">{formatKeywordTime(data.now)}</p>
         </div>
         <button
           type="button"
@@ -77,10 +69,8 @@ export function ShoppingClient() {
         </button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <PlatformPanel board={naver} empty="네이버쇼핑 상품을 불러오지 못했습니다." />
-        <PlatformPanel board={coupang} empty="쿠팡 상품을 불러오지 못했습니다." />
-      </div>
+      <PlatformPanel board={naver} empty="네이버쇼핑 상품을 불러오지 못했습니다." />
+      <PlatformPanel board={coupang} empty="쿠팡 상품을 불러오지 못했습니다." />
 
       <p className="pb-2 text-[11px] text-white/30">
         데이터 출처: 네이버 쇼핑 BEST · 쿠팡은 실시간 쇼핑 키워드 기준으로 추천합니다
@@ -98,8 +88,10 @@ function PlatformPanel({
 }) {
   if (!board) {
     return (
-      <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
-        <div className="py-10 text-center text-sm text-white/40">{empty}</div>
+      <section>
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] py-16 text-center text-sm text-white/40">
+          {empty}
+        </div>
       </section>
     )
   }
@@ -107,15 +99,13 @@ function PlatformPanel({
   const accent = board.id === 'coupang' ? 'text-red-400' : 'text-brand'
 
   return (
-    <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
-      <div className="mb-5 flex items-end justify-between gap-3">
+    <section className="space-y-5">
+      <div>
         <h2 className={cn('text-lg font-bold', accent)}>{board.label}</h2>
-        <span className="text-[11px] text-white/35">{board.hint}</span>
+        <p className="mt-0.5 text-xs text-white/40">{board.hint}</p>
       </div>
-      <div className="space-y-6">
-        <ProductSection list={board.rising} platform={board.label} />
-        <ProductSection list={board.popular} platform={board.label} />
-      </div>
+      <ProductSection list={board.rising} platform={board.label} />
+      <ProductSection list={board.popular} platform={board.label} />
     </section>
   )
 }
@@ -138,8 +128,8 @@ function ProductSection({
           {list.error || '상품이 없습니다.'}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {list.products.slice(0, 12).map((item) => (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          {list.products.map((item) => (
             <ProductCard key={`${list.id}-${item.rank}-${item.title}`} item={item} platform={platform} list={list.label} />
           ))}
         </div>
@@ -171,9 +161,9 @@ function ProductCard({
           url: item.url,
         })
       }
-      className="group overflow-hidden rounded-xl border border-white/5 bg-black/20 transition hover:border-white/20"
+      className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20"
     >
-      <div className="relative aspect-square bg-black/40">
+      <div className="relative aspect-[16/9] bg-black/40">
         {item.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -198,8 +188,8 @@ function ProductCard({
           </span>
         ) : null}
       </div>
-      <div className="space-y-1.5 p-2.5">
-        <p className="line-clamp-2 text-[13px] font-medium leading-snug text-white">{item.title}</p>
+      <div className="space-y-2 p-3.5">
+        <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">{item.title}</p>
         <div className="flex items-baseline gap-1.5">
           <span className="text-sm font-bold text-gold">{item.priceText || '가격 문의'}</span>
           {item.listPrice ? (
