@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
-import { PRESS_NAV_GROUPS, type PressOutlet } from '@/lib/press'
+import { PRESS_NAV_OUTLETS } from '@/lib/press'
 import { cn } from '@/lib/utils'
 
 const NEWS_PER_PAGE = 12
@@ -70,7 +70,7 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
         </button>
       </div>
 
-      <PressHoverBar />
+      <PressOutletBar />
 
       <section>
         <div className="mb-3 flex items-end justify-between">
@@ -147,93 +147,29 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   )
 }
 
-function PressLogo({ outlet }: { outlet: PressOutlet }) {
-  const [src, setSrc] = useState(outlet.logo)
-  const fallbackUsed = useRef(false)
+function PressOutletBar() {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      className="h-full w-full object-contain"
-      onError={() => {
-        if (fallbackUsed.current) return
-        fallbackUsed.current = true
-        try {
-          const host = new URL(outlet.url).hostname
-          setSrc(`https://www.google.com/s2/favicons?domain=${host}&sz=64`)
-        } catch {
-          /* keep broken image */
-        }
-      }}
-    />
-  )
-}
-
-function PressHoverBar() {
-  const [openTitle, setOpenTitle] = useState<string | null>(null)
-  const openIndex = PRESS_NAV_GROUPS.findIndex((group) => group.title === openTitle)
-  const openGroup = openIndex >= 0 ? PRESS_NAV_GROUPS[openIndex] : null
-
-  return (
-    <section
-      className="sticky top-0 z-20 -mx-3 bg-[var(--background)]/92 backdrop-blur-md md:-mx-0"
-      onMouseLeave={() => setOpenTitle(null)}
-    >
-      <div className="relative grid grid-cols-3 border-b border-[var(--card-border)]">
-        {PRESS_NAV_GROUPS.map((group) => {
-          const active = openTitle === group.title
-          return (
-            <div
-              key={group.title}
-              onMouseEnter={() => setOpenTitle(group.title)}
-              className="flex h-12 cursor-default items-center justify-center"
-            >
-              <span
-                className={cn(
-                  'text-sm font-semibold tracking-tight transition-colors duration-200',
-                  active ? 'text-gold' : 'text-white/55 hover:text-white'
-                )}
-              >
-                {group.title}
-              </span>
-            </div>
-          )
-        })}
-        <div
-          className={cn(
-            'pointer-events-none absolute bottom-[-1px] h-px bg-gold transition-all duration-300 ease-out',
-            openIndex >= 0 ? 'w-1/3 opacity-100' : 'w-0 opacity-0'
-          )}
-          style={{ left: openIndex >= 0 ? `${(openIndex / 3) * 100}%` : '50%' }}
-        />
-      </div>
-      <div
-        className={cn(
-          'grid transition-all duration-200 ease-out',
-          openGroup ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-        )}
-      >
-        <div className="overflow-hidden">
-          {openGroup && (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-3 py-3.5">
-              {openGroup.outlets.map((outlet) => (
-                <a
-                  key={outlet.url}
-                  href={outlet.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group inline-flex items-center gap-2 text-[13px] text-white/55 transition-colors duration-200 hover:text-white"
-                >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-[5px] bg-white">
-                    <PressLogo outlet={outlet} />
-                  </span>
-                  <span className="font-medium">{outlet.name}</span>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
+    <section className="sticky top-0 z-20 -mx-3 border-b border-[var(--card-border)] bg-[var(--background)]/92 py-3 backdrop-blur-md md:-mx-0">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        {PRESS_NAV_OUTLETS.map((outlet) => (
+          <a
+            key={outlet.url}
+            href={outlet.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 text-[13px] text-white/60 transition-colors duration-200 hover:text-white"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={outlet.logo}
+              alt=""
+              width={200}
+              height={200}
+              className="h-8 w-8 rounded-md object-cover"
+            />
+            <span className="font-medium">{outlet.name}</span>
+          </a>
+        ))}
       </div>
     </section>
   )
