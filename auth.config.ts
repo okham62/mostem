@@ -10,6 +10,7 @@ export const authConfig = {
       const isOnDashboard =
         nextUrl.pathname.startsWith('/dashboard') ||
         nextUrl.pathname.startsWith('/keywords') ||
+        nextUrl.pathname.startsWith('/news') ||
         nextUrl.pathname.startsWith('/trends') ||
         nextUrl.pathname.startsWith('/shopping') ||
         nextUrl.pathname.startsWith('/products') ||

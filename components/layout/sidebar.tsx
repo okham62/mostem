@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   Flame,
+  Newspaper,
   TrendingUp,
   ShoppingBag,
   LayoutGrid,
@@ -25,6 +26,7 @@ import type { Session } from 'next-auth'
 
 const explore = [
   { href: '/keywords', label: '실시간 키워드', icon: Flame },
+  { href: '/news', label: '실시간 뉴스', icon: Newspaper },
   { href: '/trends', label: '트렌드 데이터', icon: TrendingUp },
   { href: '/shopping', label: '쇼핑 베스트', icon: ShoppingBag },
   { href: '/products', label: '상품 보드', icon: LayoutGrid },

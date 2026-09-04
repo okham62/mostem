@@ -5,6 +5,7 @@ import { Zap } from 'lucide-react'
 
 const PAGE_TITLES: Record<string, string> = {
   '/keywords': '실시간 키워드',
+  '/news': '실시간 뉴스',
   '/trends': '트렌드 데이터',
   '/shopping': '쇼핑 베스트',
   '/products': '상품 보드',

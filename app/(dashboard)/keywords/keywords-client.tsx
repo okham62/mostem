@@ -1,20 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react'
+import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
   formatKeywordTime,
   formatSearchTraffic,
   type KeywordSourceId,
   type KeywordState,
   type KeywordsPayload,
-  type RankingNews,
   type RealtimeKeyword,
 } from '@/lib/keywords'
 import { cn } from '@/lib/utils'
 
-const NEWS_PER_PAGE = 12
-const NEWS_PAGES = 30
 const POLL_MS = 30_000
 const SOURCE_KEY = 'mostem-keyword-source'
 
@@ -46,20 +43,8 @@ function defaultSources(data: KeywordsPayload) {
   ]
 }
 
-function newsForPage(news: RankingNews[], page: number) {
-  if (news.length === 0) return []
-  if (news.length <= NEWS_PER_PAGE) {
-    return Array.from({ length: NEWS_PER_PAGE }, (_, i) => news[i % news.length])
-  }
-  const maxStart = news.length - NEWS_PER_PAGE
-  const start =
-    NEWS_PAGES <= 1 ? 0 : Math.round((page * maxStart) / (NEWS_PAGES - 1))
-  return news.slice(start, start + NEWS_PER_PAGE)
-}
-
 export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
   const [data, setData] = useState(initial)
-  const [newsPage, setNewsPage] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [sourceId, setSourceId] = useState<KeywordSourceId>('signal')
 
@@ -96,8 +81,6 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
     }
   }, [])
 
-  const page = ((newsPage % NEWS_PAGES) + NEWS_PAGES) % NEWS_PAGES
-  const newsSlice = newsForPage(data.news, page)
   const left = keywords.slice(0, 5)
   const right = keywords.slice(5, 10)
 
@@ -165,78 +148,8 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
         </section>
       )}
 
-      <section>
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-white">언론사별 가장 많이 본 뉴스</h2>
-            <p className="mt-0.5 text-xs text-white/40">각 언론사의 가장 많이 본 기사 1건</p>
-          </div>
-          {data.news.length > 0 && (
-            <div className="flex items-center gap-2 text-xs text-white/50">
-              <button
-                type="button"
-                onClick={() => setNewsPage((p) => (p - 1 + NEWS_PAGES) % NEWS_PAGES)}
-                className="rounded-md p-1 hover:bg-white/10 hover:text-white"
-                aria-label="이전 뉴스"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span>
-                {page + 1} / {NEWS_PAGES}
-              </span>
-              <button
-                type="button"
-                onClick={() => setNewsPage((p) => (p + 1) % NEWS_PAGES)}
-                className="rounded-md p-1 hover:bg-white/10 hover:text-white"
-                aria-label="다음 뉴스"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {newsSlice.map((item, index) => (
-            <a
-              key={`${item.link}-${index}`}
-              href={item.link}
-              target="_blank"
-              rel="noreferrer"
-              className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20"
-            >
-              <div className="relative aspect-[16/9] bg-black/40">
-                {item.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.image}
-                    alt=""
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-white/30">
-                    이미지 없음
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2 p-3.5">
-                <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">
-                  {item.title}
-                </p>
-                <div className="flex items-center gap-2 text-[11px] text-white/45">
-                  {item.pressImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.pressImage} alt="" className="h-4 w-4 rounded-sm object-contain" />
-                  ) : null}
-                  <span>{item.press || '뉴스'}</span>
-                </div>
-              </div>
-            </a>
-          ))}
-        </div>
-      </section>
-
       <p className="pb-2 text-[11px] text-white/30">
-        데이터 출처: 시그널(네이버 실검 대체) · 구글 트렌드 · 네이버 뉴스 랭킹
+        데이터 출처: 시그널(네이버 실검 대체) · 구글 트렌드
       </p>
     </div>
   )
