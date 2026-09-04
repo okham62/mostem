@@ -65,7 +65,6 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
   const [compare, setCompare] = useState<CompareWeeks>(1)
   const [excludeBrand, setExcludeBrand] = useState(false)
   const [query, setQuery] = useState('')
-  const [featureIndex, setFeatureIndex] = useState(0)
   const [selected, setSelected] = useState<TrendKeyword | null>(null)
 
   async function reload(nextCompare = compare) {
@@ -92,15 +91,6 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
     }
   }, [compare])
 
-  useEffect(() => {
-    if (data.featured.length < 2) return
-    const id = window.setInterval(
-      () => setFeatureIndex((i) => (i + 1) % data.featured.length),
-      5000
-    )
-    return () => window.clearInterval(id)
-  }, [data.featured.length])
-
   const filtered = useMemo(() => {
     let rows = data.items
     if (category !== 'all') rows = rows.filter((item) => item.cid === category)
@@ -119,7 +109,37 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
     return rows.slice(0, 40)
   }, [data.items, category, content, timing, excludeBrand, query, tab])
 
-  const featured = data.featured[featureIndex] ?? data.featured[0] ?? filtered[0]
+  const sparkQuery = filtered.map((item) => `${item.cid}:${item.keyword}`).join('|')
+
+  useEffect(() => {
+    if (!sparkQuery) return
+    let alive = true
+    const items = sparkQuery.split('|').map((key) => {
+      const [cid, ...rest] = key.split(':')
+      return { cid, keyword: rest.join(':') }
+    })
+    fetch('/api/trends/sparks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((next: { series?: Record<string, { spark: number[]; daily: { date: string; value: number }[] }> } | null) => {
+        if (!alive || !next?.series) return
+        setData((prev) => ({
+          ...prev,
+          items: prev.items.map((item) => {
+            const series = next.series?.[`${item.cid}:${item.keyword}`]
+            return series ? { ...item, spark: series.spark, daily: series.daily } : item
+          }),
+        }))
+      })
+      .catch(() => null)
+    return () => {
+      alive = false
+    }
+  }, [sparkQuery])
+
   const tabMeta = TABS.find((item) => item.id === tab)!
 
   return (
@@ -148,28 +168,6 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
           </p>
         </div>
       </div>
-
-      {featured ? (
-        <button
-          type="button"
-          onClick={() => setSelected(featured)}
-          className="flex w-full items-center justify-between gap-4 rounded-2xl bg-[#1b1530] px-5 py-4 text-left"
-        >
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-brand-300">지금 주목할 키워드</p>
-            <p className="mt-1 truncate text-lg font-bold text-white">
-              <span className="mr-2 text-brand-300">{featureIndex + 1}</span>
-              {featured.keyword}
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-bold text-red-400">{formatGrowth(featured.growth, featured.isNew)}</p>
-            <p className="mt-1 text-[11px] text-white/40">
-              {featureIndex + 1}/{Math.max(data.featured.length, 1)}
-            </p>
-          </div>
-        </button>
-      ) : null}
 
       <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
         <div className="flex flex-wrap gap-2">
@@ -277,7 +275,14 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
                     {item.category} · {item.intent}
                   </p>
                 </div>
-                <Sparkline points={item.spark} up={item.growth >= 0} />
+                <Sparkline
+                  points={item.spark}
+                  up={
+                    item.daily.length >= 2
+                      ? item.daily[item.daily.length - 1].value >= item.daily[0].value
+                      : item.growth >= 0
+                  }
+                />
               </button>
             ))
           )}
@@ -375,6 +380,9 @@ function HoverSelect({
 function Sparkline({ points, up }: { points: number[]; up: boolean }) {
   const w = 88
   const h = 28
+  if (points.length < 2) {
+    return <div className="h-7 w-[88px] shrink-0 rounded bg-white/5" />
+  }
   const max = Math.max(...points)
   const min = Math.min(...points)
   const d = points
@@ -423,6 +431,9 @@ function KeywordModal({
     }
   }, [item.keyword, item.cid])
 
+  const daily = detail?.daily?.length ? detail.daily : item.daily
+  const monthly = detail?.monthly ?? []
+
   async function copyKeyword() {
     await navigator.clipboard.writeText(item.keyword)
     setCopied(true)
@@ -461,10 +472,10 @@ function KeywordModal({
         </div>
 
         <ChartBlock title="1년 중 언제 많이 찾나요 (월별 검색량)">
-          <BarChart data={detail?.monthly ?? []} peakMonth={detail?.peakMonth} />
+          <BarChart data={monthly} peakMonth={detail?.peakMonth} />
         </ChartBlock>
         <ChartBlock title="최근 30일 검색 추이">
-          <LineChart data={detail?.daily ?? []} />
+          <LineChart data={daily} />
         </ChartBlock>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -489,12 +500,12 @@ function KeywordModal({
 
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
           <a
-            href={`https://www.google.com/search?q=${encodeURIComponent(item.keyword + ' threads')}`}
+            href={`https://www.threads.com/search?q=${encodeURIComponent(item.keyword)}`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-2 text-xs font-semibold text-white"
           >
-            쓰레드에서 반응 보기
+            스레드에서 반응 보기
           </a>
           <a
             href={`https://search.naver.com/search.naver?query=${encodeURIComponent(item.keyword)}`}
@@ -546,6 +557,9 @@ function BarChart({
   const months = Array.from({ length: 12 }, (_, i) => i + 1)
   const map = new Map(data.map((row) => [row.month, row.value]))
   const max = Math.max(1, ...data.map((row) => row.value))
+  if (!data.length) {
+    return <div className="flex h-full items-center justify-center text-xs text-white/30">월별 검색량을 불러오는 중</div>
+  }
   return (
     <div className="flex h-full items-end gap-1">
       {months.map((month) => {
@@ -555,7 +569,7 @@ function BarChart({
           <div key={month} className="flex flex-1 flex-col items-center justify-end gap-1">
             <div
               className={cn('w-full rounded-sm', peak ? 'bg-gold' : 'bg-brand-500')}
-              style={{ height: `${Math.max(4, (value / max) * 100)}%` }}
+              style={{ height: `${value <= 0 ? 3 : Math.max(8, (value / max) * 100)}%` }}
             />
             <span className="text-[9px] text-white/30">{month}</span>
           </div>

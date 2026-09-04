@@ -7,6 +7,11 @@ export interface ShopCategory {
   cid: string | null
 }
 
+export interface TrendPoint {
+  date: string
+  value: number
+}
+
 export interface TrendKeyword {
   keyword: string
   category: string
@@ -20,6 +25,7 @@ export interface TrendKeyword {
   contentType: 'purchase' | 'info'
   peakNow: boolean
   spark: number[]
+  daily: TrendPoint[]
 }
 
 export interface TrendDetail {
@@ -27,7 +33,7 @@ export interface TrendDetail {
   category: string
   cid: string
   monthly: { month: number; value: number }[]
-  daily: { date: string; value: number }[]
+  daily: TrendPoint[]
   peakMonth: number
   peakNow: boolean
   index: number
@@ -41,7 +47,6 @@ export interface TrendsPayload {
   now: number
   categories: ShopCategory[]
   items: TrendKeyword[]
-  featured: TrendKeyword[]
   stats: {
     total: number
     fresh: number
@@ -54,6 +59,9 @@ const BROWSER_UA =
 const RANK_URL = 'https://datalab.naver.com/shoppingInsight/getCategoryKeywordRank.naver'
 const TREND_URL = 'https://datalab.naver.com/shoppingInsight/getKeywordClickTrend.naver'
 const CACHE_MS = 5 * 60_000
+const SERIES_MS = 60 * 60_000
+const KEYWORD_REFERER = 'https://datalab.naver.com/shoppingInsight/sKeyword.naver'
+const CATEGORY_REFERER = 'https://datalab.naver.com/shoppingInsight/sCategory.naver'
 
 export const SHOP_CATEGORIES: ShopCategory[] = [
   { id: 'all', label: '전체 분야', cid: null },
@@ -77,25 +85,48 @@ const PRODUCT_RE =
 let cache: { at: number; compare: CompareWeeks; data: TrendsPayload } | null = null
 let inflight: Promise<TrendsPayload> | null = null
 let inflightCompare: CompareWeeks | null = null
+const seriesCache = new Map<
+  string,
+  { at: number; monthly: { month: number; value: number }[]; daily: TrendPoint[] }
+>()
+const seriesInflight = new Map<
+  string,
+  Promise<{ at: number; monthly: { month: number; value: number }[]; daily: TrendPoint[] }>
+>()
 
-function ymd(date: Date) {
-  return date.toISOString().slice(0, 10)
+function seoulYmd(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(date)
 }
 
-function addDays(date: Date, days: number) {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
+function seoulParts() {
+  const [year, month, day] = seoulYmd().split('-').map(Number)
+  return { year, month, day }
 }
 
-async function postForm<T>(url: string, body: Record<string, string>): Promise<T> {
+function padDate(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function seoulDaysAgo(days: number) {
+  const { year, month, day } = seoulParts()
+  const date = new Date(Date.UTC(year, month - 1, day - days))
+  return padDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate())
+}
+
+function seoulMonthStart(monthsAgo: number) {
+  const { year, month } = seoulParts()
+  const date = new Date(Date.UTC(year, month - 1 - monthsAgo, 1))
+  return padDate(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)
+}
+
+async function postForm<T>(url: string, body: Record<string, string>, referer = CATEGORY_REFERER): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'User-Agent': BROWSER_UA,
       Accept: 'application/json',
       'Content-Type': 'application/x-www-form-urlencoded',
-      Referer: 'https://datalab.naver.com/shoppingInsight/sCategory.naver',
+      Referer: referer,
     },
     body: new URLSearchParams(body).toString(),
     cache: 'no-store',
@@ -138,11 +169,29 @@ function growthFor(rank: number, prevRank: number | null, isNew: boolean) {
   return ((prevRank - rank) / prevRank) * 100
 }
 
-function sparkFromGrowth(growth: number, isNew: boolean) {
-  if (isNew || growth > 30) return [8, 9, 10, 14, 22, 38, 70, 96]
-  if (growth > 8) return [28, 30, 34, 40, 48, 58, 72, 84]
-  if (growth < -8) return [88, 80, 74, 66, 58, 50, 44, 38]
-  return [46, 48, 45, 50, 49, 52, 51, 54]
+function seriesKey(keyword: string, cid: string) {
+  return `${cid}:${keyword}`
+}
+
+function sparkFromDaily(daily: TrendPoint[]) {
+  if (daily.length <= 12) return daily.map((row) => row.value)
+  const last = daily.length - 1
+  const step = last / 11
+  return Array.from({ length: 12 }, (_, index) => daily[Math.round(index * step)]?.value ?? 0)
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>) {
+  const results = new Array<R>(items.length)
+  let next = 0
+  async function worker() {
+    while (next < items.length) {
+      const index = next
+      next += 1
+      results[index] = await mapper(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()))
+  return results
 }
 
 export function isLikelyBrand(keyword: string) {
@@ -156,22 +205,22 @@ export async function getShoppingTrends(compareWeeks: CompareWeeks = 1): Promise
 
   inflightCompare = compareWeeks
   inflight = (async () => {
-    const end = new Date()
-    const start = addDays(end, -6)
-    const prevEnd = addDays(end, -(7 * compareWeeks))
-    const prevStart = addDays(prevEnd, -6)
+    const end = seoulYmd()
+    const start = seoulDaysAgo(6)
+    const prevEnd = seoulDaysAgo(7 * compareWeeks)
+    const prevStart = seoulDaysAgo(7 * compareWeeks + 6)
     const cats = SHOP_CATEGORIES.filter((item) => item.cid)
 
     const current = await Promise.all(
       cats.map(async (cat) => ({
         cat,
-        ranks: await fetchRank(cat.cid!, ymd(start), ymd(end)).catch(() => []),
+        ranks: await fetchRank(cat.cid!, start, end).catch(() => []),
       }))
     )
     const previous = await Promise.all(
       cats.map(async (cat) => ({
         cat,
-        ranks: await fetchRank(cat.cid!, ymd(prevStart), ymd(prevEnd)).catch(() => []),
+        ranks: await fetchRank(cat.cid!, prevStart, prevEnd).catch(() => []),
       }))
     )
 
@@ -192,6 +241,8 @@ export async function getShoppingTrends(compareWeeks: CompareWeeks = 1): Promise
         const prevRank = prevMap.get(`${row.cat.cid}:${item.keyword}`) ?? null
         const isNew = prevRank == null
         const growth = growthFor(item.rank, prevRank, isNew)
+        const cached = seriesCache.get(`${row.cat.cid}:${item.keyword}`)
+        const daily = cached && Date.now() - cached.at < SERIES_MS ? cached.daily : []
         items.push({
           keyword: item.keyword,
           category: row.cat.label,
@@ -204,18 +255,17 @@ export async function getShoppingTrends(compareWeeks: CompareWeeks = 1): Promise
           intent: isNew || growth > 25 ? '급상승 구매형' : '연중 꾸준형',
           contentType: row.cat.cid === '50000011' ? 'info' : 'purchase',
           peakNow: isNew || growth > 20,
-          spark: sparkFromGrowth(growth, isNew),
+          spark: sparkFromDaily(daily),
+          daily,
         })
       }
     }
 
     items.sort((a, b) => b.score - a.score)
-    const featured = items.filter((item) => item.growth > 0 || item.isNew).slice(0, 6)
     const data: TrendsPayload = {
       now: Date.now(),
       categories: SHOP_CATEGORIES,
       items,
-      featured: featured.length ? featured : items.slice(0, 6),
       stats: {
         total: items.length,
         fresh: items.filter((item) => item.isNew).length,
@@ -239,42 +289,101 @@ function parsePeriod(period: string) {
   return period
 }
 
+async function fetchClickRange(keyword: string, cid: string, timeUnit: 'month' | 'date', startDate: string, endDate: string) {
+  const raw = await postForm<TrendPayload>(
+    TREND_URL,
+    {
+      cid,
+      timeUnit,
+      startDate,
+      endDate,
+      age: '',
+      gender: '',
+      device: '',
+      keyword,
+    },
+    KEYWORD_REFERER
+  )
+  return raw.result?.[0]?.data ?? []
+}
+
+async function loadClickSeries(keyword: string, cid: string, withMonthly: boolean) {
+  const key = seriesKey(keyword, cid)
+  const cached = seriesCache.get(key)
+  if (cached && Date.now() - cached.at < SERIES_MS && cached.daily.length && (!withMonthly || cached.monthly.length)) {
+    return cached
+  }
+
+  const pending = seriesInflight.get(key)
+  if (pending) {
+    const data = await pending
+    if (!withMonthly || data.monthly.length) return data
+  }
+
+  const task = (async () => {
+    const prev = seriesCache.get(key)
+    const end = seoulYmd()
+    const monthStart = seoulMonthStart(11)
+    const dayStart = seoulDaysAgo(29)
+    const needMonthly = withMonthly && !prev?.monthly.length
+    const needDaily = !prev?.daily.length
+    const [monthlyRaw, dailyRaw] = await Promise.all([
+      needMonthly ? fetchClickRange(keyword, cid, 'month', monthStart, end).catch(() => []) : Promise.resolve(null),
+      needDaily ? fetchClickRange(keyword, cid, 'date', dayStart, end).catch(() => []) : Promise.resolve(null),
+    ])
+
+    const monthly = monthlyRaw
+      ? monthlyRaw.map((row) => ({
+          month: Number(row.period.slice(4, 6)),
+          value: row.value,
+        }))
+      : prev?.monthly ?? []
+    const daily = dailyRaw
+      ? dailyRaw.map((row) => ({
+          date: parsePeriod(row.period),
+          value: row.value,
+        }))
+      : prev?.daily ?? []
+
+    const data = { monthly, daily, at: Date.now() }
+    seriesCache.set(key, data)
+    return data
+  })().finally(() => {
+    seriesInflight.delete(key)
+  })
+
+  seriesInflight.set(key, task)
+  return task
+}
+
+export async function getKeywordSparks(items: { keyword: string; cid: string }[]) {
+  const unique = new Map<string, { keyword: string; cid: string }>()
+  for (const item of items.slice(0, 40)) {
+    if (!item.keyword || !item.cid) continue
+    unique.set(seriesKey(item.keyword, item.cid), item)
+  }
+  const rows = Array.from(unique.values())
+  await mapLimit(rows, 6, (item) => loadClickSeries(item.keyword, item.cid, false))
+
+  const series: Record<string, { spark: number[]; daily: TrendPoint[] }> = {}
+  for (const item of rows) {
+    const key = seriesKey(item.keyword, item.cid)
+    const cached = seriesCache.get(key)
+    if (!cached?.daily.length) continue
+    series[key] = { spark: sparkFromDaily(cached.daily), daily: cached.daily }
+  }
+  return series
+}
+
 export async function getTrendDetail(keyword: string, cid: string): Promise<TrendDetail> {
-  const end = new Date()
-  const monthStart = addDays(end, -370)
-  const dayStart = addDays(end, -30)
   const category = SHOP_CATEGORIES.find((item) => item.cid === cid)?.label || '쇼핑'
-
-  const [monthlyRaw, dailyRaw] = await Promise.all([
-    postForm<TrendPayload>(TREND_URL, {
-      cid,
-      timeUnit: 'month',
-      startDate: ymd(monthStart),
-      endDate: ymd(end),
-      keyword,
-    }).catch(() => ({ result: [] }) as TrendPayload),
-    postForm<TrendPayload>(TREND_URL, {
-      cid,
-      timeUnit: 'date',
-      startDate: ymd(dayStart),
-      endDate: ymd(end),
-      keyword,
-    }).catch(() => ({ result: [] }) as TrendPayload),
-  ])
-
-  const monthly = (monthlyRaw.result?.[0]?.data ?? []).map((row) => ({
-    month: Number(row.period.slice(4, 6)),
-    value: row.value,
-  }))
-  const daily = (dailyRaw.result?.[0]?.data ?? []).map((row) => ({
-    date: parsePeriod(row.period),
-    value: row.value,
-  }))
+  const { monthly, daily } = await loadClickSeries(keyword, cid, true)
+  const { month: currentMonth } = seoulParts()
   const peak = monthly.reduce(
     (best, row) => (row.value > best.value ? row : best),
-    monthly[0] ?? { month: end.getMonth() + 1, value: 0 }
+    monthly[0] ?? { month: currentMonth, value: 0 }
   )
-  const peakNow = peak.month === end.getMonth() + 1
+  const peakNow = peak.month === currentMonth
   const last = daily.at(-1)?.value ?? peak.value
   const first = daily[0]?.value ?? last
   const rising = last >= first
