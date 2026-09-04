@@ -65,6 +65,31 @@ html {
   --hami-black: #1a1a1a;
 }
 
+.mostem-metrics-row {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.mostem-metrics-row[data-cols='6'] {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.mostem-metrics-row[data-cols='5'] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.mostem-metrics .mostem-pill {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  padding: 3px 5px;
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mostem-pill {
   position: relative;
   display: inline-flex;

@@ -88,8 +88,8 @@ export function ThreadCard({
         </div>
       )}
 
-      <div className="mostem-metrics mb-4 space-y-1.5 overflow-visible">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="mostem-metrics mb-4 space-y-1.5">
+        <div className="mostem-metrics-row" data-cols="6">
           <span className={`mostem-pill mostem-pill-grade-${stats.grade ?? 'aggregating'}`}>
             {grade ? `${grade} ${formatMultiplier(stats.multiplier)}` : '집계중 …'}
           </span>
@@ -98,12 +98,12 @@ export function ThreadCard({
           <span className="mostem-pill mostem-pill-engagement">
             참여율 {stats.engagement != null ? `${stats.engagement.toFixed(1)}%` : '0%'}
           </span>
-          <span className="mostem-pill mostem-pill-vph">시간당 조회 {formatCount(stats.viewsPerHour)}</span>
+          <span className="mostem-pill mostem-pill-vph">시간당 {formatCount(stats.viewsPerHour)}</span>
           <span className="mostem-pill mostem-pill-spread">
             확산 {stats.spread != null ? stats.spread.toFixed(1) : '0.0'}
           </span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="mostem-metrics-row" data-cols="5">
           <span className="mostem-pill mostem-pill-plain">좋아요 {formatCount(stats.likes)}</span>
           <span className="mostem-pill mostem-pill-plain">답글 {formatCount(stats.comments)}</span>
           <span className="mostem-pill mostem-pill-plain">리포스트 {formatCount(stats.reposts)}</span>
