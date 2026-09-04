@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Flame, MessageSquare, Sparkles, BarChart3, Users } from 'lucide-react'
+import { Flame, MessageSquare, Sparkles, Newspaper, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Session } from 'next-auth'
 
 const navItems = [
   { href: '/keywords', label: '키워드', icon: Flame },
+  { href: '/news', label: '뉴스', icon: Newspaper },
   { href: '/threads', label: '스레드', icon: MessageSquare },
   { href: '/ai', label: 'AI', icon: Sparkles },
-  { href: '/profit', label: '수익', icon: BarChart3 },
 ]
 
 export function MobileNav({ session }: { session: Session | null }) {

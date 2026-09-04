@@ -11,12 +11,8 @@ const TITLES: Record<string, string> = {
   '/products': '상품 보드',
   '/threads': '스레드',
   '/compose': '새 글 만들기',
-  '/ai': 'AI 도구',
-  '/calendar': '캘린더',
+  '/ai': 'AI 태그 생성기',
   '/links': '링크 변환',
-  '/profit': '수익 실적',
-  '/challenge': '챌린지·인증',
-  '/ranking': '랭킹',
   '/settings': '설정',
   '/admin': '회원 관리',
 }

@@ -10,16 +10,12 @@ import {
   ShoppingBag,
   LayoutGrid,
   MessageSquare,
-  Sparkles,
-  Calendar,
   Link2,
-  BarChart3,
-  Trophy,
-  Medal,
   Settings,
   Users,
   LogOut,
   Zap,
+  Tags,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Session } from 'next-auth'
@@ -34,15 +30,8 @@ const explore = [
 
 const publish = [
   { href: '/threads', label: '스레드', icon: MessageSquare },
-  { href: '/ai', label: 'AI 도구', icon: Sparkles },
-  { href: '/calendar', label: '캘린더', icon: Calendar },
-]
-
-const growth = [
+  { href: '/ai', label: 'AI 태그 생성기', icon: Tags },
   { href: '/links', label: '링크 변환', icon: Link2 },
-  { href: '/profit', label: '수익 실적', icon: BarChart3 },
-  { href: '/challenge', label: '챌린지·인증', icon: Trophy },
-  { href: '/ranking', label: '랭킹', icon: Medal },
 ]
 
 interface SidebarProps {
@@ -94,7 +83,7 @@ export function Sidebar({ session }: SidebarProps) {
   const isAdmin = session?.user?.role === 'admin'
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
+    <aside className="flex h-full w-60 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
       <div className="flex h-16 items-center gap-2.5 border-b border-[var(--sidebar-border)] px-4">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand">
           <Zap className="h-4 w-4 text-white" />
@@ -114,7 +103,6 @@ export function Sidebar({ session }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto px-2 scrollbar-thin">
         <NavGroup title="탐색" items={explore} pathname={pathname} />
         <NavGroup title="발행" items={publish} pathname={pathname} />
-        <NavGroup title="수익·성장" items={growth} pathname={pathname} />
         {isAdmin && (
           <NavGroup
             title="관리"

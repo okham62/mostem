@@ -22,6 +22,11 @@ body {
   background: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  height: 100%;
+}
+
+html {
+  height: 100%;
 }
 
 @layer utilities {
@@ -178,6 +183,94 @@ body {
   }
 }
 
+.hami-ext-banner {
+  position: relative;
+  z-index: 60;
+  flex-shrink: 0;
+  overflow: hidden;
+  background-color: #080304;
+  background-image: radial-gradient(circle, rgba(168, 28, 28, 0.7) 0.55px, transparent 0.75px);
+  background-size: 3px 3px;
+  border-bottom: 1px solid rgba(127, 29, 29, 0.45);
+  height: calc(28px + env(safe-area-inset-top, 0px));
+}
+
+.hami-ext-banner-led {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #ff2a2a;
+  text-shadow:
+    0 0 4px rgba(255, 40, 40, 0.95),
+    0 0 12px rgba(255, 0, 0, 0.45);
+  -webkit-mask-image: radial-gradient(#000 0.65px, transparent 1px);
+  -webkit-mask-size: 3px 3px;
+  mask-image: radial-gradient(#000 0.65px, transparent 1px);
+  mask-size: 3px 3px;
+  opacity: 0.55;
+}
+
+.hami-ext-marquee {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.hami-ext-led-track,
+.hami-ext-marquee-track {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  gap: 2.5rem;
+  animation: hami-ext-marquee 22s linear infinite;
+}
+
+.hami-ext-led-track span {
+  white-space: nowrap;
+}
+
+.hami-ext-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(78, 10, 14, 0.9);
+  border: 1px solid rgba(180, 40, 40, 0.28);
+  color: #ffd4d4;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  box-shadow: 0 0 14px rgba(255, 40, 40, 0.12);
+}
+
+.hami-ext-banner:hover .hami-ext-led-track,
+.hami-ext-banner:hover .hami-ext-marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes hami-ext-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @keyframes mostem-marquee {
   from {
     transform: translateX(0);
@@ -199,7 +292,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mostem-marquee-track {
+  .mostem-marquee-track,
+  .hami-ext-led-track,
+  .hami-ext-marquee-track {
     animation: none;
   }
 

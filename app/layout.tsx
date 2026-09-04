@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { PreventFileDrop } from '@/components/prevent-file-drop'
+import { ExtensionStatusBanner } from '@/components/layout/extension-status-banner'
 
 export const metadata: Metadata = {
   title: 'MOSTEM',
@@ -13,10 +14,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ko" className="dark" suppressHydrationWarning>
-      <body>
+    <html lang="ko" className="dark h-full" suppressHydrationWarning>
+      <body className="flex h-full flex-col">
         <PreventFileDrop />
-        {children}
+        <ExtensionStatusBanner />
+        <div className="min-h-0 flex-1">{children}</div>
       </body>
     </html>
   )

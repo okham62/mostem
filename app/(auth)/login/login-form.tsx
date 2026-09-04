@@ -38,7 +38,7 @@ export function LoginForm() {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center bg-[#080b14]">
+    <div className="relative flex h-full min-h-0 w-full items-center justify-center bg-[#080b14]">
       <LoginBg />
 
       <div className="relative z-10 w-full max-w-sm px-4">

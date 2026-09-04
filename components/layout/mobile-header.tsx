@@ -11,12 +11,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/products': '상품 보드',
   '/threads': '스레드',
   '/compose': '새 글 만들기',
-  '/ai': 'AI 도구',
-  '/calendar': '캘린더',
+  '/ai': 'AI 태그 생성기',
   '/links': '링크 변환',
-  '/profit': '수익 실적',
-  '/challenge': '챌린지·인증',
-  '/ranking': '랭킹',
   '/settings': '설정',
   '/admin': '회원 관리',
 }
@@ -30,8 +26,9 @@ export function MobileHeader() {
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center justify-between px-4 md:hidden"
+      className="fixed left-0 right-0 z-40 flex h-14 items-center justify-between px-4 md:hidden"
       style={{
+        top: 'var(--hami-ext-banner-h, 0px)',
         background: 'rgba(10, 12, 20, 0.85)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',

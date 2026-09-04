@@ -36,6 +36,42 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true })
   }
 
+  if (action === 'set-username') {
+    const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : ''
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      return NextResponse.json(
+        { error: '아이디는 영문/숫자/밑줄(_)만 사용 가능하며 3~20자여야 합니다.' },
+        { status: 400 },
+      )
+    }
+
+    const { data: current } = await supabase
+      .from('users')
+      .select('id, username, email')
+      .eq('id', userId)
+      .single()
+    if (!current) return NextResponse.json({ error: '회원을 찾을 수 없습니다.' }, { status: 404 })
+
+    const { data: taken } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .neq('id', userId)
+      .maybeSingle()
+    if (taken) {
+      return NextResponse.json({ error: '이미 사용 중인 아이디입니다.' }, { status: 409 })
+    }
+
+    const updates: Record<string, string> = { username }
+    if (!current.email || String(current.email).endsWith('@mostem.local')) {
+      updates.email = `${username}@mostem.local`
+    }
+
+    const { error } = await supabase.from('users').update(updates).eq('id', userId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true, username })
+  }
+
   if (action === 'set-password' || action === 'reset-password') {
     const nextPassword =
       action === 'reset-password'
