@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { AdminActions } from './admin-actions'
 import { AdminCredentials } from './admin-credentials'
 import { LoginHistoryButton } from './login-history-modal'
+import { MemberActivityButton } from './member-activity-modal'
 import { formatDate } from '@/lib/utils'
 import type { User } from '@/types'
 
@@ -58,9 +59,27 @@ export function AdminUserRow({
           <span className="rounded-full bg-brand/15 px-2.5 py-1 text-[11px] font-semibold text-brand-300 ring-1 ring-brand/20">
             로그인 {stats.loginCount}
           </span>
-          <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/55">수집 {stats.collectCount}</span>
-          <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/55">업로드 {stats.uploadCount}</span>
-          <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/55">채널 {stats.channelCount}</span>
+          <MemberActivityButton
+            userId={user.id}
+            userName={userName}
+            tab="collect"
+            count={stats.collectCount}
+            label="수집"
+          />
+          <MemberActivityButton
+            userId={user.id}
+            userName={userName}
+            tab="upload"
+            count={stats.uploadCount}
+            label="업로드"
+          />
+          <MemberActivityButton
+            userId={user.id}
+            userName={userName}
+            tab="channels"
+            count={stats.channelCount}
+            label="채널"
+          />
         </div>
         <p className="mt-1.5 max-w-full truncate text-[11px] text-white/40">
           {stats.lastLoginAt

@@ -35,10 +35,11 @@ export default async function UserDetailPage({
   const { id } = await params
   const supabase = createAdminClient()
 
-  const [userRes, loginLogsRes, activityLogsRes, uploadsRes, channelsRes, threadsRes] = await Promise.all([
+  const [userRes, loginLogsRes, activityLogsRes, postsRes, uploadsRes, channelsRes, threadsRes] = await Promise.all([
     supabase.from('users').select('*').eq('id', id).single(),
     supabase.from('login_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(500),
     supabase.from('activity_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(200),
+    supabase.from('collected_posts').select('id', { count: 'exact', head: true }).eq('user_id', id),
     supabase.from('uploads').select('id', { count: 'exact', head: true }).eq('user_id', id),
     supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('user_id', id),
     supabase.from('connected_accounts').select('id', { count: 'exact', head: true }).eq('user_id', id),
@@ -49,6 +50,7 @@ export default async function UserDetailPage({
 
   const loginLogs = (loginLogsRes.data ?? []) as LoginLog[]
   const activityLogs = activityLogsRes.data ?? []
+  const collectCount = postsRes.count ?? 0
   const uploadCount = uploadsRes.count ?? 0
   const channelCount = (channelsRes.count ?? 0) + (threadsRes.count ?? 0)
   const isSelf = user.id === session.user.id
@@ -104,6 +106,7 @@ export default async function UserDetailPage({
           userId={user.id}
           userName={user.name || user.username || '회원'}
           loginCount={loginLogs.length}
+          collectCount={collectCount}
           uploadCount={uploadCount}
           channelCount={channelCount}
           loginLogs={loginLogs}
