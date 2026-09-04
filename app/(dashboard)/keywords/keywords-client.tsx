@@ -5,7 +5,7 @@ import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
   formatKeywordTime,
   formatSearchTraffic,
-  type KeywordSourceId,
+  type KeywordSource,
   type KeywordState,
   type KeywordsPayload,
   type RealtimeKeyword,
@@ -13,7 +13,6 @@ import {
 import { cn } from '@/lib/utils'
 
 const POLL_MS = 30_000
-const SOURCE_KEY = 'mostem-keyword-source'
 
 const STATE_UI: Record<
   KeywordState,
@@ -29,11 +28,11 @@ function naverSearch(keyword: string) {
   return `https://search.naver.com/search.naver?query=${encodeURIComponent(keyword)}`
 }
 
-function defaultSources(data: KeywordsPayload) {
+function defaultSources(data: KeywordsPayload): KeywordSource[] {
   if (data.sources?.length) return data.sources
   return [
     {
-      id: 'signal' as const,
+      id: 'signal',
       label: '네이버',
       hint: '실시간 검색어',
       now: data.now,
@@ -46,11 +45,10 @@ function defaultSources(data: KeywordsPayload) {
 export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
   const [data, setData] = useState(initial)
   const [refreshing, setRefreshing] = useState(false)
-  const [sourceId, setSourceId] = useState<KeywordSourceId>('signal')
 
   const sources = defaultSources(data)
-  const current = sources.find((s) => s.id === sourceId) ?? sources[0]
-  const keywords = current?.keywords ?? []
+  const naver = sources.find((s) => s.id === 'signal')
+  const google = sources.find((s) => s.id === 'google')
 
   async function reload() {
     setRefreshing(true)
@@ -65,11 +63,6 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
   }
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(SOURCE_KEY)
-    if (saved === 'signal' || saved === 'google') setSourceId(saved)
-  }, [])
-
-  useEffect(() => {
     const tick = () => {
       if (document.visibilityState === 'visible') void reload()
     }
@@ -80,14 +73,6 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
       document.removeEventListener('visibilitychange', tick)
     }
   }, [])
-
-  const left = keywords.slice(0, 5)
-  const right = keywords.slice(5, 10)
-
-  function pickSource(id: KeywordSourceId) {
-    setSourceId(id)
-    window.localStorage.setItem(SOURCE_KEY, id)
-  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -101,8 +86,7 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
             <h1 className="text-xl font-bold text-white md:text-2xl">실시간 키워드</h1>
           </div>
           <p className="mt-1 text-sm text-white/45">
-            지금 많이 검색되는 말을 네이버·구글 순위로 보여 줍니다 ·{' '}
-            {formatKeywordTime(current?.now ?? data.now)}
+            네이버와 구글 급상승 검색어를 따로 보여 줍니다 · {formatKeywordTime(data.now)}
           </p>
         </div>
         <button
@@ -115,43 +99,38 @@ export function KeywordsClient({ initial }: { initial: KeywordsPayload }) {
         </button>
       </div>
 
-      {current?.error && keywords.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 py-16 text-center text-sm text-white/40">
-          {current.error}
-        </div>
-      ) : (
-        <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex rounded-lg bg-white/5 p-0.5">
-              {sources.map((source) => (
-                <button
-                  key={source.id}
-                  type="button"
-                  onClick={() => pickSource(source.id)}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-xs font-semibold',
-                    source.id === current?.id
-                      ? 'bg-gold text-black'
-                      : 'text-white/50 hover:text-white'
-                  )}
-                >
-                  {source.label}
-                </button>
-              ))}
-            </div>
-            <span className="text-[11px] text-white/35">{current?.hint} · 1~10위</span>
-          </div>
-          <div className="grid gap-x-8 md:grid-cols-2">
-            <KeywordColumn items={left} />
-            <KeywordColumn items={right} />
-          </div>
-        </section>
-      )}
+      <div className="grid gap-4 md:grid-cols-2">
+        <KeywordPanel source={naver} empty="네이버 순위를 불러오지 못했습니다." />
+        <KeywordPanel source={google} empty="구글 트렌드를 불러오지 못했습니다." />
+      </div>
 
       <p className="pb-2 text-[11px] text-white/30">
         데이터 출처: 네이버 검색어 · 구글 트렌드
       </p>
     </div>
+  )
+}
+
+function KeywordPanel({
+  source,
+  empty,
+}: {
+  source?: KeywordSource
+  empty: string
+}) {
+  const keywords = source?.keywords ?? []
+  return (
+    <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <h2 className="text-lg font-bold text-white">{source?.label ?? '검색어'}</h2>
+        <span className="text-[11px] text-white/35">{source?.hint} · 1~10위</span>
+      </div>
+      {source?.error && keywords.length === 0 ? (
+        <div className="py-10 text-center text-sm text-white/40">{source.error || empty}</div>
+      ) : (
+        <KeywordColumn items={keywords} />
+      )}
+    </section>
   )
 }
 
@@ -166,7 +145,7 @@ function KeywordColumn({
         const ui = STATE_UI[item.state]
         const traffic = formatSearchTraffic(item.traffic)
         return (
-          <li key={item.rank}>
+          <li key={`${item.rank}-${item.keyword}`}>
             <div className="flex items-center gap-3 py-2.5">
               <span
                 className={cn(
