@@ -11,7 +11,7 @@ import {
   Search,
 } from 'lucide-react'
 import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
-import { PRESS_NAV_OUTLETS } from '@/lib/press'
+import { PRESS_NAV_GROUPS, PRESS_NAV_OUTLETS, type PressGroup, type PressOutlet } from '@/lib/press'
 import { cn } from '@/lib/utils'
 
 const NEWS_PER_PAGE = 12
@@ -73,8 +73,13 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
     ? filteredNews.slice(0, NEWS_PER_PAGE)
     : newsForPage(data.news, page)
 
+  const leftGroups = PRESS_NAV_GROUPS.filter((group) => group.title === '방송')
+  const rightGroups = PRESS_NAV_GROUPS.filter(
+    (group) => group.title === '종합일간' || group.title === '경제'
+  )
+
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-white md:text-2xl">실시간 뉴스</h1>
@@ -90,7 +95,11 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
         </button>
       </div>
 
-      <NewsFilterBar query={query} onQuery={setQuery} />
+      <div className="xl:grid xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:items-start xl:gap-4">
+        <PressRail groups={leftGroups} />
+
+        <div className="min-w-0 space-y-4">
+          <NewsFilterBar query={query} onQuery={setQuery} />
 
       <section>
         <div className="mb-3 flex items-end justify-between">
@@ -127,7 +136,7 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
             검색 결과가 없습니다.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {newsSlice.map((item, index) => (
               <a
                 key={`${item.link}-${index}`}
@@ -168,7 +177,11 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
         )}
       </section>
 
-      <p className="pb-2 text-[11px] text-white/30">데이터 출처: 네이버 뉴스 랭킹</p>
+          <p className="pb-2 text-[11px] text-white/30">데이터 출처: 네이버 뉴스 랭킹</p>
+        </div>
+
+        <PressRail groups={rightGroups} />
+      </div>
     </div>
   )
 }
@@ -207,7 +220,7 @@ function NewsFilterBar({
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
           className={cn(
-            'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition',
+            'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition xl:hidden',
             open ? 'bg-gold/15 text-gold' : 'text-white/70 hover:bg-white/5 hover:text-white'
           )}
         >
@@ -237,7 +250,7 @@ function NewsFilterBar({
         </button>
       </div>
       {open ? (
-        <div className="mt-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+        <div className="mt-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)] xl:hidden">
           <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {PRESS_NAV_OUTLETS.map((outlet) => (
               <a
@@ -266,5 +279,51 @@ function NewsFilterBar({
         </div>
       ) : null}
     </section>
+  )
+}
+
+function PressRail({ groups }: { groups: PressGroup[] }) {
+  return (
+    <aside className="sticky top-3 hidden max-h-[calc(100vh-5.5rem)] space-y-5 overflow-y-auto scrollbar-thin xl:block">
+      {groups.map((group) => (
+        <div key={group.title}>
+          <p className="mb-2 px-1 text-[11px] font-semibold tracking-wide text-white/35">
+            {group.title}
+          </p>
+          <ul className="space-y-0.5">
+            {group.outlets.map((outlet) => (
+              <li key={outlet.url}>
+                <a
+                  href={outlet.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-[13px] text-white/65 transition hover:bg-white/5 hover:text-white"
+                >
+                  <PressLogo outlet={outlet} />
+                  <span className="truncate font-medium">{outlet.name}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </aside>
+  )
+}
+
+function PressLogo({ outlet }: { outlet: PressOutlet }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={outlet.logo}
+      alt=""
+      width={200}
+      height={200}
+      className="h-6 w-6 shrink-0 rounded-md object-cover"
+      onError={(event) => {
+        const host = new URL(outlet.url).hostname
+        event.currentTarget.src = `https://www.google.com/s2/favicons?domain=${host}&sz=128`
+      }}
+    />
   )
 }
