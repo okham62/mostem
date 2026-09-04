@@ -1,7 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  RefreshCw,
+  RotateCcw,
+  Search,
+} from 'lucide-react'
 import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
 import { PRESS_NAV_OUTLETS } from '@/lib/press'
 import { cn } from '@/lib/utils'
@@ -25,6 +33,7 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   const [data, setData] = useState(initial)
   const [newsPage, setNewsPage] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [query, setQuery] = useState('')
 
   async function reload() {
     setRefreshing(true)
@@ -51,7 +60,18 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   }, [])
 
   const page = ((newsPage % NEWS_PAGES) + NEWS_PAGES) % NEWS_PAGES
-  const newsSlice = newsForPage(data.news, page)
+  const searching = query.trim().length > 0
+  const filteredNews = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return data.news
+    return data.news.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) || (item.press || '').toLowerCase().includes(q)
+    )
+  }, [data.news, query])
+  const newsSlice = searching
+    ? filteredNews.slice(0, NEWS_PER_PAGE)
+    : newsForPage(data.news, page)
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -70,7 +90,7 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
         </button>
       </div>
 
-      <PressOutletBar />
+      <NewsFilterBar query={query} onQuery={setQuery} />
 
       <section>
         <div className="mb-3 flex items-end justify-between">
@@ -78,7 +98,7 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
             <h2 className="text-sm font-semibold text-white">언론사별 가장 많이 본 뉴스</h2>
             <p className="mt-0.5 text-xs text-white/40">각 언론사의 가장 많이 본 기사 1건</p>
           </div>
-          {data.news.length > 0 && (
+          {data.news.length > 0 && !searching && (
             <div className="flex items-center gap-2 text-xs text-white/50">
               <button
                 type="button"
@@ -102,44 +122,50 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
             </div>
           )}
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-          {newsSlice.map((item, index) => (
-            <a
-              key={`${item.link}-${index}`}
-              href={item.link}
-              target="_blank"
-              rel="noreferrer"
-              className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20"
-            >
-              <div className="relative aspect-[16/9] bg-black/40">
-                {item.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.image}
-                    alt=""
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-white/30">
-                    이미지 없음
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2 p-3.5">
-                <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">
-                  {item.title}
-                </p>
-                <div className="flex items-center gap-2 text-[11px] text-white/45">
-                  {item.pressImage ? (
+        {newsSlice.length === 0 ? (
+          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] py-16 text-center text-sm text-white/40">
+            검색 결과가 없습니다.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+            {newsSlice.map((item, index) => (
+              <a
+                key={`${item.link}-${index}`}
+                href={item.link}
+                target="_blank"
+                rel="noreferrer"
+                className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20"
+              >
+                <div className="relative aspect-[16/9] bg-black/40">
+                  {item.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.pressImage} alt="" className="h-4 w-4 rounded-sm object-contain" />
-                  ) : null}
-                  <span>{item.press || '뉴스'}</span>
+                    <img
+                      src={item.image}
+                      alt=""
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-white/30">
+                      이미지 없음
+                    </div>
+                  )}
                 </div>
-              </div>
-            </a>
-          ))}
-        </div>
+                <div className="space-y-2 p-3.5">
+                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">
+                    {item.title}
+                  </p>
+                  <div className="flex items-center gap-2 text-[11px] text-white/45">
+                    {item.pressImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.pressImage} alt="" className="h-4 w-4 rounded-sm object-contain" />
+                    ) : null}
+                    <span>{item.press || '뉴스'}</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
       </section>
 
       <p className="pb-2 text-[11px] text-white/30">데이터 출처: 네이버 뉴스 랭킹</p>
@@ -147,30 +173,98 @@ export function NewsClient({ initial }: { initial: KeywordsPayload }) {
   )
 }
 
-function PressOutletBar() {
+function NewsFilterBar({
+  query,
+  onQuery,
+}: {
+  query: string
+  onQuery: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
   return (
-    <section className="sticky top-0 z-20 -mx-3 border-b border-[var(--card-border)] bg-[var(--background)]/92 py-3 backdrop-blur-md md:-mx-0">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-        {PRESS_NAV_OUTLETS.map((outlet) => (
-          <a
-            key={outlet.url}
-            href={outlet.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-[13px] text-white/60 transition-colors duration-200 hover:text-white"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={outlet.logo}
-              alt=""
-              width={200}
-              height={200}
-              className="h-8 w-8 rounded-md object-cover"
-            />
-            <span className="font-medium">{outlet.name}</span>
-          </a>
-        ))}
+    <section ref={rootRef} className="sticky top-0 z-20 -mx-3 md:-mx-0">
+      <div className="flex flex-col gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={() => {
+            onQuery('')
+            setOpen(false)
+          }}
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs text-white/50 transition hover:bg-white/5 hover:text-white"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          초기화
+        </button>
+        <label className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+          <input
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+            placeholder="뉴스 제목 또는 내용 검색..."
+            className="h-10 w-full rounded-lg bg-black/35 pl-9 pr-3 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-white/30 focus:ring-gold/40"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className={cn(
+            'inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition',
+            open ? 'bg-gold/15 text-gold' : 'text-white/70 hover:bg-white/5 hover:text-white'
+          )}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          전체 방송사
+          <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
+        </button>
       </div>
+      {open ? (
+        <div className="mt-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {PRESS_NAV_OUTLETS.map((outlet) => (
+              <a
+                key={outlet.url}
+                href={outlet.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-white/70 transition hover:bg-white/5 hover:text-white"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={outlet.logo}
+                  alt=""
+                  width={200}
+                  height={200}
+                  className="h-7 w-7 rounded-md object-cover"
+                  onError={(event) => {
+                    const host = new URL(outlet.url).hostname
+                    event.currentTarget.src = `https://www.google.com/s2/favicons?domain=${host}&sz=128`
+                  }}
+                />
+                <span className="truncate font-medium">{outlet.name}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
