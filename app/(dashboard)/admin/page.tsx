@@ -2,18 +2,37 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { AdminActions } from './admin-actions'
-import { AdminCredentials } from './admin-credentials'
-import { formatDate } from '@/lib/utils'
 import { Users } from 'lucide-react'
-import Link from 'next/link'
 import type { User } from '@/types'
+import { AdminUserRow, type MemberInternal } from './admin-user-row'
 
-type LastLogin = {
+type LoginRow = {
+  user_id: string
   created_at: string
   device_type: string | null
   device_model: string | null
+  city: string | null
+  region: string | null
+}
+
+function countByUser(rows: { user_id: string }[] | null) {
+  const map = new Map<string, number>()
+  for (const row of rows ?? []) {
+    map.set(row.user_id, (map.get(row.user_id) ?? 0) + 1)
+  }
+  return map
+}
+
+function emptyStats(): MemberInternal {
+  return {
+    loginCount: 0,
+    collectCount: 0,
+    uploadCount: 0,
+    channelCount: 0,
+    lastLoginAt: null,
+    device: '',
+    location: '',
+  }
 }
 
 export default async function AdminPage() {
@@ -21,24 +40,47 @@ export default async function AdminPage() {
   if (session?.user?.role !== 'admin') redirect('/dashboard')
 
   const supabase = createAdminClient()
-  const [{ data: users }, { data: loginRows }] = await Promise.all([
+  const [
+    { data: users },
+    { data: loginRows },
+    { data: uploadRows },
+    { data: collectRows },
+    { data: channelRows },
+    { data: threadRows },
+  ] = await Promise.all([
     supabase.from('users').select('*').order('created_at', { ascending: false }),
     supabase
       .from('login_logs')
-      .select('user_id, created_at, device_type, device_model')
+      .select('user_id, created_at, device_type, device_model, city, region')
       .order('created_at', { ascending: false })
-      .limit(800),
+      .limit(3000),
+    supabase.from('uploads').select('user_id'),
+    supabase.from('collected_posts').select('user_id'),
+    supabase.from('platform_connections').select('user_id'),
+    supabase.from('connected_accounts').select('user_id'),
   ])
 
-  const lastLoginByUser = new Map<string, LastLogin>()
+  const loginCounts = countByUser(loginRows)
+  const uploadCounts = countByUser(uploadRows)
+  const collectCounts = countByUser(collectRows)
+  const channelCounts = countByUser([...(channelRows ?? []), ...(threadRows ?? [])])
+  const lastLoginByUser = new Map<string, LoginRow>()
   for (const row of loginRows ?? []) {
-    if (!lastLoginByUser.has(row.user_id)) {
-      lastLoginByUser.set(row.user_id, {
-        created_at: row.created_at,
-        device_type: row.device_type,
-        device_model: row.device_model,
-      })
-    }
+    if (!lastLoginByUser.has(row.user_id)) lastLoginByUser.set(row.user_id, row)
+  }
+
+  const statsByUser = new Map<string, MemberInternal>()
+  for (const user of (users ?? []) as User[]) {
+    const last = lastLoginByUser.get(user.id)
+    statsByUser.set(user.id, {
+      loginCount: loginCounts.get(user.id) ?? 0,
+      collectCount: collectCounts.get(user.id) ?? 0,
+      uploadCount: uploadCounts.get(user.id) ?? 0,
+      channelCount: channelCounts.get(user.id) ?? 0,
+      lastLoginAt: last?.created_at ?? null,
+      device: [last?.device_type, last?.device_model].filter(Boolean).join(' · '),
+      location: [last?.city, last?.region].filter(Boolean).join(' '),
+    })
   }
 
   const all = (users ?? []) as User[]
@@ -78,7 +120,7 @@ export default async function AdminPage() {
           </div>
           <div className="divide-y divide-[var(--card-border)]">
             {pending.map((user) => (
-              <UserRow key={user.id} user={user} lastLogin={lastLoginByUser.get(user.id)} />
+              <AdminUserRow key={user.id} user={user} stats={statsByUser.get(user.id) ?? emptyStats()} />
             ))}
           </div>
         </Card>
@@ -94,52 +136,11 @@ export default async function AdminPage() {
         ) : (
           <div className="divide-y divide-[var(--card-border)]">
             {all.map((user) => (
-              <UserRow key={user.id} user={user} lastLogin={lastLoginByUser.get(user.id)} />
+              <AdminUserRow key={user.id} user={user} stats={statsByUser.get(user.id) ?? emptyStats()} />
             ))}
           </div>
         )}
       </Card>
-    </div>
-  )
-}
-
-function UserRow({ user, lastLogin }: { user: User; lastLogin?: LastLogin }) {
-  const statusMap = {
-    pending: { label: '대기', variant: 'warning' as const },
-    approved: { label: '승인', variant: 'success' as const },
-    rejected: { label: '거절', variant: 'danger' as const },
-  }
-  const s = statusMap[user.status]
-  const device = [lastLogin?.device_type, lastLogin?.device_model].filter(Boolean).join(' · ')
-
-  return (
-    <div className="flex items-center gap-4 py-3.5">
-      {user.image ? (
-        <img src={user.image} alt={user.name} className="h-9 w-9 rounded-full object-cover" />
-      ) : (
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-sm font-medium text-white">
-          {user.name?.[0]?.toUpperCase() ?? 'U'}
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <Link href={`/admin/users/${user.id}`} className="hover:underline">
-          <p className="truncate text-sm font-medium text-[var(--foreground)]">{user.name}</p>
-        </Link>
-        <p className="truncate text-xs text-[var(--muted)]">@{user.username ?? user.email}</p>
-        <p className="truncate text-[11px] text-white/35">
-          {lastLogin
-            ? `최근 로그인 ${formatDate(lastLogin.created_at)}${device ? ` · ${device}` : ''}`
-            : '로그인 기록 없음'}
-        </p>
-      </div>
-      <div className="relative flex shrink-0 items-center gap-2">
-        <span className="hidden text-xs text-[var(--muted)] sm:block">{formatDate(user.created_at)}</span>
-        <Badge variant={s.variant}>{s.label}</Badge>
-        <AdminCredentials userId={user.id} username={user.username ?? ''} />
-        {user.status !== 'approved' || user.role !== 'admin' ? (
-          <AdminActions userId={user.id} currentStatus={user.status} />
-        ) : null}
-      </div>
     </div>
   )
 }

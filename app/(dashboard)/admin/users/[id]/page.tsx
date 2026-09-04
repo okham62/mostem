@@ -8,6 +8,8 @@ import Link from 'next/link'
 import type { User } from '@/types'
 import { AdminCredentials } from '../../admin-credentials'
 import { UserLogs } from '../../user-logs'
+import { MemberStats } from '../../member-stats'
+import type { LoginLog } from '../../login-history'
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('ko-KR', {
@@ -16,6 +18,7 @@ function formatDate(dateStr: string) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
   })
 }
 
@@ -30,18 +33,22 @@ export default async function UserDetailPage({
   const { id } = await params
   const supabase = createAdminClient()
 
-  const [userRes, loginLogsRes, activityLogsRes] = await Promise.all([
+  const [userRes, loginLogsRes, activityLogsRes, uploadsRes, channelsRes, threadsRes] = await Promise.all([
     supabase.from('users').select('*').eq('id', id).single(),
     supabase.from('login_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(200),
     supabase.from('activity_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(200),
+    supabase.from('uploads').select('id', { count: 'exact', head: true }).eq('user_id', id),
+    supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('user_id', id),
+    supabase.from('connected_accounts').select('id', { count: 'exact', head: true }).eq('user_id', id),
   ])
 
   const user = userRes.data as User | null
   if (!user) redirect('/admin')
 
-  const loginLogs = loginLogsRes.data ?? []
+  const loginLogs = (loginLogsRes.data ?? []) as LoginLog[]
   const activityLogs = activityLogsRes.data ?? []
-  const lastLogin = loginLogs[0]
+  const uploadCount = uploadsRes.count ?? 0
+  const channelCount = (channelsRes.count ?? 0) + (threadsRes.count ?? 0)
 
   const statusMap = {
     pending: { label: '대기', variant: 'warning' as const },
@@ -74,21 +81,19 @@ export default async function UserDetailPage({
             </div>
             <p className="text-sm text-[var(--muted)]">아이디: {user.username ?? '-'}</p>
             <p className="text-xs text-[var(--muted)]">가입일: {formatDate(user.created_at)}</p>
-            {lastLogin && (
-              <p className="mt-1 text-xs text-white/50">
-                최근 로그인 {formatDate(lastLogin.created_at)}
-                {lastLogin.device_type ? ` · ${lastLogin.device_type}` : ''}
-                {lastLogin.device_model ? ` · ${lastLogin.device_model}` : ''}
-              </p>
-            )}
           </div>
+          <AdminCredentials userId={user.id} username={user.username ?? ''} />
         </div>
-        <div className="mt-5 border-t border-[var(--card-border)] pt-5">
-          <AdminCredentials userId={user.id} username={user.username ?? ''} variant="panel" />
-        </div>
+        <MemberStats
+          userName={user.name || user.username || '회원'}
+          loginCount={loginLogs.length}
+          uploadCount={uploadCount}
+          channelCount={channelCount}
+          loginLogs={loginLogs}
+        />
       </Card>
 
-      <UserLogs loginLogs={loginLogs} activityLogs={activityLogs} />
+      <UserLogs activityLogs={activityLogs} />
     </div>
   )
 }
