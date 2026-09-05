@@ -68,10 +68,12 @@ function NavGroup({
   pathname: string
 }) {
   return (
-    <div className="mb-4">
-      <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-        {title}
-      </p>
+    <div className="mb-5">
+      <div className="mb-2 flex items-center gap-2 px-3">
+        <span className="h-3.5 w-[3px] shrink-0 rounded-full bg-gold" />
+        <p className="text-[13px] font-extrabold tracking-tight text-white">{title}</p>
+        <span className="h-px min-w-4 flex-1 bg-white/12" />
+      </div>
       <ul className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon
