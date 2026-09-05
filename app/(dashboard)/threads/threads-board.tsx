@@ -227,6 +227,41 @@ export function ThreadsBoard({
         </div>
       </div>
 
+      <section className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-white">내 계정 ({accounts.length}개)</p>
+          <Link
+            href="/settings?tab=threads"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/65 hover:bg-white/10 hover:text-white"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            계정 재연결
+          </Link>
+        </div>
+        {accounts.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {accounts.map((account) => (
+              <div
+                key={account.id}
+                className="inline-flex w-fit max-w-[220px] items-center gap-2 rounded-xl border border-white/8 bg-gradient-to-r from-[#1b1b22] via-[#16161c] to-brand/20 px-2.5 py-1.5"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                  {account.username[0]?.toUpperCase() ?? 'U'}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">@{account.username}</p>
+                  <p className="truncate text-[11px] text-white/40">{account.display_name || '스레드 계정'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="w-fit rounded-xl border border-dashed border-white/10 px-3 py-2 text-xs text-white/40">
+            연결된 스레드 계정이 없습니다. 계정 재연결에서 아이디를 추가하세요.
+          </div>
+        )}
+      </section>
+
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -255,41 +290,6 @@ export function ThreadsBoard({
           )
         })}
       </div>
-
-      <section className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-white">내 계정 ({accounts.length}개)</p>
-          <Link
-            href="/settings?tab=threads"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/65 hover:bg-white/10 hover:text-white"
-          >
-            <Link2 className="h-3.5 w-3.5" />
-            계정 재연결
-          </Link>
-        </div>
-        {accounts.length > 0 ? (
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {accounts.map((account) => (
-              <div
-                key={account.id}
-                className="flex items-center gap-3 overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-r from-[#1b1b22] via-[#16161c] to-brand/20 px-4 py-3"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
-                  {account.username[0]?.toUpperCase() ?? 'U'}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">@{account.username}</p>
-                  <p className="truncate text-[11px] text-white/40">{account.display_name || '스레드 계정'}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-white/40">
-            연결된 스레드 계정이 없습니다. 계정 재연결에서 아이디를 추가하세요.
-          </div>
-        )}
-      </section>
 
       <div className="flex flex-wrap items-center gap-2">
         <input
