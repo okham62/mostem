@@ -44,7 +44,7 @@ const GOOGLE_TRENDING_URL = 'https://trends.google.com/trending?geo=KR&hl=ko'
 const NATE_URL = 'https://www.nate.com/js/data/jsonLiveKeywordDataV1.js'
 const ZUM_URL = 'https://zum.com/'
 const DAUM_URL = 'https://www.daum.net/'
-const KEYWORD_LIMIT = 30
+const KEYWORD_LIMIT = 10
 const FRESH_MS = 45_000
 const STALE_MS = 15 * 60_000
 const BROWSER_UA =
@@ -599,47 +599,9 @@ async function fetchGoogleHtml() {
 
 let lastGoogle: { now: number; keywords: RealtimeKeyword[] } | null = null
 
-async function expandGoogleKeywords(seed: RealtimeKeyword[]) {
-  if (seed.length >= KEYWORD_LIMIT) return seed
-  const seen = new Set(seed.map((item) => keywordKey(item.keyword)))
-  const extras: RealtimeKeyword[] = []
-  await Promise.all(
-    seed.slice(0, 8).map(async (item) => {
-      try {
-        const res = await fetch(
-          `https://suggestqueries.google.com/complete/search?client=firefox&hl=ko&gl=kr&q=${encodeURIComponent(item.keyword)}`,
-          {
-            headers: { 'User-Agent': BROWSER_UA, 'Accept-Language': 'ko-KR,ko;q=0.9' },
-            cache: 'no-store',
-            signal: AbortSignal.timeout(2500),
-          }
-        )
-        if (!res.ok) return
-        const data = (await res.json()) as [string, string[]]
-        for (const word of data[1] ?? []) {
-          const keyword = String(word || '').trim()
-          const key = keywordKey(keyword)
-          if (!keyword || keyword.length < 2 || seen.has(key)) continue
-          seen.add(key)
-          extras.push(
-            toKeyword(keyword, {
-              summaryUrl: googleTrends(keyword),
-              searchUrl: googleSearch(keyword),
-            })
-          )
-        }
-      } catch {
-        /* skip this seed */
-      }
-    })
-  )
-  return mergeKeywords([seed, extras])
-}
-
 async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
   const [rssKeywords, htmlKeywords] = await Promise.all([fetchGoogleRss(), fetchGoogleHtml()])
-  let keywords = mergeKeywords([htmlKeywords, rssKeywords, lastGoogle?.keywords ?? []])
-  if (keywords.length < KEYWORD_LIMIT) keywords = await expandGoogleKeywords(keywords)
+  const keywords = mergeKeywords([htmlKeywords, rssKeywords, lastGoogle?.keywords ?? []])
   if (keywords.length === 0) {
     if (lastGoogle?.keywords.length) return lastGoogle
     throw new Error('google empty')

@@ -165,7 +165,7 @@ function KeywordPanel({
           </span>
         </h2>
         <span className="rounded-full bg-white/6 px-2.5 py-1 text-[11px] font-medium text-white/50">
-          {source?.hint} · 1~30위
+          {source?.hint} · 1~10위
         </span>
       </div>
       {source?.error && keywords.length === 0 ? (
