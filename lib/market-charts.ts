@@ -171,7 +171,7 @@ async function refreshCharts(): Promise<MarketChartsPayload> {
       try {
         return [id, await fetchBinanceHours(COIN_BINANCE[id])] as const
       } catch {
-        return [id, []] as const
+        return [id, [] as number[]] as const
       }
     }),
   ])
