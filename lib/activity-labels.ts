@@ -30,7 +30,7 @@ export const PAGE_LABELS: Record<string, string> = {
   '/tiktok': '틱톡',
   '/blog': '네이버 블로그',
   '/compose': '새 글 만들기',
-  '/ai': 'AI 태그 생성기',
+  '/ai': 'AI 도구',
   '/links': '링크 변환',
   '/settings': '설정',
   '/admin': '회원 관리',

@@ -15,7 +15,7 @@ import {
   Users,
   LogOut,
   PanelLeftClose,
-  Tags,
+  Sparkles,
 } from 'lucide-react'
 import { BrandMark } from '@/components/brand-logos'
 import { cn } from '@/lib/utils'
@@ -50,7 +50,7 @@ const publish = [
   { href: '/instagram', label: '인스타', icon: InstagramIcon },
   { href: '/tiktok', label: '틱톡', icon: TiktokIcon },
   { href: '/blog', label: '네이버 블로그', icon: BlogIcon },
-  { href: '/ai', label: 'AI 태그 생성기', icon: Tags },
+  { href: '/ai', label: 'AI 도구', icon: Sparkles },
   { href: '/links', label: '링크 변환', icon: Link2 },
 ]
 

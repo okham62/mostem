@@ -1,5 +1,5 @@
-import { TagGeneratorClient } from './tag-generator-client'
+import { AiToolsHub } from './ai-tools-hub'
 
 export default function AiPage() {
-  return <TagGeneratorClient />
+  return <AiToolsHub />
 }

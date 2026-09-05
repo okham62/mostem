@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Clock3, Copy, Download, LoaderCircle, RefreshCw, Sparkles, Tags } from 'lucide-react'
 import type { PlatformTagResult } from '@/lib/tag-generator'
 import {
@@ -141,6 +142,9 @@ export function TagGeneratorClient() {
 
   return (
     <div className="mx-auto max-w-7xl">
+      <Link href="/ai" className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-white/40 hover:text-white">
+        ← AI 도구
+      </Link>
       {toast && (
         <div className="fixed right-4 top-4 z-[70] rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
           {toast}
