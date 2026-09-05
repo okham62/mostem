@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Zap } from 'lucide-react'
+import type { Session } from 'next-auth'
 
 const PAGE_TITLES: Record<string, string> = {
   '/keywords': '실시간 키워드',
@@ -20,12 +22,14 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin': '회원 관리',
 }
 
-export function MobileHeader() {
+export function MobileHeader({ session }: { session: Session | null }) {
   const pathname = usePathname()
   const title =
     Object.entries(PAGE_TITLES)
       .filter(([path]) => pathname === path || pathname.startsWith(path + '/'))
       .sort((a, b) => b[0].length - a[0].length)[0]?.[1] ?? 'MOSTEM'
+  const user = session?.user
+  const loginId = user?.username || user?.email?.replace(/@mostem\.local$/, '') || ''
 
   return (
     <header
@@ -45,7 +49,19 @@ export function MobileHeader() {
         </div>
         <span className="text-sm font-bold text-white">{title}</span>
       </div>
-      <span className="rounded-md bg-gold/15 px-2 py-1 text-[10px] font-bold text-gold">0 크레딧</span>
+      {user ? (
+        <Link href="/settings" className="flex items-center gap-2">
+          {user.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.image} alt="" className="h-7 w-7 rounded-full object-cover" />
+          ) : (
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-[11px] font-medium text-white">
+              {user.name?.[0]?.toUpperCase() ?? 'U'}
+            </div>
+          )}
+          <span className="max-w-20 truncate text-[11px] text-white/70">{loginId}</span>
+        </Link>
+      ) : null}
     </header>
   )
 }

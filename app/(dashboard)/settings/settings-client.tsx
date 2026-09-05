@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Link2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { AccountSettings } from './account-settings'
 import { BrandMark } from '@/components/brand-logos'
 import {
   formatHandle,
@@ -169,8 +170,15 @@ export function SettingsClient() {
       <div>
         <h1 className="text-2xl font-bold text-white">설정</h1>
         <p className="mt-1 text-sm text-white/45">
-          스레드, 인스타, 틱톡, 네이버 블로그 계정을 이 화면에서 추가·삭제·재연결합니다.
+          내 계정과 스레드, 인스타, 틱톡, 네이버 블로그 연결을 한 화면에서 관리합니다.
         </p>
+      </div>
+
+      <AccountSettings onToast={ping} />
+
+      <div>
+        <h2 className="text-lg font-semibold text-white">플랫폼 계정</h2>
+        <p className="mt-1 text-xs text-white/40">채널별로 아이디를 추가하고 삭제하거나 다시 연결할 수 있습니다.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">

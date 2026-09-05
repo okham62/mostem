@@ -37,9 +37,6 @@ export function AppHeader() {
         <button className="rounded-lg p-2 text-white/40 hover:bg-white/5 hover:text-white">
           <Bell className="h-4 w-4" />
         </button>
-        <div className="rounded-lg bg-gold/15 px-3 py-1.5 text-xs font-bold text-gold">
-          0 크레딧
-        </div>
         <button className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
           <BookOpen className="h-3.5 w-3.5" />
           1초만에 시작하기

@@ -36,6 +36,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email ?? user.username,
           name: user.name,
           image: user.image ?? null,
+          username: user.username,
           status: user.status,
           role: user.role,
         }
@@ -43,12 +44,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id
-        token.status = (user as { status?: string }).status
-        token.role = (user as { role?: string }).role
+        token.status = user.status
+        token.role = user.role
         token.name = user.name
+        token.username = user.username
+        token.picture = user.image
+      }
+      if (trigger === 'update' && session) {
+        if (typeof session.name === 'string') token.name = session.name
+        if (typeof session.image === 'string') token.picture = session.image
       }
       return token
     },
@@ -61,6 +68,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         session.user.role = token.role as any
         session.user.name = token.name as string
+        session.user.image = (token.picture as string) || ''
+        session.user.username =
+          token.username ||
+          String(session.user.email || '').replace(/@mostem\.local$/, '')
       }
       return session
     },

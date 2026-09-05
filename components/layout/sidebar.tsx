@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 import {
   Flame,
   Newspaper,
@@ -11,7 +11,6 @@ import {
   ShoppingBag,
   LayoutGrid,
   Link2,
-  Settings,
   Users,
   LogOut,
   Zap,
@@ -107,7 +106,9 @@ function NavGroup({
 
 export function Sidebar({ session }: SidebarProps) {
   const pathname = usePathname()
-  const isAdmin = session?.user?.role === 'admin'
+  const { data: liveSession } = useSession()
+  const user = liveSession?.user ?? session?.user
+  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     const id = window.setTimeout(() => warmRealtimeCache(), 300)
@@ -145,28 +146,31 @@ export function Sidebar({ session }: SidebarProps) {
       </nav>
 
       <div className="border-t border-[var(--sidebar-border)] p-2">
-        <Link
-          href="/settings"
-          className={cn(
-            'mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium',
-            pathname.startsWith('/settings')
-              ? 'bg-brand/20 text-brand'
-              : 'text-white/50 hover:bg-white/5 hover:text-white'
-          )}
-        >
-          <Settings className="h-4 w-4" />
-          설정
-        </Link>
-        {session?.user && (
-          <div className="mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-xs font-medium text-white">
-              {session.user.name?.[0]?.toUpperCase() ?? 'U'}
-            </div>
+        {user && (
+          <Link
+            href="/settings"
+            className={cn(
+              'mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2',
+              pathname.startsWith('/settings')
+                ? 'bg-brand/20'
+                : 'hover:bg-white/5'
+            )}
+          >
+            {user.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.image} alt="" className="h-7 w-7 rounded-full object-cover" />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-xs font-medium text-white">
+                {user.name?.[0]?.toUpperCase() ?? 'U'}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-white">{session.user.name}</p>
-              <p className="truncate text-[10px] text-white/40">Free</p>
+              <p className="truncate text-xs font-medium text-white">{user.name}</p>
+              <p className="truncate text-[10px] text-white/40">
+                {user.username || user.email?.replace(/@mostem\.local$/, '')}
+              </p>
             </div>
-          </div>
+          </Link>
         )}
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}

@@ -6,6 +6,7 @@ import { MobileHeader } from '@/components/layout/mobile-header'
 import { AppHeader } from '@/components/layout/app-header'
 import { MarketTicker } from '@/components/layout/market-ticker'
 import { ActivityTracker } from '@/components/layout/activity-tracker'
+import { AppSessionProvider } from '@/components/session-provider'
 
 export default async function DashboardLayout({
   children,
@@ -19,12 +20,13 @@ export default async function DashboardLayout({
   if (session.user.status === 'rejected') redirect('/register?status=rejected')
 
   return (
+    <AppSessionProvider session={session}>
     <div className="flex h-full overflow-hidden bg-[var(--background)]">
       <div className="hidden md:flex">
         <Sidebar session={session} />
       </div>
 
-      <MobileHeader />
+      <MobileHeader session={session} />
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <div className="hidden md:block">
@@ -42,5 +44,6 @@ export default async function DashboardLayout({
       <MobileNav session={session} />
       <ActivityTracker />
     </div>
+    </AppSessionProvider>
   )
 }
