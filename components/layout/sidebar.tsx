@@ -37,6 +37,9 @@ function ThreadsIcon() {
 function InstagramIcon() {
   return <BrandMark id="instagram" className="h-5 w-5" />
 }
+function TiktokIcon() {
+  return <BrandMark id="tiktok" className="h-5 w-5" />
+}
 function BlogIcon() {
   return <BrandMark id="blog" className="h-5 w-5" />
 }
@@ -44,6 +47,7 @@ function BlogIcon() {
 const publish = [
   { href: '/threads', label: '스레드', icon: ThreadsIcon },
   { href: '/instagram', label: '인스타', icon: InstagramIcon },
+  { href: '/tiktok', label: '틱톡', icon: TiktokIcon },
   { href: '/blog', label: '네이버 블로그', icon: BlogIcon },
   { href: '/ai', label: 'AI 태그 생성기', icon: Tags },
   { href: '/links', label: '링크 변환', icon: Link2 },

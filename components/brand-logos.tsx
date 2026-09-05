@@ -3,11 +3,12 @@
 import { useId } from 'react'
 import { cn } from '@/lib/utils'
 
-export type BrandId = 'threads' | 'instagram' | 'blog'
+export type BrandId = 'threads' | 'instagram' | 'tiktok' | 'blog'
 
 const PNG: Record<BrandId, string> = {
   threads: '/logos/threads.png',
   instagram: '/logos/instagram.png',
+  tiktok: '/logos/tiktok.png',
   blog: '/logos/naver-blog.png',
 }
 
@@ -61,13 +62,44 @@ export function BrandMark({
     )
   }
 
+  if (id === 'tiktok') {
+    return (
+      <svg viewBox="0 0 24 24" className={cn('shrink-0', className)} aria-hidden>
+        <path
+          fill="#25F4EE"
+          d="M16.6 1.82c.8 1.74 2.25 3.17 4.05 3.9v3.2a8.16 8.16 0 0 1-4.16-1.14v6.7c0 3.9-3.16 7.06-7.06 7.06A7.05 7.05 0 0 1 5.3 19.3 7.06 7.06 0 0 1 12.48 8.4c.2 0 .4.02.6.04v3.28a3.86 3.86 0 0 0-.6-.05 3.78 3.78 0 1 0 3.78 3.78V1.82h3.34z"
+        />
+        <path
+          fill="#FE2C55"
+          d="M15.26 3.16c.8 1.74 2.25 3.17 4.05 3.9v2.02a8.16 8.16 0 0 1-4.16-1.14v8.38a7.06 7.06 0 1 1-7.06-7.06c.2 0 .4.02.6.04v2.1a3.86 3.86 0 0 0-.6-.05 3.78 3.78 0 1 0 3.78 3.78V1.82h3.39v1.34z"
+        />
+        <path
+          fill="#fff"
+          d="M14.58 4.5c.8 1.74 2.25 3.17 4.05 3.9v2.02a8.16 8.16 0 0 1-4.16-1.14v6.7a5.38 5.38 0 1 1-5.38-5.38c.2 0 .4.02.6.04v2.28a3.12 3.12 0 1 0 3.12 3.12V4.5h1.77z"
+        />
+      </svg>
+    )
+  }
+
   return (
     <svg viewBox="0 0 24 24" className={cn('shrink-0', className)} aria-hidden>
       <rect width="24" height="24" rx="6" fill="#03C75A" />
       <path
         fill="#fff"
-        d="M8.1 5.4h5.35c2.55 0 4.25 1.45 4.25 3.7 0 1.42-.78 2.52-2.02 3.12 1.5.62 2.42 1.88 2.42 3.55 0 2.48-2.02 4.13-4.95 4.13H8.1V5.4zm3.35 5.85h1.85c1.28 0 2.02-.68 2.02-1.7 0-1.04-.74-1.66-2.02-1.66h-1.85v3.36zm0 6.55h2.22c1.48 0 2.38-.78 2.38-1.92 0-1.16-.9-1.88-2.38-1.88h-2.22v3.8z"
+        d="M4.6 5.15h14.8a2.55 2.55 0 0 1 2.55 2.55v7.05a2.55 2.55 0 0 1-2.55 2.55h-5.35L12 20.4l-1.45-3.1H4.6A2.55 2.55 0 0 1 2.05 14.75V7.7A2.55 2.55 0 0 1 4.6 5.15z"
       />
+      <text
+        x="12"
+        y="13.15"
+        textAnchor="middle"
+        fill="#FF6B00"
+        fontFamily="Arial Black, Arial, sans-serif"
+        fontSize="6.4"
+        fontWeight="800"
+        letterSpacing="-0.2"
+      >
+        blog
+      </text>
     </svg>
   )
 }

@@ -26,6 +26,7 @@ export const PAGE_LABELS: Record<string, string> = {
   '/products': '상품 보드',
   '/threads': '스레드',
   '/instagram': '인스타',
+  '/tiktok': '틱톡',
   '/blog': '네이버 블로그',
   '/compose': '새 글 만들기',
   '/ai': 'AI 태그 생성기',
