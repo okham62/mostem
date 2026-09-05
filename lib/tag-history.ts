@@ -9,6 +9,7 @@ export const TAG_HISTORY_LIMIT = 50
 export const TAG_FAVORITE_LIMIT = 50
 const STORAGE_KEY = 'mostem:tag-history-v1'
 const FAVORITE_KEY = 'mostem:tag-favorites-v1'
+const DELETED_KEY = 'mostem:tag-history-deleted-v1'
 
 export type TagHistoryItem = {
   id: string
@@ -56,8 +57,9 @@ export function readTagHistory(): TagHistoryItem[] {
     if (!raw) return []
     const parsed = JSON.parse(raw) as TagHistoryItem[]
     if (!Array.isArray(parsed)) return []
+    const deleted = new Set(readDeletedIds())
     return parsed
-      .filter((item) => item?.topic && Array.isArray(item.platforms))
+      .filter((item) => item?.topic && Array.isArray(item.platforms) && !deleted.has(item.id))
       .slice(0, TAG_HISTORY_LIMIT)
   } catch {
     return []
@@ -84,11 +86,12 @@ export function saveTagHistory(item: Omit<TagHistoryItem, 'id'> & { id?: string 
 
 export function mergeTagHistory(items: TagHistoryItem[]): TagHistoryItem[] {
   const seen = new Set<string>()
+  const deleted = new Set(typeof window === 'undefined' ? [] : readDeletedIds())
   const out: TagHistoryItem[] = []
   const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt)
   for (const item of sorted) {
     const key = `${item.topic.trim().toLowerCase()}|${Math.floor(item.createdAt / 60_000)}`
-    if (seen.has(key) || seen.has(item.id)) continue
+    if (deleted.has(item.id) || seen.has(key) || seen.has(item.id)) continue
     seen.add(key)
     seen.add(item.id)
     out.push(item)
@@ -136,4 +139,50 @@ export function toggleTagFavorite(item: TagHistoryItem): TagHistoryItem[] {
     return persistFavorites(current.filter((row) => row.id !== item.id))
   }
   return persistFavorites([item, ...current].slice(0, TAG_FAVORITE_LIMIT))
+}
+
+function readDeletedIds(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(DELETED_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as string[]
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function rememberDeleted(id: string) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(
+      DELETED_KEY,
+      JSON.stringify([...new Set([...readDeletedIds(), id])].slice(-200))
+    )
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function writeTagHistory(items: TagHistoryItem[]) {
+  const next = items.slice(0, TAG_HISTORY_LIMIT)
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      /* ignore quota */
+    }
+  }
+  return next
+}
+
+export function removeTagHistory(id: string): TagHistoryItem[] {
+  rememberDeleted(id)
+  persistFavorites(readTagFavorites().filter((item) => item.id !== id))
+  return writeTagHistory(readTagHistory().filter((item) => item.id !== id))
+}
+
+export function removeTagFavorite(id: string): TagHistoryItem[] {
+  return persistFavorites(readTagFavorites().filter((item) => item.id !== id))
 }

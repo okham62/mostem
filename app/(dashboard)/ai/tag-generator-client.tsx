@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Clock3, Copy, Download, LoaderCircle, RefreshCw, Sparkles, Star, Tags } from 'lucide-react'
+import { Clock3, Copy, Download, LoaderCircle, RefreshCw, Sparkles, Star, Tags, Trash2 } from 'lucide-react'
 import type { PlatformTagResult } from '@/lib/tag-generator'
 import {
   isTagFavorite,
   mergeTagHistory,
   readTagFavorites,
   readTagHistory,
+  removeTagFavorite,
+  removeTagHistory,
   saveTagHistory,
   TAG_FAVORITE_LIMIT,
   TAG_HISTORY_LIMIT,
@@ -133,6 +135,18 @@ export function TagGeneratorClient() {
     const next = toggleTagFavorite(item)
     setFavorites(next)
     ping(isTagFavorite(item.id, next) ? '즐겨찾기에 저장했습니다.' : '즐겨찾기에서 뺐습니다.')
+  }
+
+  function deleteItem(item: TagHistoryItem) {
+    if (listTab === 'favorites') {
+      setFavorites(removeTagFavorite(item.id))
+      ping('즐겨찾기에서 삭제했습니다.')
+      return
+    }
+    setHistory(removeTagHistory(item.id))
+    setFavorites(readTagFavorites())
+    if (activeHistoryId === item.id) setActiveHistoryId(null)
+    ping('기록을 삭제했습니다.')
   }
 
   function openHistory(item: TagHistoryItem) {
@@ -345,6 +359,7 @@ export function TagGeneratorClient() {
               activeId={activeHistoryId}
               onOpen={openHistory}
               onFavorite={toggleFavorite}
+              onDelete={deleteItem}
               formatTime={formatHistoryTime}
             />
           )
@@ -359,6 +374,7 @@ export function TagGeneratorClient() {
             activeId={activeHistoryId}
             onOpen={openHistory}
             onFavorite={toggleFavorite}
+            onDelete={deleteItem}
             formatTime={formatHistoryTime}
           />
         )}
@@ -375,6 +391,7 @@ function HistoryList({
   activeId,
   onOpen,
   onFavorite,
+  onDelete,
   formatTime,
 }: {
   items: TagHistoryItem[]
@@ -382,6 +399,7 @@ function HistoryList({
   activeId: string | null
   onOpen: (item: TagHistoryItem) => void
   onFavorite: (item: TagHistoryItem) => void
+  onDelete: (item: TagHistoryItem) => void
   formatTime: (at: number) => string
 }) {
   return (
@@ -422,10 +440,11 @@ function HistoryList({
             </button>
             <button
               type="button"
-              onClick={() => onOpen(item)}
-              className="shrink-0 text-[11px] font-semibold text-white/45 hover:text-white"
+              aria-label="삭제"
+              onClick={() => onDelete(item)}
+              className="rounded-lg p-1.5 text-white/35 transition hover:bg-red-500/10 hover:text-red-400"
             >
-              불러오기
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         )
