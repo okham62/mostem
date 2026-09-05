@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { MarketIcon } from '@/components/market-icons'
 import { subscribeLiveMarkets } from '@/lib/live-markets'
 import { emptyMarketItems, formatChange, formatKrw, formatUsd, type MarketItem } from '@/lib/markets'
@@ -18,9 +19,10 @@ export function MarketTicker() {
           const up = (item.change ?? 0) > 0
           const down = (item.change ?? 0) < 0
           return (
-            <div
+            <Link
               key={item.id}
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-3 py-1.5"
+              href="/markets"
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-3 py-1.5 hover:border-white/35 hover:bg-white/10"
             >
               <MarketIcon id={item.id} className="h-6 w-6" />
               <span className="text-[13px] font-bold tracking-tight text-white">{item.label}</span>
@@ -40,7 +42,7 @@ export function MarketTicker() {
                   {formatChange(item.change)}
                 </span>
               ) : null}
-            </div>
+            </Link>
           )
         })}
       </div>

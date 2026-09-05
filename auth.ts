@@ -47,15 +47,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id
-        token.status = user.status
-        token.role = user.role
+        token.status = user.status ?? token.status
+        token.role = user.role ?? token.role
         token.name = user.name
         token.username = user.username
-        token.picture = user.image
+        token.picture = user.image ?? undefined
       }
       if (trigger === 'update' && session) {
-        if (typeof session.name === 'string') token.name = session.name
-        if (typeof session.image === 'string') token.picture = session.image
+        const payload = session as { name?: string; image?: string }
+        if (typeof payload.name === 'string') token.name = payload.name
+        if (typeof payload.image === 'string') token.picture = payload.image
       }
       return token
     },
