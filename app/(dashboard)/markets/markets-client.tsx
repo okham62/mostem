@@ -71,7 +71,7 @@ export function MarketsClient() {
               title={item.label}
               icon={<MarketIcon id={item.id} className="h-7 w-7" />}
               price={formatKrw(item.krw)}
-              extra={formatUsd(item.usd)}
+              usd={formatUsd(item.usd)}
               change={item.change}
               points={charts?.series?.[item.id]}
             />
@@ -103,6 +103,7 @@ function MarketCard({
   icon,
   price,
   extra,
+  usd,
   change,
   points,
 }: {
@@ -110,6 +111,7 @@ function MarketCard({
   icon?: ReactNode
   price: string
   extra?: string
+  usd?: string
   change: number | null
   points?: number[]
 }) {
@@ -137,7 +139,14 @@ function MarketCard({
         ) : null}
       </div>
       <p className="mt-3 text-xl font-bold text-gold">{price}</p>
-      {extra ? <p className="mt-0.5 text-xs text-white/45">{extra}</p> : null}
+      {usd ? (
+        <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-white/8 px-2 py-1">
+          <span className="text-[10px] font-extrabold tracking-wide text-white/55">USD</span>
+          <span className="text-sm font-bold tabular-nums text-white">{usd}</span>
+        </p>
+      ) : extra ? (
+        <p className="mt-0.5 text-xs text-white/45">{extra}</p>
+      ) : null}
       <Sparkline points={points} />
     </article>
   )
