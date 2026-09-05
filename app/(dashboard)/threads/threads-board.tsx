@@ -260,7 +260,7 @@ export function ThreadsBoard({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-white">내 계정 ({accounts.length}개)</p>
           <Link
-            href="/settings"
+            href="/settings?tab=threads"
             className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/65 hover:bg-white/10 hover:text-white"
           >
             <Link2 className="h-3.5 w-3.5" />

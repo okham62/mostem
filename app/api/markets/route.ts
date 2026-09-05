@@ -3,6 +3,7 @@ import { getMarkets } from '@/lib/markets'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 20
 
 export async function GET() {
   const session = await auth()

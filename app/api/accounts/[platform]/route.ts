@@ -1,42 +1,58 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  formatHandle,
+  isPublishPlatform,
+  normalizePublishUsername,
+  usernameError,
+  validatePublishUsername,
+} from '@/lib/publish-accounts'
 import { NextResponse } from 'next/server'
 
-function normalizeUsername(raw: string) {
-  return raw.trim().replace(/^@/, '').toLowerCase()
+function platformFrom(params: { platform: string }) {
+  return isPublishPlatform(params.platform) ? params.platform : null
 }
 
-export async function GET() {
+export async function GET(
+  _req: Request,
+  { params }: { params: { platform: string } }
+) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const platform = platformFrom(params)
+  if (!platform) return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
 
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('connected_accounts')
     .select('*')
     .eq('user_id', session.user.id)
-    .eq('platform', 'threads')
+    .eq('platform', platform)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ accounts: data ?? [] })
 }
 
-export async function POST(req: Request) {
+export async function POST(
+  req: Request,
+  { params }: { params: { platform: string } }
+) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const platform = platformFrom(params)
+  if (!platform) return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
+
   const body = await req.json().catch(() => null)
-  const username = normalizeUsername(String(body?.username ?? ''))
-  if (!/^[a-z0-9._]{2,30}$/.test(username)) {
-    return NextResponse.json(
-      { error: '스레드 아이디는 영문/숫자/점/밑줄 2~30자입니다.' },
-      { status: 400 }
-    )
+  const username = normalizePublishUsername(platform, String(body?.username ?? ''))
+  if (!validatePublishUsername(platform, username)) {
+    return NextResponse.json({ error: usernameError(platform) }, { status: 400 })
   }
 
   const supabase = createAdminClient()
@@ -45,9 +61,9 @@ export async function POST(req: Request) {
     .upsert(
       {
         user_id: session.user.id,
-        platform: 'threads',
+        platform,
         username,
-        display_name: body?.display_name ?? username,
+        display_name: body?.display_name ?? formatHandle(platform, username),
         intro: body?.intro ?? '',
         topics: Array.isArray(body?.topics) ? body.topics : [],
       },
@@ -60,11 +76,17 @@ export async function POST(req: Request) {
   return NextResponse.json({ account: data })
 }
 
-export async function PATCH(req: Request) {
+export async function PATCH(
+  req: Request,
+  { params }: { params: { platform: string } }
+) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const platform = platformFrom(params)
+  if (!platform) return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
 
   const body = await req.json().catch(() => null)
   if (!body?.id) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
@@ -79,16 +101,23 @@ export async function PATCH(req: Request) {
     })
     .eq('id', body.id)
     .eq('user_id', session.user.id)
+    .eq('platform', platform)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(
+  req: Request,
+  { params }: { params: { platform: string } }
+) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const platform = platformFrom(params)
+  if (!platform) return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
 
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
@@ -100,6 +129,7 @@ export async function DELETE(req: Request) {
     .delete()
     .eq('id', id)
     .eq('user_id', session.user.id)
+    .eq('platform', platform)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

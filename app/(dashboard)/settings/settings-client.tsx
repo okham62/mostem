@@ -1,34 +1,59 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Link2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { BrandMark } from '@/components/brand-logos'
+import {
+  formatHandle,
+  isPublishPlatform,
+  PUBLISH_PLATFORM_META,
+  PUBLISH_PLATFORMS,
+  type PublishPlatform,
+} from '@/lib/publish-accounts'
+import { cn } from '@/lib/utils'
 import type { ConnectedAccount } from '@/types'
 
 const TOPIC_OPTIONS = ['리빙', '인테리어', '주방', '욕실', '패션', '뷰티', '음식', '여행', '테크', '일상']
 
 export function SettingsClient() {
+  const searchParams = useSearchParams()
+  const tab = searchParams.get('tab')
+  const [platform, setPlatform] = useState<PublishPlatform>(
+    tab && isPublishPlatform(tab) ? tab : 'threads'
+  )
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [collapsed, setCollapsed] = useState(true)
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
   const [intro, setIntro] = useState('')
   const [topics, setTopics] = useState<string[]>([])
 
-  const selected = accounts.find((a) => a.id === selectedId) ?? accounts[0] ?? null
+  const meta = PUBLISH_PLATFORM_META[platform]
+  const currentAccounts = useMemo(
+    () => accounts.filter((item) => item.platform === platform),
+    [accounts, platform]
+  )
+  const selected = currentAccounts.find((item) => item.id === selectedId) ?? currentAccounts[0] ?? null
+  const counts = useMemo(() => {
+    return Object.fromEntries(
+      PUBLISH_PLATFORMS.map((id) => [id, accounts.filter((item) => item.platform === id).length])
+    ) as Record<PublishPlatform, number>
+  }, [accounts])
 
-  async function load() {
-    const res = await fetch('/api/accounts/threads')
+  async function load(nextPlatform = platform) {
+    const res = await fetch('/api/accounts', { cache: 'no-store' })
     const data = await res.json()
     const list = (data.accounts ?? []) as ConnectedAccount[]
     setAccounts(list)
-    setSelectedId((prev) => prev ?? list[0]?.id ?? null)
-    const current = list.find((a) => a.id === (selectedId ?? list[0]?.id))
-    if (current) {
-      setIntro(current.intro ?? '')
-      setTopics(current.topics ?? [])
-    }
+    const scoped = list.filter((item) => item.platform === nextPlatform)
+    setSelectedId((prev) => {
+      if (prev && scoped.some((item) => item.id === prev)) return prev
+      return scoped[0]?.id ?? null
+    })
   }
 
   useEffect(() => {
@@ -37,18 +62,35 @@ export function SettingsClient() {
   }, [])
 
   useEffect(() => {
-    if (!selected) return
+    if (!selected) {
+      setIntro('')
+      setTopics([])
+      return
+    }
     setIntro(selected.intro ?? '')
     setTopics(selected.topics ?? [])
   }, [selected])
 
+  function ping(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(''), 2000)
+  }
+
+  function switchPlatform(next: PublishPlatform) {
+    setPlatform(next)
+    setError('')
+    setUsername('')
+    const scoped = accounts.filter((item) => item.platform === next)
+    setSelectedId(scoped[0]?.id ?? null)
+  }
+
   async function addAccount(e?: React.FormEvent) {
     e?.preventDefault()
-    const value = username.trim().replace(/^@/, '')
+    const value = username.trim()
     if (!value) return
     setLoading(true)
     setError('')
-    const res = await fetch('/api/accounts/threads', {
+    const res = await fetch(`/api/accounts/${platform}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: value }),
@@ -60,160 +102,234 @@ export function SettingsClient() {
       return
     }
     setUsername('')
-    await load()
+    await load(platform)
     if (data.account?.id) setSelectedId(data.account.id)
+    ping(`${meta.label} 계정을 연결했습니다.`)
+  }
+
+  async function reconnectAccount(account: ConnectedAccount) {
+    setBusyId(account.id)
+    setError('')
+    const res = await fetch(`/api/accounts/${platform}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: account.username,
+        display_name: account.display_name,
+        intro: account.intro,
+        topics: account.topics,
+      }),
+    })
+    const data = await res.json()
+    setBusyId(null)
+    if (!res.ok) {
+      setError(data.error || '재연결에 실패했습니다.')
+      return
+    }
+    await load(platform)
+    ping(`${meta.label} 계정을 다시 연결했습니다.`)
   }
 
   async function removeAccount(id: string) {
-    if (!confirm('이 스레드 계정을 연결 해제할까요?')) return
-    await fetch(`/api/accounts/threads?id=${id}`, { method: 'DELETE' })
+    if (!confirm(`이 ${meta.label} 계정을 삭제할까요?`)) return
+    setBusyId(id)
+    await fetch(`/api/accounts/${platform}?id=${id}`, { method: 'DELETE' })
+    setBusyId(null)
     if (selectedId === id) setSelectedId(null)
-    await load()
+    await load(platform)
+    ping('계정을 삭제했습니다.')
   }
 
   async function savePersona() {
     if (!selected) return
     setLoading(true)
-    await fetch('/api/accounts/threads', {
+    await fetch(`/api/accounts/${platform}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: selected.id, intro, topics, display_name: selected.username }),
+      body: JSON.stringify({
+        id: selected.id,
+        intro,
+        topics,
+        display_name: formatHandle(platform, selected.username),
+      }),
     })
     setLoading(false)
-    await load()
+    await load(platform)
+    ping('페르소나를 저장했습니다.')
   }
 
   return (
     <div className="space-y-5">
+      {toast && (
+        <div className="fixed right-4 top-4 z-[70] rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-white">설정</h1>
-        <p className="mt-1 text-sm text-white/45">스레드 아이디를 여러 개 연결하고, 접어서 바로 추가할 수 있습니다.</p>
+        <p className="mt-1 text-sm text-white/45">
+          스레드, 인스타, 틱톡, 네이버 블로그 계정을 이 화면에서 추가·삭제·재연결합니다.
+        </p>
       </div>
 
-      <div className="flex gap-2">
-        <span className="rounded-lg bg-brand/20 px-3 py-1.5 text-xs font-semibold text-brand">계정 관리</span>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {PUBLISH_PLATFORMS.map((id) => {
+          const item = PUBLISH_PLATFORM_META[id]
+          const active = platform === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => switchPlatform(id)}
+              className={cn(
+                'flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition',
+                active
+                  ? 'border-gold/40 bg-gold/10'
+                  : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-white/15 hover:bg-white/5'
+              )}
+            >
+              <BrandMark id={item.brandId} className="h-8 w-8" />
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-white">{item.label}</span>
+                <span className="block text-xs text-white/45">{counts[id]}개 연결</span>
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <aside className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3">
-          <button
-            type="button"
-            onClick={() => setCollapsed((v) => !v)}
-            className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left hover:bg-white/5"
-          >
-            <span className="text-sm font-semibold text-white">스레드 아이디</span>
-            <span className="flex items-center gap-1 text-xs text-white/40">
-              {accounts.length}개
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </span>
-          </button>
-
-          {collapsed ? (
-            <div className="mt-2 space-y-2">
-              <div className="flex flex-wrap gap-1.5">
-                {accounts.map((account) => (
-                  <button
-                    key={account.id}
-                    type="button"
-                    onClick={() => setSelectedId(account.id)}
-                    className={`rounded-full px-2.5 py-1 text-xs ${
-                      selected?.id === account.id
-                        ? 'bg-brand text-white'
-                        : 'bg-white/8 text-white/70 hover:bg-white/12'
-                    }`}
-                  >
-                    @{account.username}
-                  </button>
-                ))}
-                {accounts.length === 0 && (
-                  <p className="text-xs text-white/35">아직 연결된 아이디가 없습니다.</p>
-                )}
-              </div>
-              <form onSubmit={addAccount} className="flex gap-1.5">
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="@아이디 추가"
-                  className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-brand"
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="shrink-0 rounded-lg bg-gold px-3 text-xs font-bold text-black disabled:opacity-50"
-                >
-                  연결
-                </button>
-              </form>
+      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BrandMark id={meta.brandId} className="h-5 w-5" />
+              <h2 className="text-sm font-semibold text-white">{meta.label} 계정</h2>
             </div>
-          ) : (
-            <div className="mt-2 space-y-1">
-              {accounts.map((account) => (
-                <div
-                  key={account.id}
-                  className={`flex items-center gap-2 rounded-xl px-2 py-2 ${
-                    selected?.id === account.id ? 'bg-brand/15' : 'hover:bg-white/5'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(account.id)}
-                    className="min-w-0 flex-1 text-left text-sm text-white"
-                  >
-                    @{account.username}
-                    <span className="ml-2 text-[10px] text-emerald-400">연결됨</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeAccount(account.id)}
-                    className="rounded p-1 text-white/30 hover:text-red-400"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-              <form onSubmit={addAccount} className="pt-2">
+            <span className="rounded-lg bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/50">
+              {currentAccounts.length}개
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {currentAccounts.map((account) => (
+              <div
+                key={account.id}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl border px-2.5 py-2',
+                  selected?.id === account.id
+                    ? 'border-brand/40 bg-brand/15'
+                    : 'border-white/8 bg-black/20'
+                )}
+              >
                 <button
                   type="button"
-                  onClick={() => document.getElementById('threads-id-input')?.focus()}
-                  className="mb-2 flex w-full items-center justify-center gap-1 rounded-xl bg-gold py-2 text-xs font-bold text-black"
+                  onClick={() => setSelectedId(account.id)}
+                  className="min-w-0 flex-1 text-left"
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  계정 연결
+                  <p className="truncate text-sm font-semibold text-white">
+                    {formatHandle(platform, account.username)}
+                  </p>
+                  <p className="text-[11px] text-emerald-400">연결됨</p>
                 </button>
-                <input
-                  id="threads-id-input"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="아이디 입력 후 Enter"
-                  className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-brand"
-                />
-              </form>
+                <button
+                  type="button"
+                  title="재연결"
+                  disabled={busyId === account.id}
+                  onClick={() => void reconnectAccount(account)}
+                  className="rounded-lg p-1.5 text-white/40 hover:bg-white/8 hover:text-white"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', busyId === account.id && 'animate-spin')} />
+                </button>
+                <button
+                  type="button"
+                  title="삭제"
+                  disabled={busyId === account.id}
+                  onClick={() => void removeAccount(account.id)}
+                  className="rounded-lg p-1.5 text-white/40 hover:bg-red-500/10 hover:text-red-400"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+
+            {currentAccounts.length === 0 && (
+              <div className="rounded-xl border border-dashed border-white/10 px-3 py-8 text-center text-sm text-white/40">
+                아직 연결된 {meta.label} 계정이 없습니다.
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={addAccount} className="mt-4 space-y-2">
+            <label className="block text-xs font-medium text-white/55">계정 추가</label>
+            <div className="flex gap-2">
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={meta.placeholder}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-gold"
+              />
+              <button
+                type="submit"
+                disabled={loading || username.trim().length < 2}
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-gold px-3.5 text-sm font-bold text-black disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                연결
+              </button>
             </div>
-          )}
-          {error && <p className="mt-2 px-1 text-xs text-red-400">{error}</p>}
+            <p className="text-[11px] text-white/35">{meta.usernameHint}</p>
+            {error && <p className="text-xs text-red-400">{error}</p>}
+          </form>
         </aside>
 
         <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
           {selected ? (
             <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-lg font-semibold text-white">@{selected.username}</p>
-                  <p className="text-xs text-emerald-400">연결됨 · 이 아이디로 스레드에 로그인한 뒤 하미로 수집하세요</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <BrandMark id={meta.brandId} className="h-10 w-10" />
+                  <div>
+                    <p className="text-lg font-semibold text-white">
+                      {formatHandle(platform, selected.username)}
+                    </p>
+                    <p className="text-xs text-emerald-400">연결됨 · {meta.hint}</p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeAccount(selected.id)}
-                  className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:text-red-400"
-                >
-                  삭제
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busyId === selected.id}
+                    onClick={() => void reconnectAccount(selected)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5 hover:text-white"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    재연결
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === selected.id}
+                    onClick={() => void removeAccount(selected.id)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/20 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    삭제
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-3 text-sm text-white/60">
+                <p className="flex items-center gap-2 font-medium text-white/80">
+                  <Link2 className="h-4 w-4 text-gold" />
+                  사용 방법
+                </p>
+                <p className="mt-1 text-xs leading-relaxed">{meta.hint}</p>
               </div>
 
               <div>
                 <p className="mb-2 text-sm font-medium text-white">페르소나 세팅</p>
                 <label className="mb-1 block text-xs text-white/45">
-                  @{selected.username}을 한 문장으로 소개하면?
+                  {formatHandle(platform, selected.username)}을 한 문장으로 소개하면?
                 </label>
                 <textarea
                   value={intro}
@@ -234,12 +350,13 @@ export function SettingsClient() {
                         type="button"
                         onClick={() =>
                           setTopics((prev) =>
-                            active ? prev.filter((t) => t !== topic) : [...prev, topic]
+                            active ? prev.filter((item) => item !== topic) : [...prev, topic]
                           )
                         }
-                        className={`rounded-full px-3 py-1 text-xs ${
+                        className={cn(
+                          'rounded-full px-3 py-1 text-xs',
                           active ? 'bg-brand text-white' : 'bg-white/8 text-white/60'
-                        }`}
+                        )}
                       >
                         {topic}
                       </button>
@@ -250,7 +367,7 @@ export function SettingsClient() {
 
               <button
                 type="button"
-                onClick={savePersona}
+                onClick={() => void savePersona()}
                 disabled={loading}
                 className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
@@ -258,9 +375,10 @@ export function SettingsClient() {
               </button>
             </div>
           ) : (
-            <div className="flex min-h-64 flex-col items-center justify-center text-center">
-              <p className="text-sm text-white/50">왼쪽에서 스레드 아이디를 연결하세요.</p>
-              <p className="mt-1 text-xs text-white/30">아이디를 접어 둔 상태에서도 바로 여러 개를 추가할 수 있습니다.</p>
+            <div className="flex min-h-72 flex-col items-center justify-center text-center">
+              <BrandMark id={meta.brandId} className="mb-4 h-12 w-12" />
+              <p className="text-sm font-medium text-white">왼쪽에서 {meta.label} 계정을 연결하세요.</p>
+              <p className="mt-1 max-w-sm text-xs text-white/40">{meta.hint}</p>
             </div>
           )}
         </section>

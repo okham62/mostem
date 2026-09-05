@@ -52,7 +52,7 @@ export interface CollectedPost {
 export interface ConnectedAccount {
   id: string
   user_id: string
-  platform: 'threads'
+  platform: 'threads' | 'instagram' | 'tiktok' | 'blog'
   username: string
   display_name: string | null
   intro: string | null
