@@ -1,11 +1,12 @@
 import {
   applyBrowserNaver,
   fetchBrowserNaver,
+  limitKeywordsPayload,
   stabilizeKeywordsPayload,
   type KeywordsPayload,
 } from '@/lib/keywords'
 
-const STORAGE_KEY = 'mostem:realtime-v1'
+const STORAGE_KEY = 'mostem:realtime-v2'
 let memory: KeywordsPayload | null = null
 let warming = false
 
@@ -15,7 +16,7 @@ export function peekRealtimeCache(): KeywordsPayload | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    memory = JSON.parse(raw) as KeywordsPayload
+    memory = limitKeywordsPayload(JSON.parse(raw) as KeywordsPayload)
     return memory
   } catch {
     return null
@@ -23,13 +24,13 @@ export function peekRealtimeCache(): KeywordsPayload | null {
 }
 
 export function writeRealtimeCache(data: KeywordsPayload) {
-  memory = data
+  memory = limitKeywordsPayload(data)
   if (typeof window === 'undefined') return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(memory))
   } catch {
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(memory))
     } catch {
       /* ignore quota */
     }

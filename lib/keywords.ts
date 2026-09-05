@@ -44,7 +44,7 @@ const GOOGLE_TRENDING_URL = 'https://trends.google.com/trending?geo=KR&hl=ko'
 const NATE_URL = 'https://www.nate.com/js/data/jsonLiveKeywordDataV1.js'
 const ZUM_URL = 'https://zum.com/'
 const DAUM_URL = 'https://www.daum.net/'
-const KEYWORD_LIMIT = 10
+export const KEYWORD_LIMIT = 10
 const FRESH_MS = 45_000
 const STALE_MS = 15 * 60_000
 const BROWSER_UA =
@@ -174,6 +174,19 @@ function mergeKeywords(groups: RealtimeKeyword[][], limit = KEYWORD_LIMIT) {
   return out
 }
 
+export function limitKeywordsPayload(data: KeywordsPayload): KeywordsPayload {
+  const sources = (data.sources ?? []).map((source) => ({
+    ...source,
+    hint: source.id === 'google' ? '한국 급상승 검색어' : '실시간 검색어',
+    keywords: (source.keywords ?? []).slice(0, KEYWORD_LIMIT),
+  }))
+  return {
+    ...data,
+    keywords: (data.keywords ?? []).slice(0, KEYWORD_LIMIT),
+    sources,
+  }
+}
+
 export function stabilizeKeywordList(
   incoming: RealtimeKeyword[] | undefined,
   previous: RealtimeKeyword[] | undefined,
@@ -241,11 +254,11 @@ export function stabilizeKeywordsPayload(
       ...(keywords.length ? { error: undefined } : {}),
     }
   })
-  return {
+  return limitKeywordsPayload({
     ...incoming,
     sources,
     keywords: sources.find((source) => source.id === 'signal')?.keywords ?? incoming.keywords,
-  }
+  })
 }
 
 function toKeyword(

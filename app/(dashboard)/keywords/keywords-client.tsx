@@ -7,6 +7,7 @@ import {
   fetchBrowserNaver,
   formatKeywordTime,
   formatSearchTraffic,
+  KEYWORD_LIMIT,
   type KeywordSource,
   type KeywordState,
   type KeywordsPayload,
@@ -170,7 +171,8 @@ function KeywordPanel({
   source?: KeywordSource
   empty: string
 }) {
-  const keywords = source?.keywords ?? []
+  const keywords = (source?.keywords ?? []).slice(0, KEYWORD_LIMIT)
+  const hint = source?.id === 'google' ? '한국 급상승 검색어' : '실시간 검색어'
   return (
     <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -181,7 +183,7 @@ function KeywordPanel({
           </span>
         </h2>
         <span className="rounded-full bg-white/6 px-2.5 py-1 text-[11px] font-medium text-white/50">
-          {source?.hint} · 1~10위
+          {hint} · 1~10위
         </span>
       </div>
       {keywords.length === 0 ? (
