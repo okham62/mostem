@@ -30,8 +30,7 @@ export function AiToolsHub() {
   return (
     <div className="mx-auto w-full max-w-[920px]">
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold text-white md:text-3xl">AI 도구</h1>
-        <p className="mt-2 text-sm text-white/45">
+        <p className="text-sm text-white/45">
           이미지·음성·영상·카피·태그를 한곳에서 만듭니다.
         </p>
       </div>
@@ -51,7 +50,7 @@ export function AiToolsHub() {
               <h2 className="text-sm font-bold text-white">{tool.title}</h2>
               <p className="mt-1 text-xs leading-relaxed text-white/40">{tool.description}</p>
               <p className="mt-3 text-[11px] font-semibold text-gold/80 group-hover:text-gold">
-                열기 →
+                준비중...
               </p>
             </Link>
           )
