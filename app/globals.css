@@ -102,10 +102,17 @@ html {
   opacity: 0;
   pointer-events: none;
   transform: translate3d(-120%, -50%, 0) scale(0.88);
+  transform-origin: left center;
   box-shadow:
     6px 0 24px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(14px);
+}
+
+.mostem-sidebar-peek::before {
+  content: '';
+  position: absolute;
+  inset: -16px -8px -16px 0;
 }
 
 .mostem-sidebar-peek[data-show='1'] {
@@ -138,13 +145,13 @@ html {
 }
 
 .mostem-sidebar-peek:hover {
-  width: 1.85rem;
+  width: 1.75rem;
   color: #ffd060;
   box-shadow:
     8px 0 28px rgba(255, 208, 96, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  transform: translate3d(4px, -50%, 0) scale(1.06);
-  animation: none;
+  transform: translate3d(0, -50%, 0) scale(1.05);
+  animation: mostem-peek-breathe 2.8s ease-in-out infinite;
 }
 
 .mostem-sidebar-peek:hover .mostem-sidebar-peek-icon {
@@ -170,10 +177,6 @@ html {
   0% {
     opacity: 0;
     transform: translate3d(-140%, -50%, 0) scale(0.72);
-  }
-  62% {
-    opacity: 1;
-    transform: translate3d(6px, -50%, 0) scale(1.08);
   }
   100% {
     opacity: 1;
