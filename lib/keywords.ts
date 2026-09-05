@@ -357,22 +357,43 @@ function decodeMaybeEucKr(buf: ArrayBuffer) {
   }
 }
 
-async function fetchSignalCore(): Promise<{ now: number; keywords: RealtimeKeyword[]; news: RankingNews[] }> {
-  const res = await fetch(SIGNAL_URL, {
+async function fetchJsonPayload(url: string, timeout = 5000, extra: HeadersInit = {}) {
+  const res = await fetch(url, {
     headers: {
-      Accept: 'application/json',
+      Accept: 'application/json,text/plain,*/*',
       'User-Agent': BROWSER_UA,
+      ...extra,
     },
     cache: 'no-store',
-    signal: AbortSignal.timeout(6000),
+    signal: AbortSignal.timeout(timeout),
   })
-  if (!res.ok) throw new Error(`signal ${res.status}`)
-  const raw = (await res.json()) as SignalPayload
-  return {
-    now: raw.now ?? Date.now(),
-    keywords: parseSignalKeywords(raw),
-    news: parseNews(raw),
+  if (!res.ok) throw new Error(`${url} ${res.status}`)
+  const text = await res.text()
+  const start = text.indexOf('{')
+  const json = start >= 0 ? text.slice(start) : text
+  return JSON.parse(json) as SignalPayload
+}
+
+async function fetchSignalCore(): Promise<{ now: number; keywords: RealtimeKeyword[]; news: RankingNews[] }> {
+  const urls = [
+    SIGNAL_URL,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(SIGNAL_URL)}`,
+  ]
+  for (const url of urls) {
+    try {
+      const raw = await fetchJsonPayload(url)
+      const keywords = parseSignalKeywords(raw)
+      if (!keywords.length) continue
+      return {
+        now: raw.now ?? Date.now(),
+        keywords,
+        news: parseNews(raw),
+      }
+    } catch {
+      /* try next */
+    }
   }
+  return { now: Date.now(), keywords: [], news: [] }
 }
 
 function mergeNews(groups: RankingNews[][]) {
@@ -399,7 +420,7 @@ async function fetchGoogleNewsRss(): Promise<RankingNews[]> {
       fetch(url, {
         headers: { 'User-Agent': BROWSER_UA, Accept: 'application/rss+xml,application/xml,text/xml' },
         cache: 'no-store',
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(4500),
       })
         .then((res) => (res.ok ? res.text() : ''))
         .catch(() => '')
@@ -447,7 +468,10 @@ async function fetchSignal(): Promise<{ now: number; keywords: RealtimeKeyword[]
   ])
   const keywords = mergeKeywords([core.keywords, nate, zum, daum, lastNaver])
   if (keywords.length) lastNaver = keywords
-  if (!keywords.length) throw new Error('naver empty')
+  if (!keywords.length) {
+    if (lastNaver.length) return { now: Date.now(), keywords: lastNaver, news: mergeNews([core.news, extraNews]) }
+    throw new Error('naver empty')
+  }
   return {
     now: core.now,
     keywords,
@@ -463,7 +487,7 @@ async function fetchNateKeywords(): Promise<RealtimeKeyword[]> {
         Referer: 'https://www.nate.com/',
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4500),
     })
     if (!res.ok) return []
     return parseNateKeywords(decodeMaybeEucKr(await res.arrayBuffer()))
@@ -477,7 +501,7 @@ async function fetchZumKeywords(): Promise<RealtimeKeyword[]> {
     const res = await fetch(ZUM_URL, {
       headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html' },
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4500),
     })
     if (!res.ok) return []
     return parseZumKeywords(await res.text())
@@ -495,7 +519,7 @@ async function fetchDaumKeywords(): Promise<RealtimeKeyword[]> {
         'Accept-Language': 'ko-KR,ko;q=0.9',
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4500),
     })
     if (!res.ok) return []
     return parseDaumKeywords(await res.text())
@@ -575,9 +599,47 @@ async function fetchGoogleHtml() {
 
 let lastGoogle: { now: number; keywords: RealtimeKeyword[] } | null = null
 
+async function expandGoogleKeywords(seed: RealtimeKeyword[]) {
+  if (seed.length >= KEYWORD_LIMIT) return seed
+  const seen = new Set(seed.map((item) => keywordKey(item.keyword)))
+  const extras: RealtimeKeyword[] = []
+  await Promise.all(
+    seed.slice(0, 8).map(async (item) => {
+      try {
+        const res = await fetch(
+          `https://suggestqueries.google.com/complete/search?client=firefox&hl=ko&gl=kr&q=${encodeURIComponent(item.keyword)}`,
+          {
+            headers: { 'User-Agent': BROWSER_UA, 'Accept-Language': 'ko-KR,ko;q=0.9' },
+            cache: 'no-store',
+            signal: AbortSignal.timeout(2500),
+          }
+        )
+        if (!res.ok) return
+        const data = (await res.json()) as [string, string[]]
+        for (const word of data[1] ?? []) {
+          const keyword = String(word || '').trim()
+          const key = keywordKey(keyword)
+          if (!keyword || keyword.length < 2 || seen.has(key)) continue
+          seen.add(key)
+          extras.push(
+            toKeyword(keyword, {
+              summaryUrl: googleTrends(keyword),
+              searchUrl: googleSearch(keyword),
+            })
+          )
+        }
+      } catch {
+        /* skip this seed */
+      }
+    })
+  )
+  return mergeKeywords([seed, extras])
+}
+
 async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
   const [rssKeywords, htmlKeywords] = await Promise.all([fetchGoogleRss(), fetchGoogleHtml()])
-  const keywords = mergeKeywords([htmlKeywords, rssKeywords, lastGoogle?.keywords ?? []])
+  let keywords = mergeKeywords([htmlKeywords, rssKeywords, lastGoogle?.keywords ?? []])
+  if (keywords.length < KEYWORD_LIMIT) keywords = await expandGoogleKeywords(keywords)
   if (keywords.length === 0) {
     if (lastGoogle?.keywords.length) return lastGoogle
     throw new Error('google empty')
