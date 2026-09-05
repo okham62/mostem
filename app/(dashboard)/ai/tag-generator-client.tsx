@@ -9,6 +9,8 @@ import {
   mergeTagHistory,
   readTagFavorites,
   readTagHistory,
+  clearTagFavorites,
+  clearTagHistory,
   removeTagFavorite,
   removeTagHistory,
   saveTagHistory,
@@ -147,6 +149,22 @@ export function TagGeneratorClient() {
     setFavorites(readTagFavorites())
     if (activeHistoryId === item.id) setActiveHistoryId(null)
     ping('기록을 삭제했습니다.')
+  }
+
+  function clearCurrentList() {
+    if (listTab === 'favorites') {
+      if (favorites.length === 0) return
+      if (!confirm('즐겨찾기 목록을 모두 삭제할까요?')) return
+      setFavorites(clearTagFavorites())
+      ping('즐겨찾기를 모두 삭제했습니다.')
+      return
+    }
+    if (history.length === 0) return
+    if (!confirm('최근 생성 기록을 모두 삭제할까요?')) return
+    setHistory(clearTagHistory(history))
+    setFavorites(readTagFavorites())
+    setActiveHistoryId(null)
+    ping('생성 기록을 모두 삭제했습니다.')
   }
 
   function openHistory(item: TagHistoryItem) {
@@ -341,11 +359,21 @@ export function TagGeneratorClient() {
               ? `최근 ${TAG_HISTORY_LIMIT}개까지 저장되며, 클릭하면 그때 결과를 다시 볼 수 있습니다.`
               : `별 버튼으로 저장한 기록을 다시 불러올 수 있습니다. 최대 ${TAG_FAVORITE_LIMIT}개.`}
           </p>
-          <span className="shrink-0 rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/50">
-            {listTab === 'recent'
-              ? `${history.length}/${TAG_HISTORY_LIMIT}`
-              : `${favorites.length}/${TAG_FAVORITE_LIMIT}`}
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              disabled={listTab === 'recent' ? history.length === 0 : favorites.length === 0}
+              onClick={clearCurrentList}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-red-300/80 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              전체삭제
+            </button>
+            <span className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/50">
+              {listTab === 'recent'
+                ? `${history.length}/${TAG_HISTORY_LIMIT}`
+                : `${favorites.length}/${TAG_FAVORITE_LIMIT}`}
+            </span>
+          </div>
         </div>
         {listTab === 'recent' ? (
           history.length === 0 ? (

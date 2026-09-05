@@ -186,3 +186,14 @@ export function removeTagHistory(id: string): TagHistoryItem[] {
 export function removeTagFavorite(id: string): TagHistoryItem[] {
   return persistFavorites(readTagFavorites().filter((item) => item.id !== id))
 }
+
+export function clearTagHistory(items?: TagHistoryItem[]): TagHistoryItem[] {
+  const ids = new Set((items?.length ? items : readTagHistory()).map((item) => item.id))
+  for (const id of ids) rememberDeleted(id)
+  persistFavorites(readTagFavorites().filter((item) => !ids.has(item.id)))
+  return writeTagHistory([])
+}
+
+export function clearTagFavorites(): TagHistoryItem[] {
+  return persistFavorites([])
+}
