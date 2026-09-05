@@ -42,7 +42,8 @@ const NAVER_BUY = 'https://snxbest.naver.com/product/best/buy'
 const NAVER_CLICK = 'https://snxbest.naver.com/product/best/click'
 const NAVER_KEYWORD = 'https://snxbest.naver.com/keyword/best'
 const SLOT_URL = 'https://ns-portal.shopping.naver.com/api/v2/shopping-paged-slot'
-const BOARD_SIZE = 20
+const BOARD_SIZE = 360
+const NAVER_CATEGORY_IDS = ['50000000', '50000001', '50000002', '50000006', '50000003']
 const FRESH_MS = 60_000
 const STALE_MS = 15 * 60_000
 
@@ -182,7 +183,29 @@ function parseNaverProducts(html: string): ShoppingProduct[] {
       url: row.linkUrl || `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(title)}`,
     })
   }
-  return products.slice(0, BOARD_SIZE)
+  return products
+}
+
+function mergeProducts(groups: ShoppingProduct[][]) {
+  const seen = new Set<string>()
+  const out: ShoppingProduct[] = []
+  for (const group of groups) {
+    for (const item of group) {
+      const key = titleKey(item.title)
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      out.push({ ...item, rank: out.length + 1 })
+      if (out.length >= BOARD_SIZE) return out
+    }
+  }
+  return out
+}
+
+async function fetchNaverList(kind: 'click' | 'buy') {
+  const base = kind === 'click' ? NAVER_CLICK : NAVER_BUY
+  const urls = [base, ...NAVER_CATEGORY_IDS.map((id) => `${base}?categoryId=${id}`)]
+  const pages = await mapPool(urls, 3, (url) => fetchText(url, 7000).catch(() => ''))
+  return mergeProducts(pages.filter(Boolean).map(parseNaverProducts))
 }
 
 function parseShopKeywords(html: string): ShopKeyword[] {
@@ -367,26 +390,24 @@ function emptyPayload(now = Date.now()): ShoppingPayload {
 
 async function refreshShopping(): Promise<ShoppingPayload> {
   const [buyRes, clickRes, keywordRes] = await Promise.allSettled([
-    fetchText(NAVER_BUY),
-    fetchText(NAVER_CLICK),
+    fetchNaverList('buy'),
+    fetchNaverList('click'),
     fetchText(NAVER_KEYWORD),
   ])
 
-  const popularNaver =
-    buyRes.status === 'fulfilled' ? parseNaverProducts(buyRes.value) : []
-  const risingNaver =
-    clickRes.status === 'fulfilled' ? parseNaverProducts(clickRes.value) : []
+  const popularNaver = buyRes.status === 'fulfilled' ? buyRes.value : []
+  const risingNaver = clickRes.status === 'fulfilled' ? clickRes.value : []
   const keywords =
     keywordRes.status === 'fulfilled' ? parseShopKeywords(keywordRes.value) : []
 
   const risingQueries = keywords
     .filter((item) => item.status === 'SOAR' || item.status === 'UP' || item.status === 'NEW')
     .map((item) => item.title)
-    .slice(0, 6)
+    .slice(0, 16)
   const popularQueries = keywords
     .filter((item) => !risingQueries.includes(item.title))
     .map((item) => item.title)
-    .slice(0, 6)
+    .slice(0, 16)
 
   const queryFallback = (items: ShoppingProduct[]) =>
     items.slice(0, 4).map((item) => item.title.replace(/\s+/g, ' ').slice(0, 24))

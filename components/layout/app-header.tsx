@@ -10,6 +10,8 @@ const TITLES: Record<string, string> = {
   '/shopping': '쇼핑 베스트',
   '/products': '상품 보드',
   '/threads': '스레드',
+  '/instagram': '인스타',
+  '/blog': '네이버 블로그',
   '/compose': '새 글 만들기',
   '/ai': 'AI 태그 생성기',
   '/links': '링크 변환',

@@ -5,8 +5,9 @@ import { ExternalLink, RefreshCw } from 'lucide-react'
 import { formatKeywordTime } from '@/lib/keywords'
 import {
   type ShoppingList,
+  type ShoppingListId,
   type ShoppingPayload,
-  type ShoppingPlatformBoard,
+  type ShoppingPlatform,
   type ShoppingProduct,
 } from '@/lib/shopping'
 import { fetchShopping, peekShoppingCache } from '@/lib/shopping-cache'
@@ -16,9 +17,17 @@ import { ShoppingSkeleton } from './shopping-skeleton'
 
 const POLL_MS = 60_000
 
+const TABS: { id: string; platform: ShoppingPlatform; list: ShoppingListId; label: string }[] = [
+  { id: 'naver-rising', platform: 'naver', list: 'rising', label: '네이버 판매급상승' },
+  { id: 'naver-popular', platform: 'naver', list: 'popular', label: '네이버 판매인기상품' },
+  { id: 'coupang-rising', platform: 'coupang', list: 'rising', label: '쿠팡 판매급상승' },
+  { id: 'coupang-popular', platform: 'coupang', list: 'popular', label: '쿠팡 판매인기상품' },
+]
+
 export function ShoppingClient() {
   const [data, setData] = useState<ShoppingPayload | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [tab, setTab] = useState(TABS[0].id)
 
   async function reload() {
     setRefreshing(true)
@@ -49,8 +58,9 @@ export function ShoppingClient() {
 
   if (!data) return <ShoppingSkeleton />
 
-  const naver = data.platforms.find((item) => item.id === 'naver')
-  const coupang = data.platforms.find((item) => item.id === 'coupang')
+  const current = TABS.find((item) => item.id === tab) ?? TABS[0]
+  const board = data.platforms.find((item) => item.id === current.platform)
+  const list = current.list === 'rising' ? board?.rising : board?.popular
 
   return (
     <div className="space-y-6">
@@ -69,44 +79,36 @@ export function ShoppingClient() {
         </button>
       </div>
 
-      <PlatformPanel board={naver} empty="네이버쇼핑 상품을 불러오지 못했습니다." />
-      <PlatformPanel board={coupang} empty="쿠팡 상품을 불러오지 못했습니다." />
+      <div className="flex flex-wrap gap-2">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={cn(
+              'h-10 rounded-lg px-3 text-sm font-semibold transition',
+              tab === item.id
+                ? 'mostem-filter-btn'
+                : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {list ? (
+        <ProductSection list={list} platform={board?.label || current.label} />
+      ) : (
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] py-16 text-center text-sm text-white/40">
+          상품을 불러오지 못했습니다.
+        </div>
+      )}
 
       <p className="pb-2 text-[11px] text-white/30">
         데이터 출처: 네이버 쇼핑 BEST · 쿠팡은 실시간 쇼핑 키워드 기준으로 추천합니다
       </p>
     </div>
-  )
-}
-
-function PlatformPanel({
-  board,
-  empty,
-}: {
-  board?: ShoppingPlatformBoard
-  empty: string
-}) {
-  if (!board) {
-    return (
-      <section>
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] py-16 text-center text-sm text-white/40">
-          {empty}
-        </div>
-      </section>
-    )
-  }
-
-  const accent = board.id === 'coupang' ? 'text-red-400' : 'text-brand'
-
-  return (
-    <section className="space-y-5">
-      <div>
-        <h2 className={cn('text-lg font-bold', accent)}>{board.label}</h2>
-        <p className="mt-0.5 text-xs text-white/40">{board.hint}</p>
-      </div>
-      <ProductSection list={board.rising} platform={board.label} />
-      <ProductSection list={board.popular} platform={board.label} />
-    </section>
   )
 }
 
@@ -128,7 +130,7 @@ function ProductSection({
           {list.error || '상품이 없습니다.'}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {list.products.map((item) => (
             <ProductCard key={`${list.id}-${item.rank}-${item.title}`} item={item} platform={platform} list={list.label} />
           ))}

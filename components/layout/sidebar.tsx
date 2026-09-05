@@ -10,7 +10,6 @@ import {
   TrendingUp,
   ShoppingBag,
   LayoutGrid,
-  MessageSquare,
   Link2,
   Settings,
   Users,
@@ -18,6 +17,7 @@ import {
   Zap,
   Tags,
 } from 'lucide-react'
+import { BrandMark } from '@/components/brand-logos'
 import { cn } from '@/lib/utils'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
@@ -31,8 +31,20 @@ const explore = [
   { href: '/products', label: '상품 보드', icon: LayoutGrid },
 ]
 
+function ThreadsIcon({ className }: { className?: string }) {
+  return <BrandMark id="threads" className={className} />
+}
+function InstagramIcon({ className }: { className?: string }) {
+  return <BrandMark id="instagram" className={className} />
+}
+function BlogIcon({ className }: { className?: string }) {
+  return <BrandMark id="blog" className={className} />
+}
+
 const publish = [
-  { href: '/threads', label: '스레드', icon: MessageSquare },
+  { href: '/threads', label: '스레드', icon: ThreadsIcon },
+  { href: '/instagram', label: '인스타', icon: InstagramIcon },
+  { href: '/blog', label: '네이버 블로그', icon: BlogIcon },
   { href: '/ai', label: 'AI 태그 생성기', icon: Tags },
   { href: '/links', label: '링크 변환', icon: Link2 },
 ]

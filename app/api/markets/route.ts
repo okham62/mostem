@@ -1,9 +1,8 @@
 import { auth } from '@/auth'
-import { getShoppingBest } from '@/lib/shopping'
+import { getMarkets } from '@/lib/markets'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
 
 export async function GET() {
   const session = await auth()
@@ -11,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const data = await getShoppingBest()
+  const data = await getMarkets()
   return NextResponse.json(data, {
     headers: { 'Cache-Control': 'no-store' },
   })

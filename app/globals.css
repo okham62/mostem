@@ -327,6 +327,7 @@ html {
   .mostem-press-item,
   .mostem-filter-btn,
   .mostem-filter-btn::after,
+  .mostem-menu-shell,
   .mostem-menu-panel,
   .mostem-menu-highlight,
   .mostem-menu-item,
@@ -339,16 +340,50 @@ html {
   }
 }
 
+.mostem-menu-shell {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mostem-menu-shell[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.mostem-menu-shell > .mostem-menu-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .mostem-menu-panel {
-  animation: mostem-menu-in 120ms ease-out both;
+  transform-origin: top center;
+  animation: mostem-menu-in 140ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mostem-menu-shell[data-ready='true']:not([data-open='true']) .mostem-menu-panel {
+  animation: mostem-menu-out 110ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
 }
 
 @keyframes mostem-menu-in {
   from {
     opacity: 0;
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mostem-menu-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 

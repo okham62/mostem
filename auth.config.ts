@@ -15,6 +15,8 @@ export const authConfig = {
         nextUrl.pathname.startsWith('/shopping') ||
         nextUrl.pathname.startsWith('/products') ||
         nextUrl.pathname.startsWith('/threads') ||
+        nextUrl.pathname.startsWith('/instagram') ||
+        nextUrl.pathname.startsWith('/blog') ||
         nextUrl.pathname.startsWith('/compose') ||
         nextUrl.pathname.startsWith('/ai') ||
         nextUrl.pathname.startsWith('/calendar') ||

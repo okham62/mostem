@@ -137,7 +137,7 @@ function KeywordPanel({
       <div className="mb-4 flex items-end justify-between gap-3">
         <h2 className="text-lg font-bold text-white">{source?.label ?? '검색어'}</h2>
         <span className="text-[11px] text-white/35">
-          {source?.hint} · 1~{Math.max(keywords.length, 1)}위
+          {source?.hint} · 1~30위
         </span>
       </div>
       {source?.error && keywords.length === 0 ? (

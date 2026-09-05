@@ -2,7 +2,21 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink } from 'lucide-react'
+import {
+  BarChart3,
+  CalendarClock,
+  Clock3,
+  ExternalLink,
+  Inbox,
+  Layers,
+  Link2,
+  Pencil,
+  PenLine,
+  Plus,
+  RefreshCw,
+  Upload,
+  XCircle,
+} from 'lucide-react'
 import {
   GRADE_LABEL,
   GRADE_PILL,
@@ -46,6 +60,19 @@ const KANBAN_DOT: Record<CollectStatus, string> = {
 }
 
 type ViewMode = 'grid' | 'list' | 'kanban'
+type StatusFilter = 'all' | CollectStatus
+type SortMode = 'newest' | 'oldest' | 'views' | 'likes'
+
+const STATUS_FILTERS: { id: StatusFilter; label: string; icon: typeof Inbox }[] = [
+  { id: 'all', label: '전체', icon: Layers },
+  { id: 'collected', label: '수집', icon: Inbox },
+  { id: 'analysis', label: '분석', icon: BarChart3 },
+  { id: 'editing', label: '편집', icon: Pencil },
+  { id: 'ready', label: '발행대기', icon: Clock3 },
+  { id: 'failed', label: '발행실패', icon: XCircle },
+  { id: 'scheduled', label: '예약', icon: CalendarClock },
+  { id: 'uploaded', label: '업로드', icon: Upload },
+]
 
 function captionOf(post: CollectedPost) {
   return post.caption && post.caption !== post.author && post.caption !== `@${post.author}`
@@ -110,6 +137,9 @@ export function ThreadsBoard({
   }, [hiddenIds])
   const [query, setQuery] = useState('')
   const [grade, setGrade] = useState<'all' | PerformanceGrade>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [sort, setSort] = useState<SortMode>('newest')
+  const [refreshing, setRefreshing] = useState(false)
 
   const counts = useMemo(
     () =>
@@ -121,8 +151,9 @@ export function ThreadsBoard({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return posts.filter((post) => {
+    const next = posts.filter((post) => {
       if (hiddenIds.includes(post.id)) return false
+      if (statusFilter !== 'all' && post.status !== statusFilter) return false
       const stats = derivePostStats(post)
       if (grade !== 'all' && stats.grade !== grade) return false
       if (!q) return true
@@ -131,7 +162,28 @@ export function ThreadsBoard({
         (post.caption ?? '').toLowerCase().includes(q)
       )
     })
-  }, [posts, query, grade, hiddenIds])
+    next.sort((a, b) => {
+      if (sort === 'oldest') return new Date(a.collected_at).getTime() - new Date(b.collected_at).getTime()
+      if (sort === 'views') return (b.views ?? 0) - (a.views ?? 0)
+      if (sort === 'likes') return (b.likes ?? 0) - (a.likes ?? 0)
+      return new Date(b.collected_at).getTime() - new Date(a.collected_at).getTime()
+    })
+    return next
+  }, [posts, query, grade, hiddenIds, statusFilter, sort])
+
+  async function refreshPosts() {
+    setRefreshing(true)
+    try {
+      const res = await fetch('/api/threads/posts', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      if (Array.isArray(data.posts)) {
+        setPosts(data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)))
+      }
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   function setMode(next: ViewMode) {
     setView(next)
@@ -147,47 +199,97 @@ export function ThreadsBoard({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">수집된 스레드</h1>
-          <p className="mt-1 text-sm text-white/45">
-            Mostem에 로그인한 뒤 하미에서 수집하면 여기에 바로 쌓입니다.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/compose" className="rounded-xl bg-white/8 px-3 py-2 text-xs font-semibold text-white hover:bg-white/12">
-            새 글
+        <h1 className="text-2xl font-bold text-white">수집된 스레드</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/compose"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand/90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            새게시물
+          </Link>
+          <Link
+            href="/compose"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gold px-3 py-2 text-xs font-bold text-black hover:bg-gold-hover"
+          >
+            <PenLine className="h-3.5 w-3.5" />
+            새글 만들기
           </Link>
           <a
             href="https://www.threads.net/"
             target="_blank"
             rel="noreferrer"
-            className="rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand/90"
           >
             수집하러 가기
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        {accounts.length > 0 ? (
-          accounts.map((account) => (
-            <span key={account.id} className="rounded-full bg-white/8 px-2.5 py-1 text-white/70">
-              @{account.username}
-            </span>
-          ))
-        ) : (
-          <span className="text-white/35">연결된 스레드 아이디는 선택 사항입니다</span>
-        )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => void refreshPosts()}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
+          aria-label="새로고침"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+        {STATUS_FILTERS.map((item) => {
+          const Icon = item.icon
+          const count = item.id === 'all' ? posts.length : counts[item.id]
+          const active = statusFilter === item.id
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setStatusFilter(item.id)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+                active ? 'bg-white/12 text-white' : 'bg-white/5 text-white/50 hover:bg-white/8 hover:text-white/80'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {item.label} {count}
+            </button>
+          )
+        })}
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="rounded-lg bg-white/8 px-2.5 py-1 text-white/70">전체 {posts.length}</span>
-        {STATUS_ORDER.map((status) => (
-          <span key={status} className="rounded-lg bg-white/5 px-2.5 py-1 text-white/45">
-            {STATUS_LABEL[status]} {counts[status]}
-          </span>
-        ))}
-      </div>
+      <section className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-white">내 계정 ({accounts.length}개)</p>
+          <Link
+            href="/settings"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/65 hover:bg-white/10 hover:text-white"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            계정 재연결
+          </Link>
+        </div>
+        {accounts.length > 0 ? (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {accounts.map((account) => (
+              <div
+                key={account.id}
+                className="flex items-center gap-3 overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-r from-[#1b1b22] via-[#16161c] to-brand/20 px-4 py-3"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
+                  {account.username[0]?.toUpperCase() ?? 'U'}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">@{account.username}</p>
+                  <p className="truncate text-[11px] text-white/40">{account.display_name || '스레드 계정'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-white/40">
+            연결된 스레드 계정이 없습니다. 계정 재연결에서 아이디를 추가하세요.
+          </div>
+        )}
+      </section>
 
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -207,6 +309,16 @@ export function ThreadsBoard({
           <option value="excellent">우수</option>
           <option value="normal">보통</option>
           <option value="weak">약함</option>
+        </select>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortMode)}
+          className="h-9 rounded-xl border border-white/10 bg-[#141418] px-2 text-xs text-white"
+        >
+          <option value="newest">최신순</option>
+          <option value="oldest">오래된순</option>
+          <option value="views">조회순</option>
+          <option value="likes">좋아요순</option>
         </select>
         <p className="text-xs text-white/40">총 {filtered.length}개</p>
         <div className="ml-auto flex rounded-xl bg-white/5 p-1">

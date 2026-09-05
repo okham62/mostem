@@ -1,8 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Copy, Download, LoaderCircle, RefreshCw, Sparkles, Tags } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Clock3, Copy, Download, LoaderCircle, RefreshCw, Sparkles, Tags } from 'lucide-react'
 import type { PlatformTagResult } from '@/lib/tag-generator'
+import {
+  mergeTagHistory,
+  readTagHistory,
+  saveTagHistory,
+  TAG_HISTORY_LIMIT,
+  type TagHistoryItem,
+} from '@/lib/tag-history'
 import { PlatformLogo } from '@/components/platform-logos'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +23,19 @@ export function TagGeneratorClient() {
   const [generated, setGenerated] = useState(false)
   const [results, setResults] = useState<PlatformTagResult[]>([])
   const [copied, setCopied] = useState<string | null>(null)
+  const [history, setHistory] = useState<TagHistoryItem[]>([])
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setHistory(readTagHistory())
+    void fetch('/api/ai/tags/history', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.items || !Array.isArray(data.items)) return
+        setHistory((prev) => mergeTagHistory([...data.items, ...prev, ...readTagHistory()]))
+      })
+      .catch(() => {})
+  }, [])
 
   const youtubeChars = useMemo(() => {
     const youtube = results.find((row) => row.platform === 'youtube')
@@ -44,8 +64,16 @@ export function TagGeneratorClient() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || '태그 생성에 실패했습니다.')
-      setResults(data.platforms ?? [])
+      const platforms = (data.platforms ?? []) as PlatformTagResult[]
+      setResults(platforms)
       setGenerated(true)
+      const saved = saveTagHistory({
+        topic: value,
+        createdAt: Date.now(),
+        platforms,
+      })
+      setHistory(saved)
+      setActiveHistoryId(saved[0]?.id ?? null)
       ping('태그가 생성되었습니다.')
     } catch (err) {
       setError(err instanceof Error ? err.message : '태그 생성에 실패했습니다.')
@@ -88,8 +116,27 @@ export function TagGeneratorClient() {
     setTopic('')
     setResults([])
     setGenerated(false)
+    setActiveHistoryId(null)
     setError('')
     ping('초기화했습니다.')
+  }
+
+  function openHistory(item: TagHistoryItem) {
+    setTopic(item.topic)
+    setResults(item.platforms)
+    setGenerated(true)
+    setActiveHistoryId(item.id)
+    setError('')
+    ping('이전 생성 결과를 불러왔습니다.')
+  }
+
+  function formatHistoryTime(at: number) {
+    return new Intl.DateTimeFormat('ko-KR', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(at))
   }
 
   return (
@@ -218,6 +265,50 @@ export function TagGeneratorClient() {
           </div>
         </section>
       )}
+
+      <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-6">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+              <Clock3 className="h-4 w-4 text-gold" />
+              최근 생성 기록
+            </h2>
+            <p className="mt-1 text-xs text-white/40">최근 {TAG_HISTORY_LIMIT}개까지 저장되며, 클릭하면 그때 결과를 다시 볼 수 있습니다.</p>
+          </div>
+          <span className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/50">
+            {history.length}/{TAG_HISTORY_LIMIT}
+          </span>
+        </div>
+        {history.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
+            아직 생성 기록이 없습니다.
+          </div>
+        ) : (
+          <div className="max-h-[28rem] space-y-2 overflow-y-auto scrollbar-thin pr-1">
+            {history.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openHistory(item)}
+                className={cn(
+                  'flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition',
+                  activeHistoryId === item.id
+                    ? 'border-gold/40 bg-gold/10'
+                    : 'border-white/8 bg-black/20 hover:border-white/15 hover:bg-white/5'
+                )}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{item.topic}</p>
+                  <p className="mt-0.5 text-[11px] text-white/40">
+                    {item.platforms.length}개 플랫폼 · {formatHistoryTime(item.createdAt)}
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px] font-semibold text-white/45">불러오기</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

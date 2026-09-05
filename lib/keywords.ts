@@ -36,7 +36,10 @@ export interface KeywordsPayload {
 }
 
 const SIGNAL_URL = 'https://api.signal.bz/news/realtime'
-const GOOGLE_RSS_URL = 'https://trends.google.com/trending/rss?geo=KR'
+const GOOGLE_RSS_URLS = [
+  'https://trends.google.com/trending/rss?geo=KR',
+  'https://trends.google.co.kr/trending/rss?geo=KR',
+]
 const GOOGLE_TRENDING_URL = 'https://trends.google.com/trending?geo=KR&hl=ko'
 const NATE_URL = 'https://www.nate.com/js/data/jsonLiveKeywordDataV1.js'
 const ZUM_URL = 'https://zum.com/'
@@ -357,34 +360,41 @@ async function fetchZumKeywords(): Promise<RealtimeKeyword[]> {
   }
 }
 
+async function fetchGoogleRss() {
+  for (const url of GOOGLE_RSS_URLS) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+          'User-Agent': BROWSER_UA,
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(12000),
+      })
+      if (!res.ok) continue
+      const keywords = parseGoogleRss(await res.text())
+      if (keywords.length) return keywords
+    } catch {
+      /* try next */
+    }
+  }
+  return []
+}
+
 async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
-  const [rssRes, htmlRes] = await Promise.allSettled([
-    fetch(GOOGLE_RSS_URL, {
-      headers: {
-        Accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
-        'User-Agent': BROWSER_UA,
-      },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(5000),
-    }),
+  const [rssKeywords, htmlKeywords] = await Promise.all([
+    fetchGoogleRss(),
     fetch(GOOGLE_TRENDING_URL, {
       headers: {
         Accept: 'text/html',
         'User-Agent': BROWSER_UA,
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(5000),
-    }),
+      signal: AbortSignal.timeout(12000),
+    })
+      .then(async (res) => (res.ok ? parseGoogleTrendingHtml(await res.text()) : []))
+      .catch(() => []),
   ])
-
-  const rssKeywords =
-    rssRes.status === 'fulfilled' && rssRes.value.ok
-      ? parseGoogleRss(await rssRes.value.text())
-      : []
-  const htmlKeywords =
-    htmlRes.status === 'fulfilled' && htmlRes.value.ok
-      ? parseGoogleTrendingHtml(await htmlRes.value.text())
-      : []
 
   const keywords = mergeKeywords([rssKeywords, htmlKeywords])
   if (keywords.length === 0) throw new Error('google empty')
@@ -425,11 +435,17 @@ function payloadFromSources(
   }
 }
 
+function previousGoogle() {
+  const google = cache?.data.sources?.find((source) => source.id === 'google')
+  if (!google?.keywords?.length) return null
+  return { now: google.now, keywords: google.keywords }
+}
+
 async function refreshKeywords(mode: 'fast' | 'full' = 'full'): Promise<KeywordsPayload> {
   if (mode === 'fast') {
     try {
-      const signal = await fetchSignalCore()
-      const data = payloadFromSources(signal, null)
+      const signal = await fetchSignal()
+      const data = payloadFromSources(signal, previousGoogle())
       cache = { at: Date.now(), data }
       return data
     } catch {

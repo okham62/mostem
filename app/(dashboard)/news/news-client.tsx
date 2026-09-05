@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import {
   ChevronDown,
   ChevronLeft,
@@ -200,23 +200,16 @@ function NewsFilterBar({
   onQuery: (value: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const closeTimer = useRef<number | null>(null)
+  const [ready, setReady] = useState(false)
 
   function openMenu() {
-    if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    setReady(true)
     setOpen(true)
   }
 
   function closeMenu() {
-    if (closeTimer.current) window.clearTimeout(closeTimer.current)
-    closeTimer.current = window.setTimeout(() => setOpen(false), 180)
+    setOpen(false)
   }
-
-  useEffect(() => {
-    return () => {
-      if (closeTimer.current) window.clearTimeout(closeTimer.current)
-    }
-  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -240,7 +233,11 @@ function NewsFilterBar({
             onMouseEnter={openMenu}
             onClick={() => {
               if (window.matchMedia('(hover: hover)').matches) return
-              setOpen((value) => !value)
+              setOpen((value) => {
+                const next = !value
+                if (next) setReady(true)
+                return next
+              })
             }}
             className={cn(
               'mostem-filter-btn inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors duration-150 hover:bg-gold/20 hover:text-gold'
@@ -271,35 +268,45 @@ function NewsFilterBar({
             초기화
           </button>
         </div>
-        {open ? (
-          <div className="mostem-menu-panel border-t border-white/8 p-3">
-            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-              {PRESS_NAV_OUTLETS.map((outlet) => (
-                <a
-                  key={outlet.url}
-                  href={outlet.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mostem-menu-item flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-white/70 hover:bg-brand/25 hover:text-white hover:shadow-[inset_0_0_0_1px_rgba(245,197,24,0.35)]"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={outlet.logo}
-                    alt=""
-                    width={200}
-                    height={200}
-                    className="h-7 w-7 rounded-md object-cover"
-                    onError={(event) => {
-                      const host = new URL(outlet.url).hostname
-                      event.currentTarget.src = `https://www.google.com/s2/favicons?domain=${host}&sz=128`
-                    }}
-                  />
-                  <span className="truncate font-medium">{outlet.name}</span>
-                </a>
-              ))}
-            </div>
+        <div
+          className="mostem-menu-shell"
+          data-open={open ? 'true' : 'false'}
+          data-ready={ready ? 'true' : 'false'}
+          aria-hidden={!open}
+        >
+          <div className="mostem-menu-clip">
+            {ready ? (
+              <div className="mostem-menu-panel border-t border-white/8 p-3">
+                <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  {PRESS_NAV_OUTLETS.map((outlet) => (
+                    <a
+                      key={outlet.url}
+                      href={outlet.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      tabIndex={open ? 0 : -1}
+                      className="mostem-menu-item flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-white/70 hover:bg-brand/25 hover:text-white hover:shadow-[inset_0_0_0_1px_rgba(245,197,24,0.35)]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={outlet.logo}
+                        alt=""
+                        width={200}
+                        height={200}
+                        className="h-7 w-7 rounded-md object-cover"
+                        onError={(event) => {
+                          const host = new URL(outlet.url).hostname
+                          event.currentTarget.src = `https://www.google.com/s2/favicons?domain=${host}&sz=128`
+                        }}
+                      />
+                      <span className="truncate font-medium">{outlet.name}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
     </section>
   )

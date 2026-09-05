@@ -163,6 +163,8 @@ type HdPayload = {
   rows?: HdRow[]
   categories?: { id: number; name: string }[]
   total?: number
+  pageCount?: number
+  pageSize?: number
   meta?: { latestDate?: string }
 }
 
@@ -170,6 +172,7 @@ export type TrendQuery = {
   cat?: string
   q?: string
   timing?: string
+  tab?: TrendTab
 }
 
 function hdHeaders() {
@@ -190,7 +193,7 @@ async function fetchHypeDuck(page: number, query: TrendQuery = {}): Promise<HdPa
   const res = await fetch(`${HD_URL}?${params.toString()}`, {
     headers: hdHeaders(),
     cache: 'no-store',
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(12000),
   })
   if (!res.ok) throw new Error(`hypeduck ${res.status}`)
   return (await res.json()) as HdPayload
@@ -240,16 +243,115 @@ function hdCategories(rows: { id: number; name: string }[] | undefined): ShopCat
   return [{ id: 'all', label: '전체 분야', cid: null }, ...cats]
 }
 
+type TrendCatalog = {
+  at: number
+  key: string
+  latestDate: string
+  categories: ShopCategory[]
+  items: TrendKeyword[]
+  total: number
+}
+
+let catalogCache: TrendCatalog | null = null
+let catalogInflight: { key: string; promise: Promise<TrendCatalog> } | null = null
+const CATALOG_MS = 10 * 60_000
+const CATALOG_CONCURRENCY = 20
+
+function payloadFromItems(
+  items: TrendKeyword[],
+  latestDate: string,
+  categories: ShopCategory[],
+  total: number
+): TrendsPayload {
+  for (const item of items) itemCache.set(item.keyword, item)
+  return {
+    now: Date.now(),
+    latestDate,
+    categories,
+    items,
+    stats: {
+      total,
+      fresh: items.filter((item) => item.isNew).length,
+      rising: items.filter((item) => item.growth > 0).length,
+    },
+  }
+}
+
+async function getTrendCatalog(query: TrendQuery = {}): Promise<TrendCatalog> {
+  const key = `${query.cat || 'all'}|${query.timing || 'all'}`
+  if (catalogCache && catalogCache.key === key && Date.now() - catalogCache.at < CATALOG_MS) {
+    return catalogCache
+  }
+  if (catalogInflight?.key === key) return catalogInflight.promise
+  if (catalogInflight) {
+    await catalogInflight.promise.catch(() => undefined)
+    if (catalogCache && catalogCache.key === key && Date.now() - catalogCache.at < CATALOG_MS) {
+      return catalogCache
+    }
+  }
+
+  const promise = (async () => {
+    const first = await fetchHypeDuck(1, query)
+    if (!first.rows?.length) throw new Error('hypeduck empty')
+    const pageCount = Math.min(Number(first.pageCount) || 1, 280)
+    const pages: HdPayload[] = [first]
+    for (let start = 2; start <= pageCount; start += CATALOG_CONCURRENCY) {
+      const nums = Array.from(
+        { length: Math.min(CATALOG_CONCURRENCY, pageCount - start + 1) },
+        (_, index) => start + index
+      )
+      const batch = await Promise.all(nums.map((page) => fetchHypeDuck(page, query).catch(() => ({ rows: [] }))))
+      pages.push(...batch)
+    }
+    const seen = new Set<string>()
+    const items: TrendKeyword[] = []
+    const latestDate = first.meta?.latestDate || seoulYmd()
+    for (const page of pages) {
+      for (const row of page.rows ?? []) {
+        if (!row?.keyword || seen.has(row.keyword)) continue
+        seen.add(row.keyword)
+        items.push(mapHdRow(row, items.length + 1, latestDate))
+      }
+    }
+    const data: TrendCatalog = {
+      at: Date.now(),
+      key,
+      latestDate,
+      categories: hdCategories(first.categories),
+      items,
+      total: first.total || items.length,
+    }
+    catalogCache = data
+    return data
+  })().finally(() => {
+    if (catalogInflight?.promise === promise) catalogInflight = null
+  })
+
+  catalogInflight = { key, promise }
+  return promise
+}
+
 export async function getShoppingTrends(
   compareWeeks: CompareWeeks = 1,
   query: TrendQuery = {}
 ): Promise<TrendsPayload> {
-  const cacheKey = `${compareWeeks}|${query.cat || 'all'}|${query.q || ''}|${query.timing || 'all'}`
+  const tab = query.tab || 'rising'
+  const cacheKey = `${compareWeeks}|${tab}|${query.cat || 'all'}|${query.q || ''}|${query.timing || 'all'}`
   if (cache && cache.key === cacheKey && Date.now() - cache.at < CACHE_MS) return cache.data
   if (inflight && inflightKey === cacheKey) return inflight
 
   inflightKey = cacheKey
   inflight = (async () => {
+    if ((tab === 'popular' || tab === 'new') && !query.q?.trim()) {
+      const catalog = await getTrendCatalog(query)
+      let items = catalog.items
+      if (tab === 'new') items = items.filter((item) => item.isNew)
+      items = [...items].sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth).slice(0, 80)
+      const data = payloadFromItems(items, catalog.latestDate, catalog.categories, catalog.total)
+      cache = { at: Date.now(), key: cacheKey, data }
+      return data
+    }
+
     const pages = await Promise.all([1, 2].map((page) => fetchHypeDuck(page, query)))
     const first = pages[0]
     if (!pages.some((page) => page.rows?.length)) throw new Error('hypeduck empty')
@@ -262,19 +364,18 @@ export async function getShoppingTrends(
         items.push(mapHdRow(row, items.length + 1, first.meta?.latestDate || seoulYmd()))
       }
     }
-
-    itemCache = new Map(items.map((item) => [item.keyword, item]))
-    const data: TrendsPayload = {
-      now: Date.now(),
-      latestDate: first.meta?.latestDate || seoulYmd(),
-      categories: hdCategories(first.categories),
-      items,
-      stats: {
-        total: first.total || items.length,
-        fresh: items.filter((item) => item.isNew).length,
-        rising: items.filter((item) => item.growth > 0).length,
-      },
+    if (tab === 'popular') {
+      items.sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth)
     }
+    if (tab === 'new') {
+      items.sort((a, b) => Number(b.isNew) - Number(a.isNew) || b.searchTotal - a.searchTotal)
+    }
+    const data = payloadFromItems(
+      tab === 'new' ? items.filter((item) => item.isNew) : items,
+      first.meta?.latestDate || seoulYmd(),
+      hdCategories(first.categories),
+      first.total || items.length
+    )
     cache = { at: Date.now(), key: cacheKey, data }
     return data
   })().finally(() => {

@@ -73,15 +73,18 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
     cat?: string
     q?: string
     timing?: (typeof TIMINGS)[number]['id']
+    tab?: TrendTab
   }) {
     setRefreshing(true)
     const nextCompare = next?.compare ?? compare
     const nextCat = next?.cat ?? category
     const nextQ = next?.q ?? query
     const nextTiming = next?.timing ?? timing
+    const nextTab = next?.tab ?? tab
     try {
       const params = new URLSearchParams()
       params.set('compare', String(nextCompare))
+      params.set('tab', nextTab)
       if (nextCat !== 'all') params.set('cat', nextCat)
       if (nextQ.trim()) params.set('q', nextQ.trim())
       if (nextTiming === 'now') params.set('timing', 'now')
@@ -93,6 +96,13 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
       setRefreshing(false)
     }
   }
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void fetch('/api/trends?tab=popular', { cache: 'no-store' })
+    }, 800)
+    return () => window.clearTimeout(id)
+  }, [])
 
   useEffect(() => {
     const tick = () => {
@@ -121,11 +131,8 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
       const q = query.trim().toLowerCase()
       rows = rows.filter((item) => item.keyword.toLowerCase().includes(q))
     }
-    if (tab === 'rising') rows = [...rows]
-    if (tab === 'popular') rows = [...rows].sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth)
-    if (tab === 'new') rows = rows.filter((item) => item.isNew)
     return rows
-  }, [data.items, data.categories, category, content, timing, excludeBrand, query, tab])
+  }, [data.items, data.categories, category, content, timing, excludeBrand, query])
 
   const tabMeta = TABS.find((item) => item.id === tab)!
 
@@ -164,7 +171,13 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setTab(item.id)}
+                onClick={() => {
+                  setTab(item.id)
+                  if (item.id !== 'rising') {
+                    setData((prev) => ({ ...prev, items: [] }))
+                  }
+                  void reload({ tab: item.id })
+                }}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition',
                   active ? 'bg-brand text-white shadow-[0_0_0_1px_rgba(139,92,246,0.35)]' : 'text-white/55 hover:text-white'
@@ -243,7 +256,13 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
 
         <div className="mt-2 divide-y divide-white/5">
           {filtered.length === 0 ? (
-            <div className="py-16 text-center text-sm text-white/35">조건에 맞는 키워드가 없습니다.</div>
+            <div className="py-16 text-center text-sm text-white/35">
+              {refreshing
+                ? tab === 'popular' || tab === 'new'
+                  ? '검색량 기준으로 키워드를 모으는 중'
+                  : '키워드를 불러오는 중'
+                : '조건에 맞는 키워드가 없습니다.'}
+            </div>
           ) : (
             filtered.map((item, index) => (
               <button
@@ -264,10 +283,12 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
                   <p className="truncate text-[15px] font-semibold text-white">{item.keyword}</p>
                   <p className="mt-0.5 truncate text-[11px] text-white/35">{item.categoryPath}</p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 text-[13px] font-bold text-gold">
-                      <Flame className="h-3.5 w-3.5" />
-                      {formatGrowth(item.multiplier)}
-                    </span>
+                    {tab === 'popular' ? null : (
+                      <span className="inline-flex items-center gap-1 text-[13px] font-bold text-gold">
+                        <Flame className="h-3.5 w-3.5" />
+                        {formatGrowth(item.multiplier)}
+                      </span>
+                    )}
                     {item.peakNow ? (
                       <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
                         성수기 지금! ({item.peakMonth}월)
@@ -281,9 +302,10 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <span className="w-[4.5rem] text-right text-sm font-semibold text-white/80">
-                    {formatSearchVolume(item.searchTotal)}
-                  </span>
+                  <div className="min-w-[4.75rem] text-right">
+                    <p className="text-sm font-semibold text-white/90">{formatSearchVolume(item.searchTotal)}</p>
+                    <p className="text-[10px] text-white/35">한 달 검색</p>
+                  </div>
                   <Sparkline
                     points={item.spark}
                     up={
