@@ -15,6 +15,8 @@ html[data-theme='dark'] {
   --muted-bg: #1c1c22;
   --gold: #f5c518;
   --gold-hover: #ffd84a;
+  --change-up: #25a750;
+  --change-down: #ca3f64;
   --accent: #8b5cf6;
   --ticker-bg: #0c0e14;
   --chrome-bg: rgba(10, 12, 20, 0.85);
@@ -34,6 +36,8 @@ html[data-theme='light'] {
   --muted-bg: #eef0f5;
   --gold: #c49210;
   --gold-hover: #d4a017;
+  --change-up: #25a750;
+  --change-down: #ca3f64;
   --accent: #7c3aed;
   --ticker-bg: #ffffff;
   --chrome-bg: rgba(255, 255, 255, 0.88);

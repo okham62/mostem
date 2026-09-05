@@ -1,42 +1,42 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowUp,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Filter,
   RefreshCw,
   RotateCcw,
   Search,
 } from 'lucide-react'
-import { formatKeywordTime, type KeywordsPayload, type RankingNews } from '@/lib/keywords'
+import { formatKeywordTime, type KeywordsPayload } from '@/lib/keywords'
 import { fetchRealtime, peekRealtimeCache } from '@/lib/realtime-cache'
 import { PRESS_NAV_OUTLETS } from '@/lib/press'
 import { cn } from '@/lib/utils'
 import { logWork } from '@/lib/client-log'
 import { NewsSkeleton } from './news-skeleton'
 
-const NEWS_PER_PAGE = 20
-const NEWS_PAGES = 30
+const NEWS_BATCH = 20
 const POLL_MS = 30_000
 
-function newsForPage(news: RankingNews[], page: number) {
-  if (news.length === 0) return []
-  if (news.length <= NEWS_PER_PAGE) {
-    return Array.from({ length: NEWS_PER_PAGE }, (_, i) => news[i % news.length])
+function scrollParentOf(el: HTMLElement | null) {
+  let node = el?.parentElement ?? null
+  while (node) {
+    const { overflowY } = window.getComputedStyle(node)
+    if (overflowY === 'auto' || overflowY === 'scroll') return node
+    node = node.parentElement
   }
-  const maxStart = news.length - NEWS_PER_PAGE
-  const start =
-    NEWS_PAGES <= 1 ? 0 : Math.round((page * maxStart) / (NEWS_PAGES - 1))
-  return news.slice(start, start + NEWS_PER_PAGE)
+  return document.scrollingElement as HTMLElement | null
 }
 
 export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
   const [data, setData] = useState<KeywordsPayload | null>(initial ?? null)
-  const [newsPage, setNewsPage] = useState(0)
+  const [visible, setVisible] = useState(NEWS_BATCH)
   const [refreshing, setRefreshing] = useState(false)
   const [query, setQuery] = useState('')
+  const [showTop, setShowTop] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   async function reload() {
     setRefreshing(true)
@@ -66,8 +66,6 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
     }
   }, [])
 
-  const page = ((newsPage % NEWS_PAGES) + NEWS_PAGES) % NEWS_PAGES
-  const searching = query.trim().length > 0
   const filteredNews = useMemo(() => {
     const news = data?.news ?? []
     const q = query.trim().toLowerCase()
@@ -76,9 +74,35 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
       item => item.title.toLowerCase().includes(q) || (item.press || '').toLowerCase().includes(q)
     )
   }, [data?.news, query])
-  const newsSlice = searching
-    ? filteredNews.slice(0, NEWS_PER_PAGE)
-    : newsForPage(data?.news ?? [], page)
+  const newsSlice = filteredNews.slice(0, visible)
+
+  useEffect(() => {
+    setVisible(NEWS_BATCH)
+  }, [query])
+
+  useEffect(() => {
+    const scroller = scrollParentOf(rootRef.current)
+    if (!scroller) return
+    const onScroll = () => setShowTop(scroller.scrollTop > 360)
+    onScroll()
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => scroller.removeEventListener('scroll', onScroll)
+  }, [data])
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    const scroller = scrollParentOf(rootRef.current)
+    if (!sentinel || !scroller) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return
+        setVisible((count) => Math.min(filteredNews.length, count + NEWS_BATCH))
+      },
+      { root: scroller, rootMargin: '400px 0px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [filteredNews.length, data])
 
   useEffect(() => {
     const q = query.trim()
@@ -91,13 +115,14 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
 
   if (!data) return <NewsSkeleton />
 
+  function jumpTop() {
+    scrollParentOf(rootRef.current)?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
-    <div className="space-y-4">
+    <div ref={rootRef} className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-white md:text-2xl">실시간 뉴스</h1>
-          <p className="mt-1 text-sm text-white/45">{formatKeywordTime(data.now)}</p>
-        </div>
+        <p className="text-sm text-white/45">{formatKeywordTime(data.now)}</p>
         <button
           type="button"
           onClick={() => void reload()}
@@ -116,29 +141,9 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
             <h2 className="text-sm font-semibold text-white">언론사별 가장 많이 본 뉴스</h2>
             <p className="mt-0.5 text-xs text-white/40">각 언론사의 가장 많이 본 기사 1건</p>
           </div>
-          {data.news.length > 0 && !searching && (
-            <div className="flex items-center gap-2 text-xs text-white/50">
-              <button
-                type="button"
-                onClick={() => setNewsPage((p) => (p - 1 + NEWS_PAGES) % NEWS_PAGES)}
-                className="rounded-md p-1 hover:bg-white/10 hover:text-white"
-                aria-label="이전 뉴스"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span>
-                {page + 1} / {NEWS_PAGES}
-              </span>
-              <button
-                type="button"
-                onClick={() => setNewsPage((p) => (p + 1) % NEWS_PAGES)}
-                className="rounded-md p-1 hover:bg-white/10 hover:text-white"
-                aria-label="다음 뉴스"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+          {filteredNews.length > 0 ? (
+            <p className="text-xs text-white/40">{filteredNews.length}건</p>
+          ) : null}
         </div>
         {newsSlice.length === 0 ? (
           <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] py-16 text-center text-sm text-white/40">
@@ -185,9 +190,21 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
             ))}
           </div>
         )}
+        {visible < filteredNews.length ? <div ref={sentinelRef} className="h-10" /> : null}
       </section>
 
       <p className="pb-2 text-[11px] text-white/30">데이터 출처: 네이버 뉴스 랭킹</p>
+
+      {showTop ? (
+        <button
+          type="button"
+          onClick={jumpTop}
+          aria-label="맨 위로"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[var(--card-bg)] text-white shadow-lg shadow-black/40 hover:border-gold/50 hover:text-gold md:bottom-6 md:right-6"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </button>
+      ) : null}
     </div>
   )
 }

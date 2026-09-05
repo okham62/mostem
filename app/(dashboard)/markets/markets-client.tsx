@@ -1,33 +1,63 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { MarketIcon } from '@/components/market-icons'
 import { subscribeLiveMarkets } from '@/lib/live-markets'
+import {
+  formatIndex,
+  type ChartSeriesId,
+  type IndexQuote,
+  type MarketChartsPayload,
+} from '@/lib/market-charts'
 import { emptyMarketItems, formatChange, formatKrw, formatUsd, type MarketItem } from '@/lib/markets'
 import { cn } from '@/lib/utils'
 
+const EMPTY_INDICES: IndexQuote[] = [
+  { id: 'spx', label: 'S&P 500', note: '미국 대표 지수', value: null, change: null },
+  { id: 'nasdaq', label: '나스닥', note: '미국 기술주 지수', value: null, change: null },
+  { id: 'kospi', label: '코스피', note: '한국 유가증권시장', value: null, change: null },
+  { id: 'kosdaq', label: '코스닥', note: '한국 코스닥 시장', value: null, change: null },
+]
+
 export function MarketsClient() {
   const [items, setItems] = useState<MarketItem[]>(emptyMarketItems)
+  const [charts, setCharts] = useState<MarketChartsPayload | null>(null)
 
   useEffect(() => subscribeLiveMarkets(setItems), [])
 
+  useEffect(() => {
+    let alive = true
+    void fetch('/api/markets/charts', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: MarketChartsPayload | null) => {
+        if (alive && data?.series) setCharts(data)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const fx = items.filter((item) => item.kind === 'fx')
   const coins = items.filter((item) => item.kind === 'coin')
+  const indices = charts?.indices?.length ? charts.indices : EMPTY_INDICES
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">마켓 시세</h1>
-        <p className="mt-1 text-sm text-white/45">
-          환율, 코인, 주식, 지수를 한 화면에서 봅니다. 상단 시세를 눌러도 이 페이지로 옵니다.
-        </p>
-      </div>
+      <p className="text-sm text-white/45">최근 7일 흐름을 카드 아래 그래프로 봅니다.</p>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-white/70">환율</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {fx.map((item) => (
-            <QuoteCard key={item.id} item={item} />
+            <MarketCard
+              key={item.id}
+              title={item.label}
+              icon={<MarketIcon id={item.id} className="h-7 w-7" />}
+              price={formatKrw(item.krw)}
+              change={item.change ?? charts?.fxChange?.[item.id === 'cny' ? 'cny' : 'usd'] ?? null}
+              points={charts?.series?.[item.id]}
+            />
           ))}
         </div>
       </section>
@@ -36,7 +66,15 @@ export function MarketsClient() {
         <h2 className="text-sm font-semibold text-white/70">코인</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {coins.map((item) => (
-            <QuoteCard key={item.id} item={item} />
+            <MarketCard
+              key={item.id}
+              title={item.label}
+              icon={<MarketIcon id={item.id} className="h-7 w-7" />}
+              price={formatKrw(item.krw)}
+              extra={formatUsd(item.usd)}
+              change={item.change}
+              points={charts?.series?.[item.id]}
+            />
           ))}
         </div>
       </section>
@@ -44,15 +82,15 @@ export function MarketsClient() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-white/70">지수 · 주식</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {INDEX_PLACEHOLDERS.map((item) => (
-            <div
-              key={item.name}
-              className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4"
-            >
-              <p className="text-sm font-bold text-white">{item.name}</p>
-              <p className="mt-1 text-xs text-white/40">{item.note}</p>
-              <p className="mt-4 text-lg font-bold text-white/25">준비 중</p>
-            </div>
+          {indices.map((item) => (
+            <MarketCard
+              key={item.id}
+              title={item.label}
+              extra={item.note}
+              price={formatIndex(item.value)}
+              change={item.change}
+              points={charts?.series?.[item.id as ChartSeriesId]}
+            />
           ))}
         </div>
       </section>
@@ -60,42 +98,95 @@ export function MarketsClient() {
   )
 }
 
-const INDEX_PLACEHOLDERS = [
-  { name: 'S&P 500', note: '미국 대표 지수' },
-  { name: '나스닥', note: '미국 기술주 지수' },
-  { name: '코스피', note: '한국 유가증권시장' },
-  { name: '코스닥', note: '한국 코스닥 시장' },
-]
-
-function QuoteCard({ item }: { item: MarketItem }) {
-  const up = (item.change ?? 0) > 0
-  const down = (item.change ?? 0) < 0
+function MarketCard({
+  title,
+  icon,
+  price,
+  extra,
+  change,
+  points,
+}: {
+  title: string
+  icon?: ReactNode
+  price: string
+  extra?: string
+  change: number | null
+  points?: number[]
+}) {
+  const up = (change ?? 0) > 0
+  const down = (change ?? 0) < 0
 
   return (
-    <article
-      id={item.id}
-      className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4"
-    >
-      <div className="mb-3 flex items-center gap-2">
-        <MarketIcon id={item.id} className="h-8 w-8" />
-        <p className="text-sm font-bold text-white">{item.label}</p>
+    <article className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {icon}
+          <p className="truncate text-sm font-bold text-white">{title}</p>
+        </div>
+        {change != null ? (
+          <p
+            className={cn(
+              'shrink-0 text-xs font-extrabold',
+              up && 'text-[var(--change-up)]',
+              down && 'text-[var(--change-down)]',
+              !up && !down && 'text-white/40'
+            )}
+          >
+            {formatChange(change)}
+          </p>
+        ) : null}
       </div>
-      <p className="text-xl font-bold text-gold">{formatKrw(item.krw)}</p>
-      {item.kind === 'coin' ? (
-        <p className="mt-1 text-sm font-semibold text-white/70">{formatUsd(item.usd)}</p>
-      ) : null}
-      {item.change != null ? (
-        <p
-          className={cn(
-            'mt-2 text-sm font-extrabold',
-            up && 'text-[#39FF14]',
-            down && 'text-red-500',
-            !up && !down && 'text-white/40'
-          )}
-        >
-          {formatChange(item.change)}
-        </p>
-      ) : null}
+      <p className="mt-3 text-xl font-bold text-gold">{price}</p>
+      {extra ? <p className="mt-0.5 text-xs text-white/45">{extra}</p> : null}
+      <Sparkline points={points} />
     </article>
+  )
+}
+
+function Sparkline({ points }: { points?: number[] }) {
+  const gid = useId().replace(/:/g, '')
+  if (!points || points.length < 2) {
+    return <div className="mt-4 h-12 w-full rounded-md bg-white/[0.04]" />
+  }
+
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const span = max - min || 1
+  const w = 200
+  const h = 48
+  const path = points
+    .map((value, index) => {
+      const x = (index / (points.length - 1)) * w
+      const y = h - ((value - min) / span) * (h - 6) - 3
+      return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`
+    })
+    .join(' ')
+  const up = points[points.length - 1] >= points[0]
+  const color = up ? 'var(--change-up)' : 'var(--change-down)'
+
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="mt-4 h-12 w-full"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={`${gid}-fill`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${path} L${w} ${h} L0 ${h} Z`} fill={`url(#${gid}-fill)`} />
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
   )
 }

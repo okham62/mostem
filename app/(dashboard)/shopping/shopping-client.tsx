@@ -65,10 +65,7 @@ export function ShoppingClient() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-white md:text-2xl">쇼핑 베스트</h1>
-          <p className="mt-1 text-sm text-white/45">{formatKeywordTime(data.now)}</p>
-        </div>
+        <p className="text-sm text-white/45">{formatKeywordTime(data.now)}</p>
         <button
           type="button"
           onClick={() => void reload()}
@@ -121,10 +118,6 @@ function ProductSection({
 }) {
   return (
     <div>
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-white">{list.label}</h3>
-        <p className="mt-0.5 text-[11px] text-white/40">{list.hint}</p>
-      </div>
       {list.products.length === 0 ? (
         <div className="rounded-xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
           {list.error || '상품이 없습니다.'}
