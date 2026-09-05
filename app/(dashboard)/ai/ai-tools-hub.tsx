@@ -50,7 +50,7 @@ export function AiToolsHub() {
               <h2 className="text-sm font-bold text-white">{tool.title}</h2>
               <p className="mt-1 text-xs leading-relaxed text-white/40">{tool.description}</p>
               <p className="mt-3 text-[11px] font-semibold text-gold/80 group-hover:text-gold">
-                준비중...
+                {tool.id === 'tags' ? '열기 →' : '준비중...'}
               </p>
             </Link>
           )

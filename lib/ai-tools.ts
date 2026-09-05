@@ -1,5 +1,12 @@
 export const AI_TOOLS = [
   {
+    id: 'tags',
+    title: 'AI 태그 생성기',
+    description: '유튜브·스레드·인스타·틱톡·블로그 태그를 한 번에 만듭니다.',
+    placeholder: '',
+    hint: '',
+  },
+  {
     id: 'copy',
     title: 'AI 카피 생성',
     description: '훅·본문·고정댓글 CTA를 한 세트로 만듭니다.',
@@ -54,13 +61,6 @@ export const AI_TOOLS = [
     description: '수집한 영상을 새 편집본 구조로 변환합니다.',
     placeholder: '예: 15초 후킹 후 제품 시연 3컷, 마지막에 프로필 링크 CTA',
     hint: '원본 구조와 내 상품을 적으면 리믹스 콘티를 만듭니다.',
-  },
-  {
-    id: 'tags',
-    title: 'AI 태그 생성기',
-    description: '유튜브·스레드·인스타·틱톡·블로그 태그를 한 번에 만듭니다.',
-    placeholder: '',
-    hint: '',
   },
 ] as const
 
