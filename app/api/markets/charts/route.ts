@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
+export const preferredRegion = ['icn1', 'hnd1']
 
 export async function GET() {
   const session = await auth()

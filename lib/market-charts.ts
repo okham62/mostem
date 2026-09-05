@@ -73,9 +73,20 @@ function downsample(points: number[], max = 56) {
   return out
 }
 
+function pctChange(points: number[]) {
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (first == null || last == null || first === 0) return null
+  return ((last - first) / first) * 100
+}
+
 async function fetchJson(url: string, timeout = 4500) {
+  const headers: HeadersInit =
+    typeof window === 'undefined'
+      ? { Accept: 'application/json', 'User-Agent': UA }
+      : { Accept: 'application/json' }
   const res = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': UA },
+    headers,
     cache: 'no-store',
     signal: AbortSignal.timeout(timeout),
   })
@@ -115,7 +126,8 @@ async function fetchYahoo(symbol: string): Promise<YahooChart | null> {
 
 async function fetchUpbitHours(market: string): Promise<number[]> {
   const rows = (await fetchJson(
-    `https://api.upbit.com/v1/candles/minutes/60?market=${market}&count=168`
+    `https://api.upbit.com/v1/candles/minutes/60?market=${market}&count=168`,
+    typeof window === 'undefined' ? 3000 : 6000
   )) as Array<{ trade_price?: number }>
   if (!Array.isArray(rows)) return []
   return downsample(
@@ -127,13 +139,24 @@ async function fetchUpbitHours(market: string): Promise<number[]> {
 }
 
 async function fetchBinanceHours(symbol: string): Promise<number[]> {
-  const rows = (await fetchJson(
-    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=168`
-  )) as Array<Array<number | string>>
-  if (!Array.isArray(rows)) return []
-  return downsample(
-    rows.map((row) => num(row[4])).filter((value): value is number => value != null)
-  )
+  const timeout = typeof window === 'undefined' ? 2500 : 6000
+  const urls = [
+    `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=1h&limit=168`,
+    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=168`,
+  ]
+  for (const url of urls) {
+    try {
+      const rows = (await fetchJson(url, timeout)) as Array<Array<number | string>>
+      if (!Array.isArray(rows)) continue
+      const points = downsample(
+        rows.map((row) => num(row[4])).filter((value): value is number => value != null)
+      )
+      if (points.length >= 2) return points
+    } catch {
+      /* try next host */
+    }
+  }
+  return []
 }
 
 async function fetchFrankfurterFx() {
@@ -141,7 +164,8 @@ async function fetchFrankfurterFx() {
   const start = new Date(end.getTime() - 8 * 86_400_000)
   const fmt = (date: Date) => date.toISOString().slice(0, 10)
   const data = (await fetchJson(
-    `https://api.frankfurter.app/${fmt(start)}..${fmt(end)}?from=USD&to=KRW,CNY`
+    `https://api.frankfurter.app/${fmt(start)}..${fmt(end)}?from=USD&to=KRW,CNY`,
+    typeof window === 'undefined' ? 4000 : 6000
   )) as { rates?: Record<string, { KRW?: number; CNY?: number }> }
   const usd: number[] = []
   const cny: number[] = []
@@ -168,6 +192,62 @@ async function fetchCoinHours(id: 'btc' | 'eth' | 'xrp' | 'sol') {
     /* keep empty */
   }
   return []
+}
+
+export function mergeMarketCharts(
+  prev: MarketChartsPayload | null | undefined,
+  next: MarketChartsPayload | null | undefined
+): MarketChartsPayload | null {
+  if (!prev) return next ?? null
+  if (!next) return prev
+  const series = { ...prev.series }
+  for (const key of Object.keys(next.series) as ChartSeriesId[]) {
+    const points = next.series[key]
+    if (points && points.length >= 2) series[key] = points
+  }
+  const indices = next.indices.length
+    ? next.indices.map((row) => {
+        const old = prev.indices.find((item) => item.id === row.id)
+        return {
+          ...row,
+          value: row.value ?? old?.value ?? null,
+          change: row.change ?? old?.change ?? null,
+        }
+      })
+    : prev.indices
+  return {
+    now: Math.max(prev.now, next.now),
+    series,
+    indices,
+    fxChange: {
+      usd: next.fxChange.usd ?? prev.fxChange.usd ?? null,
+      cny: next.fxChange.cny ?? prev.fxChange.cny ?? null,
+    },
+  }
+}
+
+export async function fetchBrowserMarketCharts(): Promise<MarketChartsPayload | null> {
+  if (typeof window === 'undefined') return null
+  const series: MarketChartsPayload['series'] = {}
+  const fxChange: MarketChartsPayload['fxChange'] = {}
+  const coinIds = ['btc', 'eth', 'xrp', 'sol'] as const
+  const [frank, ...coinRows] = await Promise.all([
+    fetchFrankfurterFx().catch(() => ({ usd: [] as number[], cny: [] as number[] })),
+    ...coinIds.map(async (id) => [id, await fetchCoinHours(id)] as const),
+  ])
+  if (frank.usd.length >= 2) {
+    series.usd = downsample(frank.usd)
+    fxChange.usd = pctChange(frank.usd)
+  }
+  if (frank.cny.length >= 2) {
+    series.cny = downsample(frank.cny)
+    fxChange.cny = pctChange(frank.cny)
+  }
+  for (const [id, points] of coinRows) {
+    if (points.length >= 2) series[id] = points
+  }
+  if (!Object.keys(series).length) return null
+  return { now: Date.now(), series, indices: [], fxChange }
 }
 
 function keepSeries(next: MarketChartsPayload['series']) {

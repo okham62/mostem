@@ -4,13 +4,15 @@ import { useEffect, useId, useLayoutEffect, useState, type ReactNode } from 'rea
 import { MarketIcon } from '@/components/market-icons'
 import { subscribeLiveMarkets } from '@/lib/live-markets'
 import {
+  fetchBrowserMarketCharts,
   formatIndex,
+  mergeMarketCharts,
   type ChartSeriesId,
   type IndexQuote,
   type MarketChartsPayload,
 } from '@/lib/market-charts'
 import { emptyMarketItems, formatChange, formatKrw, formatUsd, type MarketItem } from '@/lib/markets'
-import { fetchMarketCharts, peekMarketCharts } from '@/lib/market-cache'
+import { fetchMarketCharts, peekMarketCharts, writeMarketCharts } from '@/lib/market-cache'
 import { cn } from '@/lib/utils'
 
 const EMPTY_INDICES: IndexQuote[] = [
@@ -33,11 +35,16 @@ export function MarketsClient() {
 
   useEffect(() => {
     let alive = true
-    void fetchMarketCharts()
-      .then((data) => {
-        if (alive && data?.series) setCharts(data)
+    const apply = (data: MarketChartsPayload | null) => {
+      if (!alive || !data) return
+      setCharts((prev) => {
+        const merged = mergeMarketCharts(prev ?? peekMarketCharts(), data)
+        if (merged) writeMarketCharts(merged)
+        return merged
       })
-      .catch(() => {})
+    }
+    void fetchBrowserMarketCharts().then(apply).catch(() => {})
+    void fetchMarketCharts().then(apply).catch(() => {})
     return () => {
       alive = false
     }
