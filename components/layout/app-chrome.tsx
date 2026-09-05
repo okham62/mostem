@@ -66,7 +66,8 @@ export function AppChrome({
           onClick={toggle}
           className="mostem-sidebar-peek hidden md:flex"
         >
-          <ChevronRight className="h-4 w-4" />
+          <span className="mostem-sidebar-peek-glow" aria-hidden />
+          <ChevronRight className="mostem-sidebar-peek-icon h-4 w-4" />
         </button>
 
         {children}
