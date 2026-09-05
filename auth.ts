@@ -70,9 +70,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.role = token.role as any
         session.user.name = token.name as string
         session.user.image = (token.picture as string) || ''
-        session.user.username =
-          token.username ||
-          String(session.user.email || '').replace(/@mostem\.local$/, '')
+        const loginId = String(token.username || session.user.email || '').replace(/@mostem\.local$/, '')
+        session.user.username = loginId
       }
       return session
     },
