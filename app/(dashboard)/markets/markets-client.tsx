@@ -145,10 +145,7 @@ function MarketCard({
       </div>
       <p className="mt-3 text-xl font-bold text-gold">{price}</p>
       {usd ? (
-        <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-white/8 px-2 py-1">
-          <span className="text-[10px] font-extrabold tracking-wide text-white/55">USD</span>
-          <span className="text-sm font-bold tabular-nums text-white">{usd}</span>
-        </p>
+        <p className="mt-1 text-xl font-bold tabular-nums text-white">{usd}</p>
       ) : extra ? (
         <p className="mt-0.5 text-xs text-white/45">{extra}</p>
       ) : null}
