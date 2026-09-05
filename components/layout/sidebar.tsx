@@ -50,6 +50,9 @@ const publish = [
   { href: '/instagram', label: '인스타', icon: InstagramIcon },
   { href: '/tiktok', label: '틱톡', icon: TiktokIcon },
   { href: '/blog', label: '네이버 블로그', icon: BlogIcon },
+]
+
+const tools = [
   { href: '/ai', label: 'AI 도구', icon: Sparkles },
   { href: '/links', label: '링크 변환', icon: Link2 },
 ]
@@ -144,6 +147,7 @@ export function Sidebar({ session, onHide }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto px-2 pt-1 scrollbar-thin">
         <NavGroup title="탐색" items={explore} pathname={pathname} />
         <NavGroup title="발행" items={publish} pathname={pathname} />
+        <NavGroup title="도구" items={tools} pathname={pathname} />
         {isAdmin && (
           <NavGroup
             title="관리"
