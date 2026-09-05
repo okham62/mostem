@@ -1,4 +1,9 @@
-import { stabilizeKeywordsPayload, type KeywordsPayload } from '@/lib/keywords'
+import {
+  applyBrowserNaver,
+  fetchBrowserNaver,
+  stabilizeKeywordsPayload,
+  type KeywordsPayload,
+} from '@/lib/keywords'
 
 const STORAGE_KEY = 'mostem:realtime-v1'
 let memory: KeywordsPayload | null = null
@@ -47,8 +52,13 @@ export async function fetchRealtime(scope: 'fast' | 'full' | 'news' = 'full') {
 export function warmRealtimeCache() {
   if (typeof window === 'undefined' || warming) return
   warming = true
-  void fetchRealtime('fast')
-    .then(() => fetchRealtime('full'))
+  void Promise.all([
+    fetchBrowserNaver().then((local) => {
+      if (!local) return
+      writeRealtimeCache(applyBrowserNaver(peekRealtimeCache(), local))
+    }),
+    fetchRealtime('fast').then(() => fetchRealtime('full')),
+  ])
     .catch(() => {})
     .finally(() => {
       warming = false

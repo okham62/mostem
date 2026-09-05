@@ -3,6 +3,8 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
+  applyBrowserNaver,
+  fetchBrowserNaver,
   formatKeywordTime,
   formatSearchTraffic,
   type KeywordSource,
@@ -10,7 +12,7 @@ import {
   type KeywordsPayload,
   type RealtimeKeyword,
 } from '@/lib/keywords'
-import { fetchRealtime, peekRealtimeCache } from '@/lib/realtime-cache'
+import { fetchRealtime, peekRealtimeCache, writeRealtimeCache } from '@/lib/realtime-cache'
 import { cn } from '@/lib/utils'
 import { logWork } from '@/lib/client-log'
 import { KeywordsSkeleton } from './keywords-skeleton'
@@ -53,11 +55,25 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
   const naver = sources.find(s => s.id === 'signal')
   const google = sources.find(s => s.id === 'google')
 
+  async function pullNaver() {
+    const local = await fetchBrowserNaver()
+    if (!local) return
+    setData((prev) => {
+      const merged = applyBrowserNaver(prev ?? peekRealtimeCache(), local)
+      writeRealtimeCache(merged)
+      return merged
+    })
+  }
+
   async function reload(scope: 'fast' | 'full' = 'full') {
     setRefreshing(true)
     try {
-      const next = await fetchRealtime(scope)
-      setData(next)
+      const [next, local] = await Promise.all([fetchRealtime(scope).catch(() => peekRealtimeCache()), fetchBrowserNaver()])
+      const merged = local ? applyBrowserNaver(next, local) : next
+      if (merged) {
+        writeRealtimeCache(merged)
+        setData(merged)
+      }
     } finally {
       setRefreshing(false)
     }
@@ -69,13 +85,13 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
   }, [])
 
   useEffect(() => {
+    void pullNaver()
     const boot = async () => {
       if (peekRealtimeCache()) {
-        void fetchRealtime('full').then(setData)
+        void reload('full')
         return
       }
       await reload('fast')
-      void reload('full')
     }
     void boot()
     const tick = () => {
@@ -168,8 +184,8 @@ function KeywordPanel({
           {source?.hint} · 1~10위
         </span>
       </div>
-      {source?.error && keywords.length === 0 ? (
-        <div className="py-10 text-center text-sm text-white/40">{source.error || empty}</div>
+      {keywords.length === 0 ? (
+        <div className="py-10 text-center text-sm text-white/40">{source?.error || empty}</div>
       ) : (
         <KeywordColumn items={keywords} source={source?.label || ''} />
       )}

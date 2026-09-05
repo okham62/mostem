@@ -182,6 +182,51 @@ export function stabilizeKeywordList(
   return mergeKeywords([incoming ?? [], previous ?? []], limit)
 }
 
+export async function fetchBrowserNaver() {
+  if (typeof window === 'undefined') return null
+  try {
+    const res = await fetch(SIGNAL_URL, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) return null
+    const raw = (await res.json()) as SignalPayload
+    const keywords = parseSignalKeywords(raw).slice(0, KEYWORD_LIMIT)
+    if (!keywords.length) return null
+    return { now: raw.now ?? Date.now(), keywords }
+  } catch {
+    return null
+  }
+}
+
+export function applyBrowserNaver(
+  data: KeywordsPayload | null,
+  naver: { now: number; keywords: RealtimeKeyword[] }
+): KeywordsPayload {
+  const google = data?.sources?.find((source) => source.id === 'google')
+  return {
+    now: naver.now,
+    keywords: naver.keywords,
+    news: data?.news ?? [],
+    sources: [
+      {
+        id: 'signal',
+        label: '네이버',
+        hint: '실시간 검색어',
+        now: naver.now,
+        keywords: naver.keywords,
+      },
+      google ?? {
+        id: 'google',
+        label: '구글',
+        hint: '한국 급상승 검색어',
+        now: data?.now ?? naver.now,
+        keywords: [],
+      },
+    ],
+  }
+}
+
 export function stabilizeKeywordsPayload(
   incoming: KeywordsPayload,
   previous?: KeywordsPayload | null
@@ -468,10 +513,6 @@ async function fetchSignal(): Promise<{ now: number; keywords: RealtimeKeyword[]
   ])
   const keywords = mergeKeywords([core.keywords, nate, zum, daum, lastNaver])
   if (keywords.length) lastNaver = keywords
-  if (!keywords.length) {
-    if (lastNaver.length) return { now: Date.now(), keywords: lastNaver, news: mergeNews([core.news, extraNews]) }
-    throw new Error('naver empty')
-  }
   return {
     now: core.now,
     keywords,
