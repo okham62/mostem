@@ -161,14 +161,14 @@ export function SettingsClient() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full max-w-[840px] space-y-5">
       {toast && (
         <div className="fixed right-4 top-4 z-[70] rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
           {toast}
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-[520px] text-center">
+      <div>
         <h1 className="text-2xl font-bold text-white">설정</h1>
         <p className="mt-1 text-sm text-white/45">
           내 계정과 플랫폼 연결을 관리합니다.
@@ -183,7 +183,7 @@ export function SettingsClient() {
         <p className="mt-1 text-xs text-white/40">채널별로 아이디를 추가하고 삭제하거나 다시 연결할 수 있습니다.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {PUBLISH_PLATFORMS.map((id) => {
           const item = PUBLISH_PLATFORM_META[id]
           const active = platform === id
@@ -209,7 +209,7 @@ export function SettingsClient() {
         })}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">

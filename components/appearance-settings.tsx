@@ -17,8 +17,8 @@ export function AppearanceSettings() {
   const { hidden, toggle } = useSidebarChrome()
 
   return (
-    <section className="mx-auto w-full max-w-[520px] rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
-      <div className="mb-4 text-center">
+    <section className="w-full rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 md:p-6">
+      <div className="mb-4">
         <h2 className="text-base font-semibold text-white">화면 설정</h2>
         <p className="mt-1 text-xs text-white/40">원하는 톤과 사이드바 표시를 고를 수 있습니다.</p>
       </div>
