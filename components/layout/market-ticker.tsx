@@ -2,73 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { MarketIcon } from '@/components/market-icons'
-import {
-  emptyMarketItems,
-  formatChange,
-  formatKrw,
-  formatUsd,
-  mergeMarketItems,
-  type MarketsPayload,
-} from '@/lib/markets'
+import { subscribeLiveMarkets } from '@/lib/live-markets'
+import { emptyMarketItems, formatChange, formatKrw, formatUsd, type MarketItem } from '@/lib/markets'
 import { cn } from '@/lib/utils'
 
-const POLL_MS = 20_000
-const STORAGE_KEY = 'mostem:markets-v1'
-
-function readStored(): MarketsPayload | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as MarketsPayload
-    if (!Array.isArray(parsed?.items) || parsed.items.length === 0) return null
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-function writeStored(data: MarketsPayload) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    /* ignore */
-  }
-}
-
 export function MarketTicker() {
-  const [data, setData] = useState<MarketsPayload | null>(null)
+  const [items, setItems] = useState<MarketItem[]>(emptyMarketItems)
 
-  useEffect(() => {
-    const stored = readStored()
-    if (stored) setData(stored)
-
-    let alive = true
-    async function load() {
-      try {
-        const res = await fetch('/api/markets', { cache: 'no-store' })
-        if (!res.ok || !alive) return
-        const next = (await res.json()) as MarketsPayload
-        if (!Array.isArray(next?.items)) return
-        setData((prev) => {
-          const mergedItems = mergeMarketItems(prev?.items ?? stored?.items, next.items)
-          const merged = { now: next.now ?? Date.now(), items: mergedItems }
-          writeStored(merged)
-          return merged
-        })
-      } catch {
-        /* keep previous */
-      }
-    }
-    void load()
-    const id = window.setInterval(load, POLL_MS)
-    return () => {
-      alive = false
-      window.clearInterval(id)
-    }
-  }, [])
-
-  const items = data?.items ?? emptyMarketItems()
+  useEffect(() => subscribeLiveMarkets(setItems), [])
 
   return (
     <div className="sticky top-0 z-30 border-b border-[var(--card-border)] bg-[#0c0e14]">
