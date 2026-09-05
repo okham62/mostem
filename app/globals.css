@@ -296,28 +296,7 @@ html {
   }
 }
 
-@keyframes mostem-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.mostem-marquee-track {
-  display: flex;
-  width: max-content;
-  animation: mostem-marquee 32s linear infinite;
-}
-
-.mostem-marquee:hover .mostem-marquee-track,
-.mostem-marquee:focus-within .mostem-marquee-track {
-  animation-play-state: paused;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .mostem-marquee-track,
   .hami-ext-led-track,
   .hami-ext-marquee-track {
     animation: none;

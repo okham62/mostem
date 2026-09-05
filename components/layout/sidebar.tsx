@@ -31,14 +31,14 @@ const explore = [
   { href: '/products', label: '상품 보드', icon: LayoutGrid },
 ]
 
-function ThreadsIcon({ className }: { className?: string }) {
-  return <BrandMark id="threads" className={className} />
+function ThreadsIcon() {
+  return <BrandMark id="threads" className="h-5 w-5" />
 }
-function InstagramIcon({ className }: { className?: string }) {
-  return <BrandMark id="instagram" className={className} />
+function InstagramIcon() {
+  return <BrandMark id="instagram" className="h-5 w-5" />
 }
-function BlogIcon({ className }: { className?: string }) {
-  return <BrandMark id="blog" className={className} />
+function BlogIcon() {
+  return <BrandMark id="blog" className="h-5 w-5" />
 }
 
 const publish = [

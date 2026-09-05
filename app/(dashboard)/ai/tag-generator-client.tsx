@@ -140,14 +140,16 @@ export function TagGeneratorClient() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-7xl">
       {toast && (
         <div className="fixed right-4 top-4 z-[70] rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
           {toast}
         </div>
       )}
 
-      <div className="text-center">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="space-y-6">
+      <div className="text-center lg:text-left">
         <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/20 text-brand">
           <Tags className="h-6 w-6" />
         </div>
@@ -266,10 +268,13 @@ export function TagGeneratorClient() {
         </section>
       )}
 
-      <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-6">
+      </div>
+
+      <aside className="lg:sticky lg:top-4">
+      <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-white">
               <Clock3 className="h-4 w-4 text-gold" />
               최근 생성 기록
             </h2>
@@ -284,7 +289,7 @@ export function TagGeneratorClient() {
             아직 생성 기록이 없습니다.
           </div>
         ) : (
-          <div className="max-h-[28rem] space-y-2 overflow-y-auto scrollbar-thin pr-1">
+          <div className="max-h-[28rem] space-y-2 overflow-y-auto scrollbar-thin pr-1 lg:max-h-[calc(100vh-12rem)]">
             {history.map((item) => (
               <button
                 key={item.id}
@@ -309,6 +314,8 @@ export function TagGeneratorClient() {
           </div>
         )}
       </section>
+      </aside>
+      </div>
     </div>
   )
 }

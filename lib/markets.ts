@@ -45,7 +45,7 @@ async function fetchJson(url: string, timeout = 8000) {
   return res.json()
 }
 
-function emptyItems(): MarketItem[] {
+export function emptyMarketItems(): MarketItem[] {
   return [
     { id: 'usd', label: '원달러', image: ICONS.usd, krw: null, usd: 1, change: null, kind: 'fx' },
     { id: 'cny', label: '중국환율', image: ICONS.cny, krw: null, usd: null, change: null, kind: 'fx' },
@@ -57,7 +57,7 @@ function emptyItems(): MarketItem[] {
 }
 
 async function refreshMarkets(): Promise<MarketsPayload> {
-  const items = emptyItems()
+  const items = emptyMarketItems()
   const [fxRes, upbitRes, binanceRes] = await Promise.allSettled([
     fetchJson('https://open.er-api.com/v6/latest/USD'),
     fetchJson('https://api.upbit.com/v1/ticker?markets=KRW-BTC,KRW-ETH,KRW-XRP,KRW-SOL'),
@@ -124,7 +124,7 @@ export async function getMarkets(): Promise<MarketsPayload> {
   try {
     return await inflight
   } catch {
-    return cache?.data ?? { now: Date.now(), items: emptyItems() }
+    return cache?.data ?? { now: Date.now(), items: emptyMarketItems() }
   }
 }
 
