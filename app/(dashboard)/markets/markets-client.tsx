@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useLayoutEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useState, type PointerEvent, type ReactNode } from 'react'
 import { MarketIcon } from '@/components/market-icons'
 import { subscribeLiveMarkets } from '@/lib/live-markets'
 import {
@@ -69,6 +69,7 @@ export function MarketsClient() {
               price={formatKrw(item.krw)}
               change={item.change ?? charts?.fxChange?.[item.id === 'cny' ? 'cny' : 'usd'] ?? null}
               points={charts?.series?.[item.id]}
+              formatPoint={formatKrw}
             />
           ))}
         </div>
@@ -86,6 +87,7 @@ export function MarketsClient() {
               usd={formatUsd(item.usd)}
               change={item.change}
               points={charts?.series?.[item.id]}
+              formatPoint={coinPointFormat(charts?.series?.[item.id], item)}
             />
           ))}
         </div>
@@ -102,12 +104,21 @@ export function MarketsClient() {
               price={formatIndex(item.value)}
               change={item.change}
               points={charts?.series?.[item.id as ChartSeriesId]}
+              formatPoint={formatIndex}
             />
           ))}
         </div>
       </section>
     </div>
   )
+}
+
+function coinPointFormat(points: number[] | undefined, item: MarketItem) {
+  const last = points?.at(-1)
+  if (last == null) return formatKrw
+  const usdScore = item.usd ? Math.abs(last / item.usd - 1) : Number.POSITIVE_INFINITY
+  const krwScore = item.krw ? Math.abs(last / item.krw - 1) : Number.POSITIVE_INFINITY
+  return usdScore <= krwScore ? formatUsd : formatKrw
 }
 
 function MarketCard({
@@ -118,6 +129,7 @@ function MarketCard({
   usd,
   change,
   points,
+  formatPoint,
 }: {
   title: string
   icon?: ReactNode
@@ -126,6 +138,7 @@ function MarketCard({
   usd?: string
   change: number | null
   points?: number[]
+  formatPoint: (value: number | null) => string
 }) {
   const up = (change ?? 0) > 0
   const down = (change ?? 0) < 0
@@ -156,13 +169,21 @@ function MarketCard({
       ) : extra ? (
         <p className="mt-0.5 text-xs text-white/45">{extra}</p>
       ) : null}
-      <Sparkline points={points} />
+      <Sparkline points={points} formatPoint={formatPoint} />
     </article>
   )
 }
 
-function Sparkline({ points }: { points?: number[] }) {
+function Sparkline({
+  points,
+  formatPoint,
+}: {
+  points?: number[]
+  formatPoint: (value: number | null) => string
+}) {
   const gid = useId().replace(/:/g, '')
+  const [hover, setHover] = useState<{ x: number; y: number; value: number } | null>(null)
+
   if (!points || points.length < 2) {
     return <div className="mt-4 h-12 w-full rounded-md bg-white/[0.04]" />
   }
@@ -172,39 +193,93 @@ function Sparkline({ points }: { points?: number[] }) {
   const span = max - min || 1
   const w = 200
   const h = 48
+  const toY = (value: number) => h - ((value - min) / span) * (h - 6) - 3
   const path = points
     .map((value, index) => {
       const x = (index / (points.length - 1)) * w
-      const y = h - ((value - min) / span) * (h - 6) - 3
-      return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`
+      return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${toY(value).toFixed(1)}`
     })
     .join(' ')
   const up = points[points.length - 1] >= points[0]
   const color = up ? 'var(--change-up)' : 'var(--change-down)'
 
+  function onMove(event: PointerEvent<SVGSVGElement>) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+    const pos = ratio * (points.length - 1)
+    const left = Math.floor(pos)
+    const right = Math.min(points.length - 1, left + 1)
+    const t = pos - left
+    const value = points[left] * (1 - t) + points[right] * t
+    setHover({ x: ratio * w, y: toY(value), value })
+  }
+
+  const labelSide = hover && hover.x > w * 0.72 ? '-100%' : hover && hover.x < w * 0.28 ? '0' : '-50%'
+  const labelLift = hover && hover.y < 18 ? '6px' : 'calc(-100% - 6px)'
+
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="mt-4 h-12 w-full"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id={`${gid}-fill`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${path} L${w} ${h} L0 ${h} Z`} fill={`url(#${gid}-fill)`} />
-      <path
-        d={path}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+    <div className="relative mt-4">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="h-12 w-full cursor-crosshair overflow-visible"
+        preserveAspectRatio="none"
+        onPointerMove={onMove}
+        onPointerDown={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        <defs>
+          <linearGradient id={`${gid}-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <rect width={w} height={h} fill="transparent" />
+        <path d={`${path} L${w} ${h} L0 ${h} Z`} fill={`url(#${gid}-fill)`} />
+        <path
+          d={path}
+          fill="none"
+          stroke={color}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        {hover ? (
+          <>
+            <line
+              x1={hover.x}
+              y1="0"
+              x2={hover.x}
+              y2={h}
+              stroke="white"
+              strokeOpacity="0.22"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+            <circle
+              cx={hover.x}
+              cy={hover.y}
+              r="3.2"
+              fill={color}
+              stroke="white"
+              strokeWidth="1.2"
+              vectorEffect="non-scaling-stroke"
+            />
+          </>
+        ) : null}
+      </svg>
+      {hover ? (
+        <div
+          className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md bg-black/80 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white shadow-lg ring-1 ring-white/15"
+          style={{
+            left: `${(hover.x / w) * 100}%`,
+            top: `${(hover.y / h) * 100}%`,
+            transform: `translate(${labelSide}, ${labelLift})`,
+          }}
+        >
+          {formatPoint(hover.value)}
+        </div>
+      ) : null}
+    </div>
   )
 }
