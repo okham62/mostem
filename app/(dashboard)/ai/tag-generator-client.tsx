@@ -36,6 +36,7 @@ export function TagGeneratorClient() {
   const [favorites, setFavorites] = useState<TagHistoryItem[]>([])
   const [listTab, setListTab] = useState<'recent' | 'favorites'>('recent')
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   useEffect(() => {
     setHistory(readTagHistory())
@@ -151,20 +152,22 @@ export function TagGeneratorClient() {
     ping('기록을 삭제했습니다.')
   }
 
-  function clearCurrentList() {
+  function askClearAll() {
+    if (listTab === 'favorites' ? favorites.length === 0 : history.length === 0) return
+    setConfirmClear(true)
+  }
+
+  function confirmClearAll() {
     if (listTab === 'favorites') {
-      if (favorites.length === 0) return
-      if (!confirm('즐겨찾기 목록을 모두 삭제할까요?')) return
       setFavorites(clearTagFavorites())
       ping('즐겨찾기를 모두 삭제했습니다.')
-      return
+    } else {
+      setHistory(clearTagHistory(history))
+      setFavorites(readTagFavorites())
+      setActiveHistoryId(null)
+      ping('생성 기록을 모두 삭제했습니다.')
     }
-    if (history.length === 0) return
-    if (!confirm('최근 생성 기록을 모두 삭제할까요?')) return
-    setHistory(clearTagHistory(history))
-    setFavorites(readTagFavorites())
-    setActiveHistoryId(null)
-    ping('생성 기록을 모두 삭제했습니다.')
+    setConfirmClear(false)
   }
 
   function openHistory(item: TagHistoryItem) {
@@ -193,6 +196,41 @@ export function TagGeneratorClient() {
       {toast && (
         <div className="fixed right-4 top-4 z-[70] rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
           {toast}
+        </div>
+      )}
+      {confirmClear && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-all-title"
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#16161b] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+          >
+            <h3 id="clear-all-title" className="text-base font-bold text-white">
+              정말 전체를 삭제할까요?
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-white/55">
+              {listTab === 'favorites'
+                ? '즐겨찾기 목록에 저장된 기록이 모두 사라집니다. 이 작업은 되돌릴 수 없습니다.'
+                : '최근 생성 기록이 모두 사라집니다. 이 작업은 되돌릴 수 없습니다.'}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="rounded-xl bg-white/8 px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/12"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmClearAll}
+                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-bold text-white hover:bg-red-400"
+              >
+                전체 삭제
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -363,7 +401,7 @@ export function TagGeneratorClient() {
             <button
               type="button"
               disabled={listTab === 'recent' ? history.length === 0 : favorites.length === 0}
-              onClick={clearCurrentList}
+              onClick={askClearAll}
               className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-red-300/80 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-35"
             >
               전체삭제
