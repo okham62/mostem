@@ -2,13 +2,17 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Clock3, Copy, Download, LoaderCircle, RefreshCw, Sparkles, Tags } from 'lucide-react'
+import { Clock3, Copy, Download, LoaderCircle, RefreshCw, Sparkles, Star, Tags } from 'lucide-react'
 import type { PlatformTagResult } from '@/lib/tag-generator'
 import {
+  isTagFavorite,
   mergeTagHistory,
+  readTagFavorites,
   readTagHistory,
   saveTagHistory,
+  TAG_FAVORITE_LIMIT,
   TAG_HISTORY_LIMIT,
+  toggleTagFavorite,
   type TagHistoryItem,
 } from '@/lib/tag-history'
 import { PlatformLogo } from '@/components/platform-logos'
@@ -25,10 +29,13 @@ export function TagGeneratorClient() {
   const [results, setResults] = useState<PlatformTagResult[]>([])
   const [copied, setCopied] = useState<string | null>(null)
   const [history, setHistory] = useState<TagHistoryItem[]>([])
+  const [favorites, setFavorites] = useState<TagHistoryItem[]>([])
+  const [listTab, setListTab] = useState<'recent' | 'favorites'>('recent')
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
 
   useEffect(() => {
     setHistory(readTagHistory())
+    setFavorites(readTagFavorites())
     void fetch('/api/ai/tags/history', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -120,6 +127,12 @@ export function TagGeneratorClient() {
     setActiveHistoryId(null)
     setError('')
     ping('초기화했습니다.')
+  }
+
+  function toggleFavorite(item: TagHistoryItem) {
+    const next = toggleTagFavorite(item)
+    setFavorites(next)
+    ping(isTagFavorite(item.id, next) ? '즐겨찾기에 저장했습니다.' : '즐겨찾기에서 뺐습니다.')
   }
 
   function openHistory(item: TagHistoryItem) {
@@ -276,50 +289,147 @@ export function TagGeneratorClient() {
 
       <aside className="lg:sticky lg:top-4">
       <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 md:p-5">
-        <div className="mb-4 flex items-end justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold text-white">
-              <Clock3 className="h-4 w-4 text-gold" />
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setListTab('recent')}
+            className={cn(
+              'rounded-xl border px-3 py-2.5 text-left transition',
+              listTab === 'recent'
+                ? 'border-gold/40 bg-gold/10'
+                : 'border-white/8 bg-black/20 hover:border-white/15'
+            )}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-white">
+              <Clock3 className="h-3.5 w-3.5 text-gold" />
               최근 생성 기록
-            </h2>
-            <p className="mt-1 text-xs text-white/40">최근 {TAG_HISTORY_LIMIT}개까지 저장되며, 클릭하면 그때 결과를 다시 볼 수 있습니다.</p>
-          </div>
-          <span className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/50">
-            {history.length}/{TAG_HISTORY_LIMIT}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setListTab('favorites')}
+            className={cn(
+              'rounded-xl border px-3 py-2.5 text-left transition',
+              listTab === 'favorites'
+                ? 'border-gold/40 bg-gold/10'
+                : 'border-white/8 bg-black/20 hover:border-white/15'
+            )}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-white">
+              <Star className="h-3.5 w-3.5 text-gold" />
+              즐겨찾기 목록
+            </span>
+          </button>
+        </div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-white/40">
+            {listTab === 'recent'
+              ? `최근 ${TAG_HISTORY_LIMIT}개까지 저장되며, 클릭하면 그때 결과를 다시 볼 수 있습니다.`
+              : `별 버튼으로 저장한 기록을 다시 불러올 수 있습니다. 최대 ${TAG_FAVORITE_LIMIT}개.`}
+          </p>
+          <span className="shrink-0 rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/50">
+            {listTab === 'recent'
+              ? `${history.length}/${TAG_HISTORY_LIMIT}`
+              : `${favorites.length}/${TAG_FAVORITE_LIMIT}`}
           </span>
         </div>
-        {history.length === 0 ? (
+        {listTab === 'recent' ? (
+          history.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
+              아직 생성 기록이 없습니다.
+            </div>
+          ) : (
+            <HistoryList
+              items={history}
+              favorites={favorites}
+              activeId={activeHistoryId}
+              onOpen={openHistory}
+              onFavorite={toggleFavorite}
+              formatTime={formatHistoryTime}
+            />
+          )
+        ) : favorites.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
-            아직 생성 기록이 없습니다.
+            아직 즐겨찾기한 기록이 없습니다.
           </div>
         ) : (
-          <div className="max-h-[28rem] space-y-2 overflow-y-auto scrollbar-thin pr-1 lg:max-h-[calc(100vh-12rem)]">
-            {history.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => openHistory(item)}
-                className={cn(
-                  'flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition',
-                  activeHistoryId === item.id
-                    ? 'border-gold/40 bg-gold/10'
-                    : 'border-white/8 bg-black/20 hover:border-white/15 hover:bg-white/5'
-                )}
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{item.topic}</p>
-                  <p className="mt-0.5 text-[11px] text-white/40">
-                    {item.platforms.length}개 플랫폼 · {formatHistoryTime(item.createdAt)}
-                  </p>
-                </div>
-                <span className="shrink-0 text-[11px] font-semibold text-white/45">불러오기</span>
-              </button>
-            ))}
-          </div>
+          <HistoryList
+            items={favorites}
+            favorites={favorites}
+            activeId={activeHistoryId}
+            onOpen={openHistory}
+            onFavorite={toggleFavorite}
+            formatTime={formatHistoryTime}
+          />
         )}
       </section>
       </aside>
       </div>
+    </div>
+  )
+}
+
+function HistoryList({
+  items,
+  favorites,
+  activeId,
+  onOpen,
+  onFavorite,
+  formatTime,
+}: {
+  items: TagHistoryItem[]
+  favorites: TagHistoryItem[]
+  activeId: string | null
+  onOpen: (item: TagHistoryItem) => void
+  onFavorite: (item: TagHistoryItem) => void
+  formatTime: (at: number) => string
+}) {
+  return (
+    <div className="max-h-[28rem] space-y-2 overflow-y-auto scrollbar-thin pr-1 lg:max-h-[calc(100vh-14rem)]">
+      {items.map((item) => {
+        const favored = isTagFavorite(item.id, favorites)
+        return (
+          <div
+            key={item.id}
+            className={cn(
+              'flex items-center gap-2 rounded-xl border px-3 py-3 transition',
+              activeId === item.id
+                ? 'border-gold/40 bg-gold/10'
+                : 'border-white/8 bg-black/20 hover:border-white/15 hover:bg-white/5'
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => onOpen(item)}
+              className="min-w-0 flex-1 text-left"
+            >
+              <p className="truncate text-sm font-semibold text-white">{item.topic}</p>
+              <p className="mt-0.5 text-[11px] text-white/40">
+                {item.platforms.length}개 플랫폼 · {formatTime(item.createdAt)}
+              </p>
+            </button>
+            <button
+              type="button"
+              aria-label={favored ? '즐겨찾기 해제' : '즐겨찾기에 저장'}
+              aria-pressed={favored}
+              onClick={() => onFavorite(item)}
+              className={cn(
+                'rounded-lg p-1.5 transition',
+                favored ? 'text-gold hover:bg-gold/15' : 'text-white/35 hover:bg-white/8 hover:text-gold'
+              )}
+            >
+              <Star className={cn('h-4 w-4', favored && 'fill-current')} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpen(item)}
+              className="shrink-0 text-[11px] font-semibold text-white/45 hover:text-white"
+            >
+              불러오기
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }

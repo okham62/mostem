@@ -6,7 +6,9 @@ import {
 } from '@/lib/tag-generator'
 
 export const TAG_HISTORY_LIMIT = 50
+export const TAG_FAVORITE_LIMIT = 50
 const STORAGE_KEY = 'mostem:tag-history-v1'
+const FAVORITE_KEY = 'mostem:tag-favorites-v1'
 
 export type TagHistoryItem = {
   id: string
@@ -97,4 +99,41 @@ export function mergeTagHistory(items: TagHistoryItem[]): TagHistoryItem[] {
 
 export function isTagPlatformId(value: string): value is TagPlatformId {
   return TAG_PLATFORMS.some((platform) => platform.id === value)
+}
+
+function persistFavorites(items: TagHistoryItem[]) {
+  if (typeof window === 'undefined') return items
+  try {
+    window.localStorage.setItem(FAVORITE_KEY, JSON.stringify(items))
+  } catch {
+    /* ignore quota */
+  }
+  return items
+}
+
+export function readTagFavorites(): TagHistoryItem[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(FAVORITE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as TagHistoryItem[]
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((item) => item?.id && item?.topic && Array.isArray(item.platforms))
+      .slice(0, TAG_FAVORITE_LIMIT)
+  } catch {
+    return []
+  }
+}
+
+export function isTagFavorite(id: string, favorites = readTagFavorites()) {
+  return favorites.some((item) => item.id === id)
+}
+
+export function toggleTagFavorite(item: TagHistoryItem): TagHistoryItem[] {
+  const current = readTagFavorites()
+  if (current.some((row) => row.id === item.id)) {
+    return persistFavorites(current.filter((row) => row.id !== item.id))
+  }
+  return persistFavorites([item, ...current].slice(0, TAG_FAVORITE_LIMIT))
 }
