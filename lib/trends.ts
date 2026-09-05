@@ -99,7 +99,7 @@ let inflight: Promise<TrendsPayload> | null = null
 let inflightKey: string | null = null
 const detailCache = new Map<string, { at: number; data: TrendDetail }>()
 const detailInflight = new Map<string, Promise<TrendDetail>>()
-let itemCache = new Map<string, TrendKeyword>()
+const itemCache = new Map<string, TrendKeyword>()
 
 function seoulYmd(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(date)
