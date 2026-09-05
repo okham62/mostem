@@ -27,6 +27,7 @@ export function MarketTicker() {
   const pathname = usePathname()
   const [items, setItems] = useState<MarketItem[]>(emptyMarketItems)
   const [forcedHide, setForcedHide] = useState(hideNow)
+  const hostRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const lensRef = useRef<HTMLDivElement>(null)
   const cloneRef = useRef<HTMLDivElement>(null)
@@ -68,9 +69,10 @@ export function MarketTicker() {
 
   function onMove(event: React.MouseEvent<HTMLDivElement>) {
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+    const host = hostRef.current
     const row = rowRef.current
-    if (!row) return
-    const rect = row.getBoundingClientRect()
+    if (!host || !row) return
+    const rect = host.getBoundingClientRect()
     pointRef.current = {
       x: event.clientX - rect.left + row.scrollLeft,
       y: event.clientY - rect.top,
@@ -95,27 +97,30 @@ export function MarketTicker() {
   if (onMarkets) return null
 
   return (
-    <div className="sticky top-0 z-30 overflow-visible border-b border-[var(--card-border)] bg-[var(--ticker-bg)]">
+    <div
+      ref={hostRef}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      className="relative sticky top-0 z-30 overflow-x-clip overflow-y-visible border-b border-[var(--card-border)] bg-[var(--ticker-bg)]"
+    >
       <div
         ref={rowRef}
-        onMouseMove={onMove}
-        onMouseLeave={onLeave}
-        className="relative flex flex-nowrap items-center justify-center gap-2 overflow-x-auto px-3 py-2.5 scrollbar-thin md:gap-2.5 md:px-4"
+        className="flex flex-nowrap items-center justify-center gap-2 overflow-x-auto overflow-y-hidden px-3 py-2.5 [scrollbar-width:none] [-ms-overflow-style:none] md:gap-2.5 md:px-4 [&::-webkit-scrollbar]:hidden"
       >
         <TickerPills items={items} />
+      </div>
+      <div
+        ref={lensRef}
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-0 z-10 overflow-hidden rounded-full border border-white/25 bg-[var(--ticker-bg)] opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.45)] will-change-transform"
+        style={{ width: LENS, height: LENS }}
+      >
         <div
-          ref={lensRef}
-          aria-hidden
-          className="pointer-events-none absolute left-0 top-0 z-10 overflow-hidden rounded-full border border-white/25 bg-[var(--ticker-bg)] opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.45)] will-change-transform"
-          style={{ width: LENS, height: LENS }}
+          ref={cloneRef}
+          className="absolute left-0 top-0 box-border flex flex-nowrap items-center justify-center gap-2 px-3 py-2.5 will-change-transform md:gap-2.5 md:px-4"
+          style={{ transformOrigin: '0 0' }}
         >
-          <div
-            ref={cloneRef}
-            className="absolute left-0 top-0 box-border flex flex-nowrap items-center justify-center gap-2 px-3 py-2.5 will-change-transform md:gap-2.5 md:px-4"
-            style={{ transformOrigin: '0 0' }}
-          >
-            <TickerPills items={items} inert />
-          </div>
+          <TickerPills items={items} inert />
         </div>
       </div>
     </div>
