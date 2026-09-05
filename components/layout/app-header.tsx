@@ -13,7 +13,6 @@ const TITLES: Record<string, string> = {
   '/markets': '마켓 시세',
   '/trends': '트렌드 데이터',
   '/shopping': '쇼핑 베스트',
-  '/products': '상품 보드',
   '/threads': '스레드',
   '/instagram': '인스타',
   '/tiktok': '틱톡',

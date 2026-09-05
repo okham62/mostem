@@ -9,7 +9,6 @@ import {
   Newspaper,
   TrendingUp,
   ShoppingBag,
-  LayoutGrid,
   LineChart,
   Link2,
   Users,
@@ -29,7 +28,6 @@ const explore = [
   { href: '/markets', label: '마켓 시세', icon: LineChart },
   { href: '/trends', label: '트렌드 데이터', icon: TrendingUp },
   { href: '/shopping', label: '쇼핑 베스트', icon: ShoppingBag },
-  { href: '/products', label: '상품 보드', icon: LayoutGrid },
 ]
 
 function ThreadsIcon() {
