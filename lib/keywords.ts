@@ -43,6 +43,7 @@ const GOOGLE_RSS_URLS = [
 const GOOGLE_TRENDING_URL = 'https://trends.google.com/trending?geo=KR&hl=ko'
 const NATE_URL = 'https://www.nate.com/js/data/jsonLiveKeywordDataV1.js'
 const ZUM_URL = 'https://zum.com/'
+const DAUM_URL = 'https://www.daum.net/'
 const KEYWORD_LIMIT = 30
 const FRESH_MS = 45_000
 const STALE_MS = 15 * 60_000
@@ -173,6 +174,35 @@ function mergeKeywords(groups: RealtimeKeyword[][], limit = KEYWORD_LIMIT) {
   return out
 }
 
+export function stabilizeKeywordList(
+  incoming: RealtimeKeyword[] | undefined,
+  previous: RealtimeKeyword[] | undefined,
+  limit = KEYWORD_LIMIT
+) {
+  return mergeKeywords([incoming ?? [], previous ?? []], limit)
+}
+
+export function stabilizeKeywordsPayload(
+  incoming: KeywordsPayload,
+  previous?: KeywordsPayload | null
+): KeywordsPayload {
+  if (!previous?.sources?.length) return incoming
+  const sources = incoming.sources.map((source) => {
+    const old = previous.sources.find((item) => item.id === source.id)
+    const keywords = stabilizeKeywordList(source.keywords, old?.keywords)
+    return {
+      ...source,
+      keywords,
+      ...(keywords.length ? { error: undefined } : {}),
+    }
+  })
+  return {
+    ...incoming,
+    sources,
+    keywords: sources.find((source) => source.id === 'signal')?.keywords ?? incoming.keywords,
+  }
+}
+
 function toKeyword(
   keyword: string,
   extra: Partial<RealtimeKeyword> = {}
@@ -231,16 +261,18 @@ function parseGoogleRss(xml: string): RealtimeKeyword[] {
 }
 
 function parseGoogleTrendingHtml(html: string): RealtimeKeyword[] {
-  const rows = Array.from(
-    html.matchAll(/\["([^"]{1,80})",null,"KR",\[\d+\](?:,\[\d+\])?,null,(\d+)/g)
+  const decoded = html.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+    String.fromCharCode(Number.parseInt(hex, 16))
   )
   const seen = new Set<string>()
   const items: { keyword: string; volume: number }[] = []
+  const rows = decoded.matchAll(/\["([^"]{2,80})",null,"KR"(?:,\[[^\]]*\])*(?:,null,(\d+))?/g)
   for (const row of rows) {
     const keyword = decodeXml(row[1]).trim()
-    const volume = Number(row[2])
+    const volume = Number(row[2] || 0)
     const key = keywordKey(keyword)
-    if (!keyword || !key || seen.has(key) || !Number.isFinite(volume)) continue
+    if (!keyword || !key || seen.has(key)) continue
+    if (key.includes('daily search trends')) continue
     seen.add(key)
     items.push({ keyword, volume })
   }
@@ -250,7 +282,7 @@ function parseGoogleTrendingHtml(html: string): RealtimeKeyword[] {
       rank: index + 1,
       summaryUrl: googleTrends(item.keyword),
       searchUrl: googleSearch(item.keyword),
-      traffic: String(item.volume),
+      ...(item.volume ? { traffic: String(item.volume) } : {}),
     })
   )
 }
@@ -293,6 +325,29 @@ function parseZumKeywords(html: string): RealtimeKeyword[] {
   return keywords
 }
 
+function parseDaumKeywords(html: string): RealtimeKeyword[] {
+  const seen = new Set<string>()
+  const keywords: RealtimeKeyword[] = []
+  for (const match of html.matchAll(/"keyword"\s*:\s*"((?:\\.|[^"\\]){2,40})"/g)) {
+    const keyword = decodeXml(
+      match[1].replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+        String.fromCharCode(Number.parseInt(hex, 16))
+      )
+    ).trim()
+    if (!keyword || keyword.length < 2) continue
+    const key = keywordKey(keyword)
+    if (seen.has(key)) continue
+    seen.add(key)
+    keywords.push(
+      toKeyword(keyword, {
+        rank: keywords.length + 1,
+        searchUrl: naverSearch(keyword),
+      })
+    )
+  }
+  return keywords
+}
+
 function decodeMaybeEucKr(buf: ArrayBuffer) {
   const bytes = Buffer.from(buf)
   try {
@@ -309,7 +364,7 @@ async function fetchSignalCore(): Promise<{ now: number; keywords: RealtimeKeywo
       'User-Agent': BROWSER_UA,
     },
     cache: 'no-store',
-    signal: AbortSignal.timeout(4000),
+    signal: AbortSignal.timeout(6000),
   })
   if (!res.ok) throw new Error(`signal ${res.status}`)
   const raw = (await res.json()) as SignalPayload
@@ -320,12 +375,83 @@ async function fetchSignalCore(): Promise<{ now: number; keywords: RealtimeKeywo
   }
 }
 
+function mergeNews(groups: RankingNews[][]) {
+  const seen = new Set<string>()
+  const out: RankingNews[] = []
+  for (const group of groups) {
+    for (const item of group) {
+      const link = item.link?.trim()
+      if (!link || seen.has(link)) continue
+      seen.add(link)
+      out.push(item)
+    }
+  }
+  return out
+}
+
+async function fetchGoogleNewsRss(): Promise<RankingNews[]> {
+  const urls = [
+    'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko',
+    'https://news.google.com/rss/headlines/section/topic/NATION?hl=ko&gl=KR&ceid=KR:ko',
+  ]
+  const pages = await Promise.all(
+    urls.map((url) =>
+      fetch(url, {
+        headers: { 'User-Agent': BROWSER_UA, Accept: 'application/rss+xml,application/xml,text/xml' },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
+      })
+        .then((res) => (res.ok ? res.text() : ''))
+        .catch(() => '')
+    )
+  )
+  const items: RankingNews[] = []
+  const seen = new Set<string>()
+  for (const xml of pages) {
+    const blocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? []
+    for (const block of blocks) {
+      const titleRaw = decodeXml((block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/) || [])[1] || '')
+      const link = decodeXml((block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || '').trim()
+      const source = decodeXml((block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || '')
+      if (!titleRaw || !link || seen.has(link)) continue
+      seen.add(link)
+      const cut = titleRaw.lastIndexOf(' - ')
+      const title = cut > 8 ? titleRaw.slice(0, cut).trim() : titleRaw
+      const press = source || (cut > 8 ? titleRaw.slice(cut + 3).trim() : '뉴스')
+      const logo = pressImage(press)
+      items.push({
+        title,
+        link,
+        image: '',
+        press,
+        ...(logo ? { pressImage: logo } : {}),
+      })
+    }
+  }
+  return items
+}
+
+let lastNaver: RealtimeKeyword[] = []
+
 async function fetchSignal(): Promise<{ now: number; keywords: RealtimeKeyword[]; news: RankingNews[] }> {
-  const [core, nate, zum] = await Promise.all([fetchSignalCore(), fetchNateKeywords(), fetchZumKeywords()])
+  const newsPromise = fetchGoogleNewsRss().catch(() => [] as RankingNews[])
+  const [core, nate, zum, daum] = await Promise.all([
+    fetchSignalCore().catch(() => ({ now: Date.now(), keywords: [] as RealtimeKeyword[], news: [] as RankingNews[] })),
+    fetchNateKeywords(),
+    fetchZumKeywords(),
+    fetchDaumKeywords(),
+  ])
+  const extraNews = await Promise.race([
+    newsPromise,
+    new Promise<RankingNews[]>((resolve) => setTimeout(() => resolve([]), 2200)),
+  ])
+  const keywords = mergeKeywords([core.keywords, nate, zum, daum, lastNaver])
+  if (keywords.length) lastNaver = keywords
+  if (!keywords.length) throw new Error('naver empty')
   return {
     now: core.now,
-    keywords: mergeKeywords([core.keywords, nate, zum]),
-    news: core.news,
+    keywords,
+    news: mergeNews([core.news, extraNews]),
   }
 }
 
@@ -360,16 +486,40 @@ async function fetchZumKeywords(): Promise<RealtimeKeyword[]> {
   }
 }
 
+async function fetchDaumKeywords(): Promise<RealtimeKeyword[]> {
+  try {
+    const res = await fetch(DAUM_URL, {
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Accept: 'text/html',
+        'Accept-Language': 'ko-KR,ko;q=0.9',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return []
+    return parseDaumKeywords(await res.text())
+  } catch {
+    return []
+  }
+}
+
+const GOOGLE_HEADERS = {
+  'User-Agent': BROWSER_UA,
+  'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+  Referer: 'https://trends.google.com/trending?geo=KR',
+}
+
 async function fetchGoogleRss() {
   for (const url of GOOGLE_RSS_URLS) {
     try {
       const res = await fetch(url, {
         headers: {
+          ...GOOGLE_HEADERS,
           Accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
-          'User-Agent': BROWSER_UA,
         },
         cache: 'no-store',
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(5000),
       })
       if (!res.ok) continue
       const keywords = parseGoogleRss(await res.text())
@@ -381,57 +531,100 @@ async function fetchGoogleRss() {
   return []
 }
 
-async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
-  const [rssKeywords, htmlKeywords] = await Promise.all([
-    fetchGoogleRss(),
-    fetch(GOOGLE_TRENDING_URL, {
+async function readGoogleHtml(url: string): Promise<RealtimeKeyword[]> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8000)
+  let text = ''
+  try {
+    const res = await fetch(url, {
       headers: {
-        Accept: 'text/html',
-        'User-Agent': BROWSER_UA,
+        ...GOOGLE_HEADERS,
+        Accept: 'text/html,application/xhtml+xml',
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(12000),
+      signal: controller.signal,
     })
-      .then(async (res) => (res.ok ? parseGoogleTrendingHtml(await res.text()) : []))
-      .catch(() => []),
-  ])
+    if (!res.ok) return []
+    if (!res.body) return parseGoogleTrendingHtml(await res.text())
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += decoder.decode(value, { stream: true })
+      if (parseGoogleTrendingHtml(text).length >= KEYWORD_LIMIT) {
+        controller.abort()
+        break
+      }
+    }
+  } catch {
+    /* timeout or stop after 30 rows */
+  } finally {
+    clearTimeout(timer)
+  }
+  return parseGoogleTrendingHtml(text)
+}
 
-  const keywords = mergeKeywords([rssKeywords, htmlKeywords])
-  if (keywords.length === 0) throw new Error('google empty')
-  return { now: Date.now(), keywords }
+async function fetchGoogleHtml() {
+  for (const url of [`${GOOGLE_TRENDING_URL}&hours=24`, GOOGLE_TRENDING_URL]) {
+    const keywords = await readGoogleHtml(url)
+    if (keywords.length) return keywords
+  }
+  return []
+}
+
+let lastGoogle: { now: number; keywords: RealtimeKeyword[] } | null = null
+
+async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
+  const [rssKeywords, htmlKeywords] = await Promise.all([fetchGoogleRss(), fetchGoogleHtml()])
+  const keywords = mergeKeywords([htmlKeywords, rssKeywords, lastGoogle?.keywords ?? []])
+  if (keywords.length === 0) {
+    if (lastGoogle?.keywords.length) return lastGoogle
+    throw new Error('google empty')
+  }
+  lastGoogle = { now: Date.now(), keywords }
+  return lastGoogle
+}
+
+function previousSource(id: KeywordSourceId) {
+  return cache?.data.sources?.find((source) => source.id === id) ?? null
 }
 
 function payloadFromSources(
   signal: { now: number; keywords: RealtimeKeyword[]; news?: RankingNews[] } | null,
   google: { now: number; keywords: RealtimeKeyword[] } | null
 ): KeywordsPayload {
+  const prevNaver = previousSource('signal')
+  const prevGoogle = previousSource('google')
+  const naverKeywords = stabilizeKeywordList(signal?.keywords, prevNaver?.keywords)
+  const googleKeywords = stabilizeKeywordList(google?.keywords, prevGoogle?.keywords)
   const sources: KeywordSource[] = [
     {
       id: 'signal',
       label: '네이버',
       hint: '실시간 검색어',
-      now: signal?.now ?? Date.now(),
-      keywords: signal?.keywords ?? [],
-      ...(signal ? {} : { error: '네이버 순위를 불러오지 못했습니다.' }),
+      now: signal?.now ?? prevNaver?.now ?? Date.now(),
+      keywords: naverKeywords,
+      ...(naverKeywords.length ? {} : { error: '네이버 순위를 불러오지 못했습니다.' }),
     },
     {
       id: 'google',
       label: '구글',
       hint: '한국 급상승 검색어',
-      now: google?.now ?? cache?.data.sources?.find(s => s.id === 'google')?.now ?? Date.now(),
-      keywords: google?.keywords ?? cache?.data.sources?.find(s => s.id === 'google')?.keywords ?? [],
-      ...(google || cache?.data.sources?.find(s => s.id === 'google')?.keywords?.length
-        ? {}
-        : { error: '구글 트렌드를 불러오지 못했습니다.' }),
+      now: google?.now ?? prevGoogle?.now ?? Date.now(),
+      keywords: googleKeywords,
+      ...(googleKeywords.length ? {} : { error: '구글 트렌드를 불러오지 못했습니다.' }),
     },
   ]
 
   return {
     now: signal?.now ?? google?.now ?? Date.now(),
-    keywords: signal?.keywords ?? [],
+    keywords: naverKeywords,
     sources,
     news: signal?.news ?? cache?.data.news ?? [],
-    ...(!signal && !google ? { error: '실시간 키워드를 불러오지 못했습니다.' } : {}),
+    ...(!signal && !google && !naverKeywords.length && !googleKeywords.length
+      ? { error: '실시간 키워드를 불러오지 못했습니다.' }
+      : {}),
   }
 }
 
@@ -445,14 +638,30 @@ async function refreshKeywords(mode: 'fast' | 'full' = 'full'): Promise<Keywords
   if (mode === 'fast') {
     try {
       const signal = await fetchSignal()
-      const data = payloadFromSources(signal, previousGoogle())
+      const data = payloadFromSources(signal, lastGoogle ?? previousGoogle())
       cache = { at: Date.now(), data }
+      if (!inflight) {
+        inflight = fetchGoogle()
+          .then((google) => {
+            const next = payloadFromSources(
+              {
+                now: cache?.data.now ?? signal.now,
+                keywords: cache?.data.keywords ?? signal.keywords,
+                news: cache?.data.news ?? signal.news,
+              },
+              google
+            )
+            cache = { at: Date.now(), data: next }
+            return next
+          })
+          .catch(() => cache?.data ?? data)
+          .finally(() => {
+            inflight = null
+          })
+      }
       return data
     } catch {
-      return (
-        cache?.data ??
-        payloadFromSources(null, null)
-      )
+      return cache?.data ?? payloadFromSources(null, lastGoogle ?? previousGoogle())
     }
   }
 

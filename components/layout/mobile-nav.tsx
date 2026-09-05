@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Flame, MessageSquare, Sparkles, Newspaper, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { warmMarketCharts } from '@/lib/market-cache'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
 import type { Session } from 'next-auth'
 
@@ -23,7 +24,10 @@ export function MobileNav({ session }: { session: Session | null }) {
     : navItems
 
   useEffect(() => {
-    const id = window.setTimeout(() => warmRealtimeCache(), 300)
+    const id = window.setTimeout(() => {
+      warmRealtimeCache()
+      warmMarketCharts()
+    }, 300)
     return () => window.clearTimeout(id)
   }, [])
 

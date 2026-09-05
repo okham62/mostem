@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { BrandMark } from '@/components/brand-logos'
 import { cn } from '@/lib/utils'
+import { warmMarketCharts } from '@/lib/market-cache'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
 import { previewHideMarketTicker } from '@/components/layout/market-ticker'
@@ -88,10 +89,12 @@ function NavGroup({
                 onMouseEnter={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
                   if (item.href === '/shopping') warmShoppingCache()
+                  if (item.href === '/markets') warmMarketCharts()
                 }}
                 onFocus={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
                   if (item.href === '/shopping') warmShoppingCache()
+                  if (item.href === '/markets') warmMarketCharts()
                 }}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -118,7 +121,10 @@ export function Sidebar({ session, onHide }: SidebarProps) {
   const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
-    const id = window.setTimeout(() => warmRealtimeCache(), 300)
+    const id = window.setTimeout(() => {
+      warmRealtimeCache()
+      warmMarketCharts()
+    }, 300)
     return () => window.clearTimeout(id)
   }, [])
 

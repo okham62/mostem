@@ -70,8 +70,12 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
 
   useEffect(() => {
     const boot = async () => {
-      if (!peekRealtimeCache()) await reload('fast')
-      await reload('full')
+      if (peekRealtimeCache()) {
+        void fetchRealtime('full').then(setData)
+        return
+      }
+      await reload('fast')
+      void reload('full')
     }
     void boot()
     const tick = () => {
@@ -167,9 +171,7 @@ function KeywordPanel({
       {source?.error && keywords.length === 0 ? (
         <div className="py-10 text-center text-sm text-white/40">{source.error || empty}</div>
       ) : (
-        <div className="max-h-[70vh] overflow-y-auto scrollbar-thin pr-1">
-          <KeywordColumn items={keywords} source={source?.label || ''} />
-        </div>
+        <KeywordColumn items={keywords} source={source?.label || ''} />
       )}
     </section>
   )

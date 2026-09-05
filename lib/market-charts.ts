@@ -73,7 +73,7 @@ function downsample(points: number[], max = 56) {
   return out
 }
 
-async function fetchJson(url: string, timeout = 8000) {
+async function fetchJson(url: string, timeout = 4500) {
   const res = await fetch(url, {
     headers: { Accept: 'application/json', 'User-Agent': UA },
     cache: 'no-store',
@@ -154,26 +154,57 @@ async function fetchFrankfurterFx() {
   return { usd, cny }
 }
 
+async function fetchCoinHours(id: 'btc' | 'eth' | 'xrp' | 'sol') {
+  try {
+    const points = await fetchBinanceHours(COIN_BINANCE[id])
+    if (points.length >= 2) return points
+  } catch {
+    /* try upbit */
+  }
+  try {
+    const points = await fetchUpbitHours(COIN_UPBIT[id])
+    if (points.length >= 2) return points
+  } catch {
+    /* keep empty */
+  }
+  return []
+}
+
+function keepSeries(next: MarketChartsPayload['series']) {
+  const prev = cache?.data.series ?? {}
+  for (const key of Object.keys(prev) as ChartSeriesId[]) {
+    if ((!next[key] || (next[key]?.length ?? 0) < 2) && (prev[key]?.length ?? 0) >= 2) {
+      next[key] = prev[key]
+    }
+  }
+  return next
+}
+
 async function refreshCharts(): Promise<MarketChartsPayload> {
   const series: MarketChartsPayload['series'] = {}
   const fxChange: MarketChartsPayload['fxChange'] = {}
 
-  const [usd, cny, ...coins] = await Promise.all([
+  const [usd, cny, frank, coinRows, indexRows] = await Promise.all([
     fetchYahoo('KRW=X'),
     fetchYahoo('CNYKRW=X'),
-    ...(['btc', 'eth', 'xrp', 'sol'] as const).map(async (id) => {
-      try {
-        const points = await fetchUpbitHours(COIN_UPBIT[id])
-        if (points.length >= 2) return [id, points] as const
-      } catch {
-        /* fallback */
-      }
-      try {
-        return [id, await fetchBinanceHours(COIN_BINANCE[id])] as const
-      } catch {
-        return [id, [] as number[]] as const
-      }
-    }),
+    fetchFrankfurterFx().catch(() => ({ usd: [] as number[], cny: [] as number[] })),
+    Promise.all(
+      (['btc', 'eth', 'xrp', 'sol'] as const).map(async (id) => [id, await fetchCoinHours(id)] as const)
+    ),
+    Promise.all(
+      (Object.keys(INDEX_META) as IndexId[]).map(async (id) => {
+        const meta = INDEX_META[id]
+        const chart = await fetchYahoo(meta.symbol)
+        if (chart?.points.length) series[id] = chart.points
+        return {
+          id,
+          label: meta.label,
+          note: meta.note,
+          value: chart?.price ?? cache?.data.indices.find((row) => row.id === id)?.value ?? null,
+          change: chart?.change ?? cache?.data.indices.find((row) => row.id === id)?.change ?? null,
+        } satisfies IndexQuote
+      })
+    ),
   ])
 
   if (usd?.points.length) {
@@ -184,43 +215,30 @@ async function refreshCharts(): Promise<MarketChartsPayload> {
     series.cny = cny.points
     fxChange.cny = cny.change
   }
+  if (!series.usd && frank.usd.length >= 2) series.usd = downsample(frank.usd)
+  if (!series.cny && frank.cny.length >= 2) series.cny = downsample(frank.cny)
 
-  if (!series.usd || !series.cny) {
-    try {
-      const fallback = await fetchFrankfurterFx()
-      if (!series.usd && fallback.usd.length >= 2) series.usd = downsample(fallback.usd)
-      if (!series.cny && fallback.cny.length >= 2) series.cny = downsample(fallback.cny)
-    } catch {
-      /* keep what we have */
-    }
-  }
-
-  for (const [id, points] of coins) {
+  for (const [id, points] of coinRows) {
     if (points.length >= 2) series[id] = points
   }
 
-  const indexRows = await Promise.all(
-    (Object.keys(INDEX_META) as IndexId[]).map(async (id) => {
-      const meta = INDEX_META[id]
-      const chart = await fetchYahoo(meta.symbol)
-      if (chart?.points.length) series[id] = chart.points
-      return {
-        id,
-        label: meta.label,
-        note: meta.note,
-        value: chart?.price ?? null,
-        change: chart?.change ?? null,
-      } satisfies IndexQuote
-    })
-  )
-
   const data: MarketChartsPayload = {
     now: Date.now(),
-    series,
-    indices: indexRows,
-    fxChange,
+    series: keepSeries(series),
+    indices: indexRows.map((row) => {
+      const prev = cache?.data.indices.find((item) => item.id === row.id)
+      return {
+        ...row,
+        value: row.value ?? prev?.value ?? null,
+        change: row.change ?? prev?.change ?? null,
+      }
+    }),
+    fxChange: {
+      usd: fxChange.usd ?? cache?.data.fxChange.usd ?? null,
+      cny: fxChange.cny ?? cache?.data.fxChange.cny ?? null,
+    },
   }
-  if (Object.keys(series).length) cache = { at: Date.now(), data }
+  if (Object.keys(data.series).length) cache = { at: Date.now(), data }
   return cache?.data ?? data
 }
 

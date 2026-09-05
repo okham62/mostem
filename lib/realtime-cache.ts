@@ -1,4 +1,4 @@
-import type { KeywordsPayload } from '@/lib/keywords'
+import { stabilizeKeywordsPayload, type KeywordsPayload } from '@/lib/keywords'
 
 const STORAGE_KEY = 'mostem:realtime-v1'
 let memory: KeywordsPayload | null = null
@@ -8,7 +8,7 @@ export function peekRealtimeCache(): KeywordsPayload | null {
   if (memory) return memory
   if (typeof window === 'undefined') return null
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     memory = JSON.parse(raw) as KeywordsPayload
     return memory
@@ -21,9 +21,13 @@ export function writeRealtimeCache(data: KeywordsPayload) {
   memory = data
   if (typeof window === 'undefined') return
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   } catch {
-    /* ignore quota */
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    } catch {
+      /* ignore quota */
+    }
   }
 }
 
@@ -36,8 +40,8 @@ export async function fetchRealtime(scope: 'fast' | 'full' | 'news' = 'full') {
     writeRealtimeCache({ ...memory, news: data.news, now: data.now })
     return peekRealtimeCache() ?? data
   }
-  writeRealtimeCache(data)
-  return data
+  writeRealtimeCache(stabilizeKeywordsPayload(data, memory))
+  return peekRealtimeCache() ?? data
 }
 
 export function warmRealtimeCache() {

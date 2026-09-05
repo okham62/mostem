@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useState, type ReactNode } from 'react'
 import { MarketIcon } from '@/components/market-icons'
 import { subscribeLiveMarkets } from '@/lib/live-markets'
 import {
@@ -10,6 +10,7 @@ import {
   type MarketChartsPayload,
 } from '@/lib/market-charts'
 import { emptyMarketItems, formatChange, formatKrw, formatUsd, type MarketItem } from '@/lib/markets'
+import { fetchMarketCharts, peekMarketCharts } from '@/lib/market-cache'
 import { cn } from '@/lib/utils'
 
 const EMPTY_INDICES: IndexQuote[] = [
@@ -25,11 +26,15 @@ export function MarketsClient() {
 
   useEffect(() => subscribeLiveMarkets(setItems), [])
 
+  useLayoutEffect(() => {
+    const cached = peekMarketCharts()
+    if (cached) setCharts(cached)
+  }, [])
+
   useEffect(() => {
     let alive = true
-    void fetch('/api/markets/charts', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: MarketChartsPayload | null) => {
+    void fetchMarketCharts()
+      .then((data) => {
         if (alive && data?.series) setCharts(data)
       })
       .catch(() => {})
