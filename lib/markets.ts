@@ -206,7 +206,6 @@ export async function getMarkets(): Promise<MarketsPayload> {
 
 export function formatKrw(value: number | null) {
   if (value == null) return '-'
-  if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(2)}억`
   if (value >= 10_000) return `${Math.round(value).toLocaleString('ko-KR')}원`
   return `${value.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원`
 }
