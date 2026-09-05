@@ -20,6 +20,7 @@ import { BrandMark } from '@/components/brand-logos'
 import { cn } from '@/lib/utils'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
+import { previewHideMarketTicker } from '@/components/layout/market-ticker'
 import type { Session } from 'next-auth'
 
 const explore = [
@@ -79,6 +80,9 @@ function NavGroup({
             <li key={item.href}>
               <Link
                 href={item.href}
+                onClick={() => {
+                  previewHideMarketTicker(item.href === '/markets')
+                }}
                 onMouseEnter={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
                   if (item.href === '/shopping') warmShoppingCache()
