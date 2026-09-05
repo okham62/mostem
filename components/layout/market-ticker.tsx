@@ -8,13 +8,8 @@ import { subscribeLiveMarkets } from '@/lib/live-markets'
 import { emptyMarketItems, formatChange, formatKrw, formatUsd, type MarketItem } from '@/lib/markets'
 import { cn } from '@/lib/utils'
 
-const MAX_SCALE = 1.42
-const INFLUENCE = 86
-
-function dockScale(distance: number) {
-  if (distance >= INFLUENCE) return 1
-  return 1 + (MAX_SCALE - 1) * Math.cos((distance / INFLUENCE) * (Math.PI / 2)) ** 2
-}
+const LENS = 72
+const ZOOM = 1.28
 
 let hideNow = false
 const hideListeners = new Set<(hidden: boolean) => void>()
@@ -33,7 +28,10 @@ export function MarketTicker() {
   const [items, setItems] = useState<MarketItem[]>(emptyMarketItems)
   const [forcedHide, setForcedHide] = useState(hideNow)
   const rowRef = useRef<HTMLDivElement>(null)
+  const lensRef = useRef<HTMLDivElement>(null)
+  const cloneRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef(0)
+  const pointRef = useRef({ x: 0, y: 0, on: false })
   const onMarkets = forcedHide || isMarketsPath(pathname)
 
   useEffect(() => subscribeLiveMarkets(setItems), [])
@@ -50,35 +48,46 @@ export function MarketTicker() {
     if (!isMarketsPath(pathname)) previewHideMarketTicker(false)
   }, [pathname])
 
-  function paint(clientX: number | null) {
+  function paint() {
     const row = rowRef.current
-    if (!row) return
-    for (const node of Array.from(row.children)) {
-      const wrap = node as HTMLElement
-      const chip = wrap.firstElementChild as HTMLElement | null
-      if (!chip) continue
-      if (clientX == null) {
-        chip.style.transform = 'scale(1) translateY(0px)'
-        continue
-      }
-      const rect = wrap.getBoundingClientRect()
-      const distance = Math.abs(clientX - (rect.left + rect.width / 2))
-      const scale = dockScale(distance)
-      const lift = (scale - 1) * 10
-      chip.style.transform = `scale(${scale.toFixed(3)}) translateY(${lift.toFixed(1)}px)`
+    const lens = lensRef.current
+    const clone = cloneRef.current
+    if (!row || !lens || !clone) return
+    if (!pointRef.current.on) {
+      lens.style.opacity = '0'
+      return
     }
+    const { x, y } = pointRef.current
+    const half = LENS / 2
+    lens.style.opacity = '1'
+    lens.style.transform = `translate3d(${x - half}px, ${y - half}px, 0)`
+    clone.style.width = `${row.offsetWidth}px`
+    clone.style.height = `${row.offsetHeight}px`
+    clone.style.transform = `translate3d(${half - x * ZOOM}px, ${half - y * ZOOM}px, 0) scale(${ZOOM})`
   }
 
   function onMove(event: React.MouseEvent<HTMLDivElement>) {
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
-    const x = event.clientX
-    if (frameRef.current) cancelAnimationFrame(frameRef.current)
-    frameRef.current = requestAnimationFrame(() => paint(x))
+    const row = rowRef.current
+    if (!row) return
+    const rect = row.getBoundingClientRect()
+    pointRef.current = {
+      x: event.clientX - rect.left + row.scrollLeft,
+      y: event.clientY - rect.top,
+      on: true,
+    }
+    if (frameRef.current) return
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0
+      paint()
+    })
   }
 
   function onLeave() {
+    pointRef.current.on = false
     if (frameRef.current) cancelAnimationFrame(frameRef.current)
-    paint(null)
+    frameRef.current = 0
+    paint()
   }
 
   useEffect(() => () => cancelAnimationFrame(frameRef.current), [])
@@ -91,41 +100,64 @@ export function MarketTicker() {
         ref={rowRef}
         onMouseMove={onMove}
         onMouseLeave={onLeave}
-        className="flex flex-nowrap items-start justify-center gap-2 overflow-x-auto px-3 pb-4 pt-2 scrollbar-thin md:gap-2.5 md:px-4"
+        className="relative flex flex-nowrap items-center justify-center gap-2 overflow-x-auto px-3 py-2.5 scrollbar-thin md:gap-2.5 md:px-4"
       >
-        {items.map((item) => {
-          const up = (item.change ?? 0) > 0
-          const down = (item.change ?? 0) < 0
-          return (
-            <div key={item.id} className="flex shrink-0">
-              <Link
-                href="/markets"
-                onClick={() => previewHideMarketTicker(true)}
-                className="inline-flex origin-top items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-3 py-1.5 will-change-transform hover:border-white/35 hover:bg-white/10 [transition:transform_40ms_linear]"
-              >
-                <MarketIcon id={item.id} className="h-6 w-6" />
-                <span className="text-[13px] font-bold tracking-tight text-white">{item.label}</span>
-                <span className="text-[13px] font-bold text-gold">{formatKrw(item.krw)}</span>
-                {item.kind === 'coin' ? (
-                  <span className="text-[13px] font-semibold text-white/70">{formatUsd(item.usd)}</span>
-                ) : null}
-                {item.change != null ? (
-                  <span
-                    className={cn(
-                      'text-xs font-extrabold',
-                      up && 'text-[var(--change-up)]',
-                      down && 'text-[var(--change-down)]',
-                      !up && !down && 'text-white/50',
-                    )}
-                  >
-                    {formatChange(item.change)}
-                  </span>
-                ) : null}
-              </Link>
-            </div>
-          )
-        })}
+        <TickerPills items={items} />
+        <div
+          ref={lensRef}
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-0 z-10 overflow-hidden rounded-full border border-white/25 bg-[var(--ticker-bg)] opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.45)] will-change-transform"
+          style={{ width: LENS, height: LENS }}
+        >
+          <div
+            ref={cloneRef}
+            className="absolute left-0 top-0 box-border flex flex-nowrap items-center justify-center gap-2 px-3 py-2.5 will-change-transform md:gap-2.5 md:px-4"
+            style={{ transformOrigin: '0 0' }}
+          >
+            <TickerPills items={items} inert />
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+function TickerPills({ items, inert }: { items: MarketItem[]; inert?: boolean }) {
+  return (
+    <>
+      {items.map((item) => {
+        const up = (item.change ?? 0) > 0
+        const down = (item.change ?? 0) < 0
+        return (
+          <div key={item.id} className="flex shrink-0">
+            <Link
+              href="/markets"
+              tabIndex={inert ? -1 : 0}
+              onClick={() => previewHideMarketTicker(true)}
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-3 py-1.5 hover:border-white/35 hover:bg-white/10"
+            >
+              <MarketIcon id={item.id} className="h-6 w-6" />
+              <span className="text-[13px] font-bold tracking-tight text-white">{item.label}</span>
+              <span className="text-[13px] font-bold text-gold">{formatKrw(item.krw)}</span>
+              {item.kind === 'coin' ? (
+                <span className="text-[13px] font-semibold text-white/70">{formatUsd(item.usd)}</span>
+              ) : null}
+              {item.change != null ? (
+                <span
+                  className={cn(
+                    'text-xs font-extrabold',
+                    up && 'text-[var(--change-up)]',
+                    down && 'text-[var(--change-down)]',
+                    !up && !down && 'text-white/50',
+                  )}
+                >
+                  {formatChange(item.change)}
+                </span>
+              ) : null}
+            </Link>
+          </div>
+        )
+      })}
+    </>
   )
 }
