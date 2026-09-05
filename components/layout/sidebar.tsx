@@ -14,7 +14,7 @@ import {
   Link2,
   Users,
   LogOut,
-  Zap,
+  PanelLeftClose,
   Tags,
 } from 'lucide-react'
 import { BrandMark } from '@/components/brand-logos'
@@ -56,6 +56,7 @@ const publish = [
 
 interface SidebarProps {
   session: Session | null
+  onHide?: () => void
 }
 
 function NavGroup({
@@ -106,7 +107,7 @@ function NavGroup({
   )
 }
 
-export function Sidebar({ session }: SidebarProps) {
+export function Sidebar({ session, onHide }: SidebarProps) {
   const pathname = usePathname()
   const { data: liveSession } = useSession()
   const user = liveSession?.user ?? session?.user
@@ -119,23 +120,18 @@ export function Sidebar({ session }: SidebarProps) {
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
-      <div className="flex h-16 items-center gap-2.5 border-b border-[var(--sidebar-border)] px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand">
-          <Zap className="h-4 w-4 text-white" />
-        </div>
-        <span className="text-base font-bold text-white">MOSTEM</span>
-      </div>
-
-      <div className="p-3">
-        <Link
-          href="/compose"
-          className="flex w-full items-center justify-center rounded-xl bg-gold py-2.5 text-sm font-bold text-black transition hover:bg-gold-hover"
+      <div className="flex items-center justify-end px-2 pt-2">
+        <button
+          type="button"
+          aria-label="사이드바 숨기기"
+          onClick={onHide}
+          className="rounded-lg p-1.5 text-white/35 transition-colors hover:bg-white/8 hover:text-white"
         >
-          새 글 만들기
-        </Link>
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 scrollbar-thin">
+      <nav className="flex-1 overflow-y-auto px-2 pt-1 scrollbar-thin">
         <NavGroup title="탐색" items={explore} pathname={pathname} />
         <NavGroup title="발행" items={publish} pathname={pathname} />
         {isAdmin && (

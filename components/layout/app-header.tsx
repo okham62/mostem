@@ -1,7 +1,11 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Bell, Search, BookOpen } from 'lucide-react'
+import { Bell, BookOpen, Monitor, Moon, PanelLeftOpen, Search, Sun } from 'lucide-react'
+import { useSidebarChrome } from '@/components/layout/app-chrome'
+import { useTheme } from '@/components/theme-provider'
+import { cn } from '@/lib/utils'
+import type { ThemeChoice } from '@/lib/theme'
 
 const TITLES: Record<string, string> = {
   '/keywords': '실시간 키워드',
@@ -21,8 +25,16 @@ const TITLES: Record<string, string> = {
   '/admin': '회원 관리',
 }
 
+const THEME_BUTTONS: { id: ThemeChoice; label: string; icon: typeof Sun }[] = [
+  { id: 'light', label: '화이트톤', icon: Sun },
+  { id: 'dark', label: '어두운톤', icon: Moon },
+  { id: 'auto', label: '자동', icon: Monitor },
+]
+
 export function AppHeader() {
   const pathname = usePathname()
+  const { hidden, toggle } = useSidebarChrome()
+  const { choice, setChoice } = useTheme()
   const title =
     Object.entries(TITLES)
       .filter(([path]) => pathname === path || pathname.startsWith(path + '/'))
@@ -30,8 +42,41 @@ export function AppHeader() {
 
   return (
     <header className="hidden h-16 shrink-0 items-center justify-between border-b border-[var(--card-border)] px-6 md:flex">
-      <h1 className="text-sm font-semibold text-white/80">{title}</h1>
+      <div className="flex items-center gap-2">
+        {hidden ? (
+          <button
+            type="button"
+            aria-label="사이드바 열기"
+            onClick={toggle}
+            className="rounded-lg p-2 text-white/40 hover:bg-white/5 hover:text-white"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </button>
+        ) : null}
+        <h1 className="text-sm font-semibold text-white/80">{title}</h1>
+      </div>
       <div className="flex items-center gap-3">
+        <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
+          {THEME_BUTTONS.map((item) => {
+            const Icon = item.icon
+            const active = choice === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                title={item.label}
+                aria-label={item.label}
+                onClick={() => setChoice(item.id)}
+                className={cn(
+                  'rounded-md p-1.5 transition',
+                  active ? 'bg-white/12 text-white' : 'text-white/40 hover:text-white'
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            )
+          })}
+        </div>
         <button className="rounded-lg p-2 text-white/40 hover:bg-white/5 hover:text-white">
           <Search className="h-4 w-4" />
         </button>

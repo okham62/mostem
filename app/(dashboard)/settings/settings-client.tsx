@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Link2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { AppearanceSettings } from '@/components/appearance-settings'
 import { AccountSettings } from './account-settings'
 import { BrandMark } from '@/components/brand-logos'
 import {
@@ -167,14 +168,15 @@ export function SettingsClient() {
         </div>
       )}
 
-      <div>
+      <div className="mx-auto w-full max-w-[520px] text-center">
         <h1 className="text-2xl font-bold text-white">설정</h1>
         <p className="mt-1 text-sm text-white/45">
-          내 계정과 스레드, 인스타, 틱톡, 네이버 블로그 연결을 한 화면에서 관리합니다.
+          내 계정과 플랫폼 연결을 관리합니다.
         </p>
       </div>
 
       <AccountSettings onToast={ping} />
+      <AppearanceSettings />
 
       <div>
         <h2 className="text-lg font-semibold text-white">플랫폼 계정</h2>

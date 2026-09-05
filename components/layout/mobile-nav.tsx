@@ -32,7 +32,7 @@ export function MobileNav({ session }: { session: Session | null }) {
       <div
         className="flex items-stretch border-t border-white/10"
         style={{
-          background: 'rgba(10, 12, 20, 0.85)',
+          background: 'var(--chrome-bg)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           paddingBottom: 'env(safe-area-inset-bottom)',

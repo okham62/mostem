@@ -3,10 +3,20 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Zap, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Monitor, Moon, Sun, Zap } from 'lucide-react'
+import { useTheme } from '@/components/theme-provider'
+import { cn } from '@/lib/utils'
+import type { ThemeChoice } from '@/lib/theme'
+
+const THEME_BUTTONS: { id: ThemeChoice; label: string; icon: typeof Sun }[] = [
+  { id: 'light', label: '화이트톤', icon: Sun },
+  { id: 'dark', label: '어두운톤', icon: Moon },
+  { id: 'auto', label: '자동', icon: Monitor },
+]
 
 export function LoginForm() {
   const router = useRouter()
+  const { choice, setChoice } = useTheme()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -42,10 +52,10 @@ export function LoginForm() {
         <div
           className="rounded-2xl p-8"
           style={{
-            background: 'rgba(255, 255, 255, 0.04)',
+            background: 'var(--glass)',
             backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 0 0 1px rgba(255,255,255,0.05), 0 32px 64px rgba(0,0,0,0.4)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: '0 16px 48px rgba(0,0,0,0.12)',
           }}
         >
           {/* 로고 */}
@@ -80,8 +90,8 @@ export function LoginForm() {
               autoComplete="username"
               className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:ring-1 focus:ring-indigo-500/50"
               style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--card-border)',
               }}
             />
             <div className="relative">
@@ -94,8 +104,8 @@ export function LoginForm() {
                 autoComplete="current-password"
                 className="w-full rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder-white/30 outline-none transition focus:ring-1 focus:ring-indigo-500/50"
                 style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'var(--input-bg)',
+                  border: '1px solid var(--card-border)',
                 }}
               />
               <button
@@ -128,7 +138,29 @@ export function LoginForm() {
           </p>
         </div>
 
-        <p className="mt-4 text-center text-xs text-white/20">
+        <div className="mt-4 flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-[var(--card-bg)] p-0.5">
+          {THEME_BUTTONS.map((item) => {
+            const Icon = item.icon
+            const active = choice === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                title={item.label}
+                aria-label={item.label}
+                onClick={() => setChoice(item.id)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition',
+                  active ? 'bg-white/12 text-white' : 'text-white/40 hover:text-white'
+                )}
+              >
+                <Icon className="h-3 w-3" />
+                {item.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-3 text-center text-xs text-white/20">
           관리자 승인 후 서비스를 이용할 수 있습니다.
         </p>
       </div>

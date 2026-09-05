@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 :root,
-.dark {
+.dark,
+html[data-theme='dark'] {
   --background: #0b0b0d;
   --foreground: #f4f4f5;
   --sidebar-bg: #111114;
@@ -15,6 +16,30 @@
   --gold: #f5c518;
   --gold-hover: #ffd84a;
   --accent: #8b5cf6;
+  --ticker-bg: #0c0e14;
+  --chrome-bg: rgba(10, 12, 20, 0.85);
+  --glass: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.06);
+}
+
+html[data-theme='light'] {
+  --background: #f4f5f8;
+  --foreground: #14161c;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e6e8ef;
+  --card-bg: #ffffff;
+  --card-border: #e4e7ee;
+  --muted: #667085;
+  --muted-bg: #eef0f5;
+  --gold: #c49210;
+  --gold-hover: #d4a017;
+  --accent: #7c3aed;
+  --ticker-bg: #ffffff;
+  --chrome-bg: rgba(255, 255, 255, 0.88);
+  --glass: rgba(255, 255, 255, 0.86);
+  --glass-border: rgba(20, 22, 28, 0.08);
+  --input-bg: rgba(20, 22, 28, 0.04);
 }
 
 body {
@@ -27,6 +52,121 @@ body {
 
 html {
   height: 100%;
+}
+
+.mostem-sidebar-rail {
+  width: 15rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mostem-sidebar-rail[data-ready='1'] {
+  transition: width 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mostem-sidebar-rail-hidden {
+  width: 0;
+}
+
+.mostem-sidebar-pane {
+  width: 15rem;
+  height: 100%;
+}
+
+.mostem-sidebar-rail[data-ready='1'] .mostem-sidebar-pane {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mostem-sidebar-rail-hidden .mostem-sidebar-pane {
+  transform: translateX(-100%);
+}
+
+.mostem-sidebar-peek {
+  position: fixed;
+  left: 0;
+  top: 5.75rem;
+  z-index: 60;
+  height: 3rem;
+  width: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--card-border);
+  border-left: 0;
+  border-radius: 0 0.75rem 0.75rem 0;
+  background: var(--sidebar-bg);
+  color: var(--foreground);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-110%);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.12);
+}
+
+.mostem-sidebar-peek[data-show='1'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.mostem-sidebar-rail[data-ready='1'] ~ .mostem-sidebar-peek,
+.mostem-sidebar-peek {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease;
+}
+
+html[data-theme='light'] .text-white {
+  color: var(--foreground) !important;
+}
+
+html[data-theme='light'] .text-white\/80 { color: color-mix(in srgb, var(--foreground) 80%, transparent) !important; }
+html[data-theme='light'] .text-white\/70 { color: color-mix(in srgb, var(--foreground) 70%, transparent) !important; }
+html[data-theme='light'] .text-white\/60 { color: color-mix(in srgb, var(--foreground) 60%, transparent) !important; }
+html[data-theme='light'] .text-white\/55 { color: color-mix(in srgb, var(--foreground) 55%, transparent) !important; }
+html[data-theme='light'] .text-white\/50 { color: color-mix(in srgb, var(--foreground) 50%, transparent) !important; }
+html[data-theme='light'] .text-white\/45 { color: color-mix(in srgb, var(--foreground) 45%, transparent) !important; }
+html[data-theme='light'] .text-white\/40 { color: color-mix(in srgb, var(--foreground) 40%, transparent) !important; }
+html[data-theme='light'] .text-white\/35 { color: color-mix(in srgb, var(--foreground) 35%, transparent) !important; }
+html[data-theme='light'] .text-white\/30 { color: color-mix(in srgb, var(--foreground) 30%, transparent) !important; }
+html[data-theme='light'] .text-white\/25 { color: color-mix(in srgb, var(--foreground) 25%, transparent) !important; }
+html[data-theme='light'] .text-white\/20 { color: color-mix(in srgb, var(--foreground) 20%, transparent) !important; }
+
+html[data-theme='light'] .placeholder\:text-white\/30::placeholder {
+  color: color-mix(in srgb, var(--foreground) 35%, transparent) !important;
+}
+
+html[data-theme='light'] .hover\:text-white:hover {
+  color: var(--foreground) !important;
+}
+
+html[data-theme='light'] .hover\:text-white\/60:hover {
+  color: color-mix(in srgb, var(--foreground) 60%, transparent) !important;
+}
+
+html[data-theme='light'] .bg-white\/5,
+html[data-theme='light'] .hover\:bg-white\/5:hover { background-color: rgb(20 22 28 / 0.05) !important; }
+html[data-theme='light'] .bg-white\/8,
+html[data-theme='light'] .hover\:bg-white\/8:hover { background-color: rgb(20 22 28 / 0.07) !important; }
+html[data-theme='light'] .bg-white\/10,
+html[data-theme='light'] .hover\:bg-white\/10:hover { background-color: rgb(20 22 28 / 0.08) !important; }
+html[data-theme='light'] .bg-white\/12 { background-color: rgb(20 22 28 / 0.1) !important; }
+html[data-theme='light'] .bg-white\/\[0\.06\] { background-color: rgb(20 22 28 / 0.05) !important; }
+html[data-theme='light'] .bg-white\/\[0\.04\] { background-color: rgb(20 22 28 / 0.04) !important; }
+
+html[data-theme='light'] .bg-black\/20 { background-color: rgb(20 22 28 / 0.04) !important; }
+html[data-theme='light'] .bg-black\/30 { background-color: rgb(20 22 28 / 0.06) !important; }
+html[data-theme='light'] .bg-black\/55 { background-color: rgb(20 22 28 / 0.45) !important; }
+
+html[data-theme='light'] .border-white\/8 { border-color: rgb(20 22 28 / 0.08) !important; }
+html[data-theme='light'] .border-white\/10 { border-color: rgb(20 22 28 / 0.1) !important; }
+html[data-theme='light'] .border-white\/20 { border-color: rgb(20 22 28 / 0.14) !important; }
+html[data-theme='light'] .hover\:border-white\/15:hover { border-color: rgb(20 22 28 / 0.16) !important; }
+html[data-theme='light'] .hover\:border-white\/20:hover { border-color: rgb(20 22 28 / 0.2) !important; }
+html[data-theme='light'] .hover\:border-white\/35:hover { border-color: rgb(20 22 28 / 0.28) !important; }
+
+html[data-theme='light'] :is(.bg-brand, .bg-gold, .bg-emerald-500, .bg-red-500).text-white,
+html[data-theme='light'] :is(.bg-brand, .bg-gold, .bg-emerald-500, .bg-red-500) .text-white,
+html[data-theme='light'] .bg-brand .text-white {
+  color: #fff !important;
 }
 
 @layer utilities {
@@ -297,6 +437,12 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mostem-sidebar-rail,
+  .mostem-sidebar-pane,
+  .mostem-sidebar-peek {
+    transition: none !important;
+  }
+
   .hami-ext-led-track,
   .hami-ext-marquee-track {
     animation: none;

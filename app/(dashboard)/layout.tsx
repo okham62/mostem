@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import { Sidebar } from '@/components/layout/sidebar'
+import { AppChrome } from '@/components/layout/app-chrome'
 import { MobileNav } from '@/components/layout/mobile-nav'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import { AppHeader } from '@/components/layout/app-header'
@@ -21,11 +21,7 @@ export default async function DashboardLayout({
 
   return (
     <AppSessionProvider session={session}>
-    <div className="flex h-full overflow-hidden bg-[var(--background)]">
-      <div className="hidden md:flex">
-        <Sidebar session={session} />
-      </div>
-
+    <AppChrome session={session}>
       <MobileHeader session={session} />
 
       <main className="flex flex-1 flex-col overflow-hidden">
@@ -43,7 +39,7 @@ export default async function DashboardLayout({
 
       <MobileNav session={session} />
       <ActivityTracker />
-    </div>
+    </AppChrome>
     </AppSessionProvider>
   )
 }

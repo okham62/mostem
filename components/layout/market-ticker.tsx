@@ -13,7 +13,7 @@ export function MarketTicker() {
   useEffect(() => subscribeLiveMarkets(setItems), [])
 
   return (
-    <div className="sticky top-0 z-30 border-b border-[var(--card-border)] bg-[#0c0e14]">
+    <div className="sticky top-0 z-30 border-b border-[var(--card-border)] bg-[var(--ticker-bg)]">
       <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2 md:gap-2.5 md:px-4">
         {items.map((item) => {
           const up = (item.change ?? 0) > 0

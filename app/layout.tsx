@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { PreventFileDrop } from '@/components/prevent-file-drop'
 import { ExtensionStatusBanner } from '@/components/layout/extension-status-banner'
+import { ThemeProvider } from '@/components/theme-provider'
+import { THEME_BOOT_SCRIPT } from '@/lib/theme'
 
 export const metadata: Metadata = {
   title: 'MOSTEM',
@@ -14,11 +16,16 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ko" className="dark h-full" suppressHydrationWarning>
+    <html lang="ko" className="h-full" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="flex h-full flex-col">
-        <PreventFileDrop />
-        <ExtensionStatusBanner />
-        <div className="min-h-0 flex-1">{children}</div>
+        <ThemeProvider>
+          <PreventFileDrop />
+          <ExtensionStatusBanner />
+          <div className="min-h-0 flex-1">{children}</div>
+        </ThemeProvider>
       </body>
     </html>
   )

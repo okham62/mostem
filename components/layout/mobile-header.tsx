@@ -37,10 +37,10 @@ export function MobileHeader({ session }: { session: Session | null }) {
       className="fixed left-0 right-0 z-40 flex h-14 items-center justify-between px-4 md:hidden"
       style={{
         top: 'var(--hami-ext-banner-h, 0px)',
-        background: 'rgba(10, 12, 20, 0.85)',
+        background: 'var(--chrome-bg)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid var(--card-border)',
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
