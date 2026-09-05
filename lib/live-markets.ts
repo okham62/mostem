@@ -31,7 +31,6 @@ let items: MarketItem[] = emptyMarketItems()
 let started = false
 let upbitWs: WebSocket | null = null
 let binanceWs: WebSocket | null = null
-let fxTimer: number | null = null
 let upbitRetry = 0
 let binanceRetry = 0
 
@@ -207,7 +206,7 @@ function start() {
   void hydrateRest()
   connectUpbit()
   connectBinance()
-  fxTimer = window.setInterval(() => {
+  window.setInterval(() => {
     void hydrateRest()
   }, FX_POLL_MS)
 }
