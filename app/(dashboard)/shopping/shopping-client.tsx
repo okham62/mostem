@@ -76,14 +76,14 @@ export function ShoppingClient() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
             className={cn(
-              'h-10 rounded-lg px-3 text-sm font-semibold transition',
+              'h-10 shrink-0 rounded-lg px-3 text-sm font-semibold transition',
               tab === item.id
                 ? 'mostem-filter-btn'
                 : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'

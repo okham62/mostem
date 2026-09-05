@@ -33,7 +33,7 @@ export function MobileHeader({ session }: { session: Session | null }) {
 
   return (
     <header
-      className="fixed left-0 right-0 z-40 flex h-14 items-center justify-between px-4 md:hidden"
+      className="fixed left-0 right-0 z-40 flex min-h-14 items-center justify-between px-3 md:hidden"
       style={{
         top: 'var(--hami-ext-banner-h, 0px)',
         background: 'var(--chrome-bg)',
@@ -59,7 +59,7 @@ export function MobileHeader({ session }: { session: Session | null }) {
               {user.name?.[0]?.toUpperCase() ?? 'U'}
             </div>
           )}
-          <span className="max-w-20 truncate text-[11px] text-white/70">{loginId}</span>
+          <span className="max-w-[4.5rem] truncate text-[11px] text-white/70">{loginId}</span>
         </Link>
       ) : null}
     </header>

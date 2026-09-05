@@ -48,9 +48,9 @@ export function LoginForm() {
 
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center">
-      <div className="relative z-10 w-full max-w-sm px-4 pointer-events-auto">
+      <div className="relative z-10 w-full max-w-sm px-4 py-[max(1rem,env(safe-area-inset-top))] pointer-events-auto">
         <div
-          className="rounded-2xl p-8"
+          className="rounded-2xl p-6 md:p-8"
           style={{
             background: 'var(--glass)',
             backdropFilter: 'blur(20px)',
@@ -88,7 +88,7 @@ export function LoginForm() {
               onChange={e => setUsername(e.target.value.toLowerCase())}
               required
               autoComplete="username"
-              className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:ring-1 focus:ring-indigo-500/50"
+              className="w-full rounded-xl px-4 py-3 text-base text-white placeholder-white/30 outline-none transition focus:ring-1 focus:ring-indigo-500/50 md:text-sm"
               style={{
                 background: 'var(--input-bg)',
                 border: '1px solid var(--card-border)',
@@ -102,7 +102,7 @@ export function LoginForm() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder-white/30 outline-none transition focus:ring-1 focus:ring-indigo-500/50"
+                className="w-full rounded-xl px-4 py-3 pr-11 text-base text-white placeholder-white/30 outline-none transition focus:ring-1 focus:ring-indigo-500/50 md:text-sm"
                 style={{
                   background: 'var(--input-bg)',
                   border: '1px solid var(--card-border)',

@@ -27,8 +27,8 @@ export default async function DashboardLayout({
         <div className="hidden md:block">
           <MarketTicker />
         </div>
-        <div className="flex-1 overflow-y-auto scrollbar-thin pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
-          <div className="md:hidden">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
+          <div className="sticky top-0 z-20 md:hidden">
             <MarketTicker />
           </div>
           <div className="p-3 md:p-4">{children}</div>

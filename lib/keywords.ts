@@ -800,3 +800,14 @@ export function formatKeywordTime(now: number) {
     hour12: true,
   }).format(new Date(now))
 }
+
+export function formatKeywordTimeShort(now: number) {
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(now))
+}

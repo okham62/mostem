@@ -24,7 +24,7 @@ import { warmShoppingCache } from '@/lib/shopping-cache'
 import { previewHideMarketTicker } from '@/components/layout/market-ticker'
 import type { Session } from 'next-auth'
 
-const explore = [
+export const explore = [
   { href: '/keywords', label: '실시간 키워드', icon: Flame },
   { href: '/news', label: '실시간 뉴스', icon: Newspaper },
   { href: '/markets', label: '마켓 시세', icon: LineChart },
@@ -45,14 +45,14 @@ function BlogIcon() {
   return <BrandMark id="blog" className="h-5 w-5" />
 }
 
-const publish = [
+export const publish = [
   { href: '/threads', label: '스레드', icon: ThreadsIcon },
   { href: '/instagram', label: '인스타', icon: InstagramIcon },
   { href: '/tiktok', label: '틱톡', icon: TiktokIcon },
   { href: '/blog', label: '네이버 블로그', icon: BlogIcon },
 ]
 
-const tools = [
+export const tools = [
   { href: '/ai', label: 'AI 도구', icon: Sparkles },
   { href: '/links', label: '링크 변환', icon: Link2 },
 ]

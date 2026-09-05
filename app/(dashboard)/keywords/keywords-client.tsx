@@ -6,6 +6,7 @@ import {
   applyBrowserNaver,
   fetchBrowserNaver,
   formatKeywordTime,
+  formatKeywordTimeShort,
   formatSearchTraffic,
   KEYWORD_LIMIT,
   type KeywordSource,
@@ -109,23 +110,26 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
   if (!data) return <KeywordsSkeleton />
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="mx-auto max-w-6xl space-y-4 md:space-y-5">
+      <div className="flex items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-gold" />
             </span>
-            <p className="text-sm text-white/45">
-              네이버와 구글 급상승 검색어를 따로 보여 줍니다 · {formatKeywordTime(data.now)}
+            <p className="min-w-0 text-xs leading-snug text-white/45 md:text-sm">
+              <span className="md:hidden">급상승 검색어 · {formatKeywordTimeShort(data.now)}</span>
+              <span className="hidden md:inline">
+                네이버와 구글 급상승 검색어를 따로 보여 줍니다 · {formatKeywordTime(data.now)}
+              </span>
             </p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => void reload('full')}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-white/5 px-3 text-xs text-white/70 hover:bg-white/10"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
           새로고침
@@ -178,11 +182,11 @@ function KeywordPanel({
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="inline-flex items-center gap-2.5">
           <SourceMark id={source?.id} />
-          <span className="text-xl font-extrabold tracking-tight text-white">
+          <span className="text-lg font-extrabold tracking-tight text-white md:text-xl">
             {source?.label ?? '검색어'}
           </span>
         </h2>
-        <span className="rounded-full bg-white/6 px-2.5 py-1 text-[11px] font-medium text-white/50">
+        <span className="shrink-0 rounded-full bg-white/6 px-2 py-1 text-[10px] font-medium text-white/50 md:px-2.5 md:text-[11px]">
           {hint} · 1~10위
         </span>
       </div>
@@ -209,7 +213,7 @@ function KeywordColumn({
         const traffic = formatSearchTraffic(item.traffic)
         return (
           <li key={`${item.rank}-${item.keyword}`}>
-            <div className="flex items-center gap-3 py-2.5">
+            <div className="flex min-h-11 items-center gap-3 py-2.5">
               <span
                 className={cn(
                   'w-7 shrink-0 text-center text-sm font-bold tabular-nums',

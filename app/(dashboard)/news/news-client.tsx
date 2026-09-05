@@ -9,7 +9,7 @@ import {
   RotateCcw,
   Search,
 } from 'lucide-react'
-import { formatKeywordTime, type KeywordsPayload } from '@/lib/keywords'
+import { formatKeywordTime, formatKeywordTimeShort, type KeywordsPayload } from '@/lib/keywords'
 import { fetchRealtime, peekRealtimeCache } from '@/lib/realtime-cache'
 import { PRESS_NAV_OUTLETS } from '@/lib/press'
 import { cn } from '@/lib/utils'
@@ -122,11 +122,14 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
   return (
     <div ref={rootRef} className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-white/45">{formatKeywordTime(data.now)}</p>
+        <p className="min-w-0 text-xs text-white/45 md:text-sm">
+          <span className="md:hidden">{formatKeywordTimeShort(data.now)}</span>
+          <span className="hidden md:inline">{formatKeywordTime(data.now)}</span>
+        </p>
         <button
           type="button"
           onClick={() => void reload()}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-white/5 px-3 text-xs text-white/70 hover:bg-white/10"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
           새로고침

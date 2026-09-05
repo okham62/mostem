@@ -107,7 +107,7 @@ export function MarketTicker() {
     >
       <div
         ref={rowRef}
-        className="flex flex-nowrap items-center justify-center gap-2 overflow-x-auto px-3 py-3.5 [scrollbar-width:none] [-ms-overflow-style:none] md:gap-2.5 md:px-4 [&::-webkit-scrollbar]:hidden"
+        className="flex flex-nowrap items-center justify-start gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [-ms-overflow-style:none] md:justify-center md:gap-2.5 md:px-4 md:py-3.5 [&::-webkit-scrollbar]:hidden"
       >
         {items.map((item) => {
           const up = (item.change ?? 0) > 0
@@ -118,13 +118,13 @@ export function MarketTicker() {
                 href="/markets"
                 data-ticker-pill
                 onClick={() => previewHideMarketTicker(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-3 py-1.5 will-change-transform [transition:transform_160ms_cubic-bezier(0.22,1,0.36,1)] hover:border-white/40 hover:bg-white/10"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.06] px-2.5 py-1 will-change-transform [transition:transform_160ms_cubic-bezier(0.22,1,0.36,1)] hover:border-white/40 hover:bg-white/10 md:gap-2 md:px-3 md:py-1.5"
               >
-                <MarketIcon id={item.id} className="h-6 w-6" />
-                <span className="text-[13px] font-bold tracking-tight text-white">{item.label}</span>
-                <span className="text-[13px] font-bold text-gold">{formatKrw(item.krw)}</span>
+                <MarketIcon id={item.id} className="h-5 w-5 md:h-6 md:w-6" />
+                <span className="text-[12px] font-bold tracking-tight text-white md:text-[13px]">{item.label}</span>
+                <span className="text-[12px] font-bold text-gold md:text-[13px]">{formatKrw(item.krw)}</span>
                 {item.kind === 'coin' ? (
-                  <span className="text-[13px] font-semibold text-white/80">{formatUsd(item.usd)}</span>
+                  <span className="hidden text-[13px] font-semibold text-white/80 md:inline">{formatUsd(item.usd)}</span>
                 ) : null}
                 {item.change != null ? (
                   <span

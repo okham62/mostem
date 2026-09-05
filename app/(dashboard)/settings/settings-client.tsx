@@ -169,7 +169,7 @@ export function SettingsClient() {
       )}
 
       <div>
-        <h1 className="text-2xl font-bold text-white">설정</h1>
+        <h1 className="text-xl font-bold text-white md:text-2xl">설정</h1>
         <p className="mt-1 text-sm text-white/45">
           내 계정과 플랫폼 연결을 관리합니다.
         </p>

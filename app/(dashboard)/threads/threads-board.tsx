@@ -262,11 +262,11 @@ export function ThreadsBoard({
         )}
       </section>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={() => void refreshPosts()}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
           aria-label="새로고침"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -280,7 +280,7 @@ export function ThreadsBoard({
               key={item.id}
               type="button"
               onClick={() => setStatusFilter(item.id)}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+              className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium ${
                 active ? 'bg-white/12 text-white' : 'bg-white/5 text-white/50 hover:bg-white/8 hover:text-white/80'
               }`}
             >
@@ -321,7 +321,7 @@ export function ThreadsBoard({
           <option value="likes">좋아요순</option>
         </select>
         <p className="text-xs text-white/40">총 {filtered.length}개</p>
-        <div className="ml-auto flex rounded-xl bg-white/5 p-1">
+        <div className="flex w-full rounded-xl bg-white/5 p-1 sm:ml-auto sm:w-auto">
           {([
             ['grid', '그리드'],
             ['list', '리스트'],
@@ -331,7 +331,7 @@ export function ThreadsBoard({
               key={id}
               type="button"
               onClick={() => setMode(id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+              className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold sm:flex-none ${
                 view === id ? 'bg-white text-black' : 'text-white/55 hover:text-white'
               }`}
             >
@@ -473,12 +473,12 @@ function KanbanView({
   onRemoved: (id: string) => void
 }) {
   return (
-    <div className="-mx-1 overflow-x-auto pb-2">
-      <div className="flex min-w-max gap-3 px-1">
+    <div className="-mx-3 overflow-x-auto snap-x snap-mandatory pb-2 md:-mx-1">
+      <div className="flex min-w-max gap-3 px-3 md:px-1">
         {KANBAN_COLUMNS.map((status) => {
           const column = posts.filter((post) => post.status === status)
           return (
-            <section key={status} className="w-[280px] shrink-0 rounded-2xl bg-white/[0.03] p-3">
+            <section key={status} className="w-[min(80vw,280px)] shrink-0 snap-start rounded-2xl bg-white/[0.03] p-3">
               <div className="mb-3 flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${KANBAN_DOT[status]}`} />
                 <h2 className="text-sm font-semibold text-white">{STATUS_LABEL[status]}</h2>
