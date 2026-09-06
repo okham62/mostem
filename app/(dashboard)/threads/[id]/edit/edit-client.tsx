@@ -216,8 +216,12 @@ export function EditClient({
   }
 
   return (
-    <div className="-m-4 md:-m-6 min-h-full bg-[#0b0b0d]">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 md:px-6">
+    <div className="-m-3 min-h-full bg-[#0b0b0d] md:-m-4">
+      <div
+        className="flex min-h-full w-[840px] max-w-full flex-col"
+        style={{ width: 840, maxWidth: '100%' }}
+      >
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/threads" className="text-sm text-white/60 hover:text-white">
             ← 스레드
@@ -268,8 +272,7 @@ export function EditClient({
       </div>
 
       {tab === 'original' && (
-        <div className="mx-auto w-full px-4 py-4 md:px-5 md:py-5">
-        <div className="mx-auto grid w-[840px] max-w-full gap-4 md:grid-cols-2">
+        <div className="grid w-full gap-4 p-4 md:grid-cols-2">
           <section className="rounded-2xl border border-white/10 bg-[#141418] p-5">
             <div className="mb-3 flex items-start justify-between">
               <div className="flex items-center gap-2">
@@ -308,12 +311,10 @@ export function EditClient({
             </button>
           </section>
         </div>
-        </div>
       )}
 
       {tab === 'rewrite' && (
-        <div className="mx-auto w-full px-4 py-4 md:px-5 md:py-5">
-        <div className="mx-auto grid w-[840px] max-w-full gap-3 lg:grid-cols-[76px_minmax(0,1fr)_280px]">
+        <div className="grid w-full gap-3 p-4 lg:grid-cols-[76px_minmax(0,1fr)_280px]">
           <EditToolbar
             accounts={accounts}
             accountId={accountId}
@@ -412,8 +413,8 @@ export function EditClient({
             </div>
           </aside>
         </div>
-        </div>
       )}
+      </div>
 
       {publishOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
