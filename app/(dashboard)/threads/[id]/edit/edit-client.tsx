@@ -262,7 +262,7 @@ export function EditClient({
       </div>
 
       {tab === 'original' && (
-        <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6">
+        <div className="mx-auto grid w-full max-w-[840px] gap-4 p-4 md:grid-cols-2 md:p-5">
           <section className="rounded-2xl border border-white/10 bg-[#141418] p-5">
             <div className="mb-3 flex items-start justify-between">
               <div className="flex items-center gap-2">
@@ -304,7 +304,7 @@ export function EditClient({
       )}
 
       {tab === 'rewrite' && (
-        <div className="grid gap-4 p-4 lg:grid-cols-[76px_minmax(0,1fr)_280px] md:p-6">
+        <div className="mx-auto grid w-full max-w-[840px] gap-3 p-4 lg:grid-cols-[76px_minmax(0,1fr)_280px] md:p-5">
           <EditToolbar
             accounts={accounts}
             accountId={accountId}
