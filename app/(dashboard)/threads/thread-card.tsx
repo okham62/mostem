@@ -11,12 +11,27 @@ import type { CollectedPost } from '@/types'
 export function ThreadCard({
   post,
   onRemoved,
+  onUpdated,
 }: {
   post: CollectedPost
   onRemoved?: (id: string) => void
+  onUpdated?: (post: CollectedPost) => void
 }) {
+  const scheduled = post.status === 'scheduled'
+  const scheduleAt = post.scheduled_at ? new Date(post.scheduled_at) : null
   const collected = post.collected_at ? new Date(post.collected_at) : null
-  const date = collected ? collected.toISOString().slice(0, 10) : ''
+  const date =
+    scheduled && scheduleAt && !Number.isNaN(scheduleAt.getTime())
+      ? scheduleAt.toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : collected
+        ? collected.toISOString().slice(0, 10)
+        : ''
   const shortDate = collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : ''
   const stats = derivePostStats(post)
   const grade = stats.grade ? GRADE_LABEL[stats.grade] : null
@@ -33,6 +48,24 @@ export function ThreadCard({
       return
     }
     void fetch(`/api/threads/posts/${post.id}`, { method: 'DELETE' })
+  }
+
+  async function cancelSchedule() {
+    const next = { ...post, status: 'ready' as const, scheduled_at: null }
+    onUpdated?.(next)
+    try {
+      window.localStorage.removeItem(`mostem-schedule:${post.id}`)
+    } catch {
+      // ignore
+    }
+    const res = await fetch(`/api/threads/posts/${post.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'ready', scheduled_at: null }),
+    })
+    if (!res.ok) {
+      onUpdated?.(post)
+    }
   }
 
   return (
@@ -58,6 +91,15 @@ export function ThreadCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          {scheduled ? (
+            <button
+              type="button"
+              onClick={() => void cancelSchedule()}
+              className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30 hover:text-white"
+            >
+              예약 취소
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={remove}

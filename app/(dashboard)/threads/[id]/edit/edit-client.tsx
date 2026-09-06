@@ -211,6 +211,7 @@ export function EditClient({
   const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scheduleAt, setScheduleAt] = useState(() => new Date(Date.now() + 10 * 60 * 1000))
+  const [postStatus, setPostStatus] = useState(post.status)
   const [history, setHistory] = useState<GenerateRun[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
 
@@ -319,17 +320,22 @@ export function EditClient({
     router.replace(`/threads/${post.id}/edit?tab=${next}`, { scroll: false })
   }
 
-  async function persist(status: 'editing' | 'ready' | 'scheduled' | 'uploaded') {
+  async function persist(
+    status: 'editing' | 'ready' | 'scheduled' | 'uploaded',
+    scheduledAt?: string | null,
+  ) {
     setSaving(true)
     setMessage('')
+    const body: Record<string, unknown> = {
+      caption,
+      status,
+      collected_by: selected?.username,
+    }
+    if (scheduledAt !== undefined) body.scheduled_at = scheduledAt
     const res = await fetch(`/api/threads/posts/${post.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        caption,
-        status,
-        collected_by: selected?.username,
-      }),
+      body: JSON.stringify(body),
     })
     setSaving(false)
     if (!res.ok) {
@@ -338,9 +344,23 @@ export function EditClient({
       return false
     }
     rememberDraft()
+    setPostStatus(status)
     if (status === 'uploaded' || status === 'scheduled') statusLockRef.current = true
+    if (status === 'ready' || status === 'editing') statusLockRef.current = false
     router.refresh()
     return true
+  }
+
+  async function cancelReservation() {
+    try {
+      window.localStorage.removeItem(`mostem-schedule:${post.id}`)
+    } catch {
+      // ignore
+    }
+    const ok = await persist('ready', null)
+    if (ok) {
+      setMessage('예약을 취소했습니다. 발행대기 상태로 돌아갔습니다.')
+    }
   }
 
   async function publishViaExtension() {
@@ -622,6 +642,16 @@ export function EditClient({
           >
             📅 예약발행
           </button>
+          {postStatus === 'scheduled' ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void cancelReservation()}
+              className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/30"
+            >
+              예약 취소
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -854,8 +884,13 @@ export function EditClient({
           onClose={() => setScheduleOpen(false)}
           onConfirm={async (when) => {
             setScheduleAt(when)
-            const ok = await persist('scheduled')
+            const ok = await persist('scheduled', when.toISOString())
             if (ok) {
+              try {
+                window.localStorage.setItem(`mostem-schedule:${post.id}`, when.toISOString())
+              } catch {
+                // ignore
+              }
               setMessage(`${when.toLocaleString('ko-KR')}에 @${selected?.username} 계정으로 예약했습니다.`)
               setScheduleOpen(false)
             }

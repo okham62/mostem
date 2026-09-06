@@ -45,12 +45,24 @@ export async function PATCH(
   if (typeof body.caption === 'string') update.caption = body.caption
   if (typeof body.status === 'string') update.status = body.status
   if (typeof body.collected_by === 'string') update.collected_by = body.collected_by.replace(/^@/, '').toLowerCase()
+  if (body.scheduled_at === null) update.scheduled_at = null
+  else if (typeof body.scheduled_at === 'string') update.scheduled_at = body.scheduled_at
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from('collected_posts')
     .update(update)
     .eq('id', id)
     .eq('user_id', session.user.id)
+
+  if (error && /scheduled_at/i.test(error.message)) {
+    const { scheduled_at: _ignored, ...withoutSchedule } = update
+    const retry = await supabase
+      .from('collected_posts')
+      .update(withoutSchedule)
+      .eq('id', id)
+      .eq('user_id', session.user.id)
+    error = retry.error
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
