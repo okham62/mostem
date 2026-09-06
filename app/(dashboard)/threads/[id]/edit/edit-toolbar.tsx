@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BookOpen, ImagePlus, RotateCcw, StickyNote, UserRound } from 'lucide-react'
+import { BookOpen, RotateCcw, StickyNote, UserRound } from 'lucide-react'
 import type { AiGuide } from '@/lib/ai-guides'
 import type { ConnectedAccount } from '@/types'
 import { cn } from '@/lib/utils'
@@ -15,7 +15,6 @@ export function EditToolbar({
   guideId,
   onGuide,
   isAdmin,
-  onImport,
   onTemplate,
   onReset,
 }: {
@@ -26,7 +25,6 @@ export function EditToolbar({
   guideId: string
   onGuide: (id: string) => void
   isAdmin: boolean
-  onImport: () => void
   onTemplate: () => void
   onReset: () => void
 }) {
@@ -124,7 +122,6 @@ export function EditToolbar({
         </Popover>
       ) : null}
 
-      <ToolButton label="가져오기" onClick={onImport} icon={<ImagePlus className="h-5 w-5" />} />
       <ToolButton label="템플릿" onClick={onTemplate} icon={<StickyNote className="h-5 w-5" />} />
 
       <div className="hidden flex-1 lg:block" />

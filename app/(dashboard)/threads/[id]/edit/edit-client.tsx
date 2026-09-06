@@ -4,12 +4,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
+import { parseMediaItems } from '@/lib/collect-media'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
 import { isHamiOnline, requestHamiPublish } from '@/lib/threads-publish'
 import { EditToolbar } from './edit-toolbar'
-import { ImportModal } from './import-modal'
 import { ModelPicker } from './model-picker'
 import { PublishModal } from './publish-modal'
 import { TemplateModal } from './template-modal'
@@ -19,19 +19,14 @@ type MediaPreview = { url: string; type: 'image' | 'video' }
 
 function originalMedia(post: CollectedPost): MediaPreview[] {
   const items: MediaPreview[] = []
-  for (const item of post.media_items ?? []) {
-    const url = item.poster || item.url || item.videoUrl
-    if (!url) continue
-    items.push({ url, type: item.type === 'video' ? 'video' : 'image' })
-  }
-  if (post.thumbnail_url && !items.some((item) => item.url === post.thumbnail_url)) {
-    items.unshift({ url: post.thumbnail_url, type: 'image' })
-  }
-  if (post.media_url && !items.some((item) => item.url === post.media_url)) {
-    items.push({
-      url: post.media_url,
-      type: /\.(mp4|webm|mov)(\?|$)/i.test(post.media_url) ? 'video' : 'image',
-    })
+  const seen = new Set<string>()
+  for (const item of [...(post.media_items ?? []), ...parseMediaItems(post)]) {
+    const play = item.videoUrl || (item.type === 'video' ? item.url : '')
+    const show = item.poster || item.url || play
+    if (!show || show.startsWith('[') || seen.has(show) || (play && seen.has(play))) continue
+    seen.add(show)
+    if (play) seen.add(play)
+    items.push({ url: play || show, type: play ? 'video' : 'image' })
   }
   return items
 }
@@ -57,10 +52,8 @@ export function EditClient({
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [guides, setGuides] = useState<AiGuide[]>(DEFAULT_AI_GUIDES)
   const [guideId, setGuideId] = useState(pickDefaultGuide(DEFAULT_AI_GUIDES).id)
-  const [mediaMode, setMediaMode] = useState<'original' | 'custom'>('original')
-  const [customMedia, setCustomMedia] = useState<MediaPreview[]>([])
+  const [extraMedia, setExtraMedia] = useState<MediaPreview[]>([])
   const [templateOpen, setTemplateOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [modelId, setModelId] = useState(DEFAULT_AI_MODEL.id)
   const [webSearch, setWebSearch] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -203,8 +196,12 @@ export function EditClient({
 
   const previewName = selected ? `@${selected.username}` : '내 계정'
   const selectedGuide = guides.find((item) => item.id === guideId) ?? pickDefaultGuide(guides)
-  const previewMedia = mediaMode === 'custom' ? customMedia : sourceMedia
-  const previewThumb = previewMedia[0]?.url ? mediaSrc(previewMedia[0].url) : thumb
+  const previewMedia = [...sourceMedia, ...extraMedia]
+  const previewThumb = previewMedia[0]?.url
+    ? previewMedia[0].url.startsWith('blob:')
+      ? previewMedia[0].url
+      : mediaSrc(previewMedia[0].url)
+    : thumb
 
   useEffect(() => {
     let alive = true
@@ -232,17 +229,24 @@ export function EditClient({
   }
 
   function attachFiles(files: File[]) {
-    setCustomMedia((prev) => {
-      for (const item of prev) {
-        if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
-      }
-      return files.map((file) => ({
+    if (!files.length) return
+    setExtraMedia((prev) => [
+      ...prev,
+      ...files.map((file) => ({
         url: URL.createObjectURL(file),
-        type: file.type.startsWith('video/') ? 'video' : 'image',
-      }))
+        type: (file.type.startsWith('video/') ? 'video' : 'image') as MediaPreview['type'],
+      })),
+    ])
+    setMessage('파일을 추가했습니다.')
+  }
+
+  function removeExtra(index: number) {
+    setExtraMedia((prev) => {
+      const next = [...prev]
+      const [removed] = next.splice(index, 1)
+      if (removed?.url.startsWith('blob:')) URL.revokeObjectURL(removed.url)
+      return next
     })
-    setMediaMode('custom')
-    setMessage('직접 첨부한 파일을 씁니다.')
   }
 
   function resetEditor() {
@@ -251,8 +255,7 @@ export function EditClient({
     setDraftIndex(0)
     setCaption(post.caption ?? '')
     setInstruction('')
-    setMediaMode('original')
-    setCustomMedia((prev) => {
+    setExtraMedia((prev) => {
       for (const item of prev) {
         if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
       }
@@ -370,7 +373,6 @@ export function EditClient({
             guideId={selectedGuide.id}
             onGuide={setGuideId}
             isAdmin={isAdmin}
-            onImport={() => setImportOpen(true)}
             onTemplate={() => setTemplateOpen(true)}
             onReset={resetEditor}
           />
@@ -393,22 +395,53 @@ export function EditClient({
                 </button>
               ))}
             </div>
-            {previewMedia.length ? (
-              <div className="mb-3 flex gap-2 overflow-x-auto">
-                {previewMedia.map((item, index) => (
-                  <div
-                    key={`${item.url}-${index}`}
-                    className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/5"
+            <div className="mb-3 flex gap-2 overflow-x-auto">
+              {sourceMedia.map((item, index) => (
+                <div
+                  key={`orig-${item.url}-${index}`}
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/5"
+                >
+                  {item.type === 'video' ? (
+                    <video src={item.url} muted className="h-full w-full object-cover" />
+                  ) : (
+                    <img src={mediaSrc(item.url) || item.url} alt="" className="h-full w-full object-cover" />
+                  )}
+                </div>
+              ))}
+              {extraMedia.map((item, index) => (
+                <div
+                  key={`extra-${item.url}-${index}`}
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/5"
+                >
+                  {item.type === 'video' ? (
+                    <video src={item.url} muted className="h-full w-full object-cover" />
+                  ) : (
+                    <img src={item.url} alt="" className="h-full w-full object-cover" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeExtra(index)}
+                    className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[10px] text-white"
+                    aria-label="첨부 삭제"
                   >
-                    {item.type === 'video' ? (
-                      <video src={item.url} muted className="h-full w-full object-cover" />
-                    ) : (
-                      <img src={mediaSrc(item.url) || item.url} alt="" className="h-full w-full object-cover" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : null}
+                    ×
+                  </button>
+                </div>
+              ))}
+              <label className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed border-white/20 bg-white/5 text-xl text-white/40 hover:border-white/40 hover:text-white">
+                +
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    attachFiles(Array.from(event.target.files ?? []))
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
             <textarea
               value={caption}
               onChange={(e) => {
@@ -562,23 +595,6 @@ export function EditClient({
           </div>
         </div>
       )}
-
-      {importOpen ? (
-        <ImportModal
-          onClose={() => setImportOpen(false)}
-          onUseOriginal={() => {
-            setMediaMode('original')
-            setCustomMedia((prev) => {
-              for (const item of prev) {
-                if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
-              }
-              return []
-            })
-            setMessage('원문 영상·사진을 그대로 씁니다.')
-          }}
-          onAttach={attachFiles}
-        />
-      ) : null}
 
       {templateOpen ? (
         <TemplateModal onClose={() => setTemplateOpen(false)} onInsert={insertTemplate} />
