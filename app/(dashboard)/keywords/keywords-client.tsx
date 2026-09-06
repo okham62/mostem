@@ -20,6 +20,7 @@ import { logWork } from '@/lib/client-log'
 import { KeywordsSkeleton } from './keywords-skeleton'
 
 const POLL_MS = 30_000
+let reloading = false
 
 const STATE_UI: Record<
   KeywordState,
@@ -68,15 +69,24 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
   }
 
   async function reload(scope: 'fast' | 'full' = 'full') {
+    if (reloading) return
+    reloading = true
     setRefreshing(true)
     try {
-      const [next, local] = await Promise.all([fetchRealtime(scope).catch(() => peekRealtimeCache()), fetchBrowserNaver()])
-      const merged = local ? applyBrowserNaver(next, local) : next
-      if (merged) {
-        writeRealtimeCache(merged)
-        setData(merged)
-      }
+      const [next, local] = await Promise.all([
+        fetchRealtime(scope).catch(() => peekRealtimeCache()),
+        fetchBrowserNaver(),
+      ])
+      setData((prev) => {
+        const base = next ?? prev ?? peekRealtimeCache()
+        if (!base) return prev
+        const merged = local ? applyBrowserNaver(base, local) : base
+        const kept = stabilizeKeywordsPayload(merged, prev ?? peekRealtimeCache())
+        writeRealtimeCache(kept)
+        return kept
+      })
     } finally {
+      reloading = false
       setRefreshing(false)
     }
   }
@@ -191,7 +201,9 @@ function KeywordPanel({
         </span>
       </div>
       {keywords.length === 0 ? (
-        <div className="py-10 text-center text-sm text-white/40">{source?.error || empty}</div>
+        <div className="py-10 text-center text-sm text-white/40">
+          {source?.error || '불러오는 중...'}
+        </div>
       ) : (
         <KeywordColumn items={keywords} source={source?.label || ''} />
       )}

@@ -216,48 +216,56 @@ export function applyBrowserNaver(
   data: KeywordsPayload | null,
   naver: { now: number; keywords: RealtimeKeyword[] }
 ): KeywordsPayload {
-  const google = data?.sources?.find((source) => source.id === 'google')
-  return {
-    now: naver.now,
-    keywords: naver.keywords,
-    news: data?.news ?? [],
-    sources: [
-      {
-        id: 'signal',
-        label: '네이버',
-        hint: '실시간 검색어',
-        now: naver.now,
-        keywords: naver.keywords,
-      },
-      google ?? {
-        id: 'google',
-        label: '구글',
-        hint: '한국 급상승 검색어',
-        now: data?.now ?? naver.now,
-        keywords: [],
-      },
-    ],
-  }
+  return stabilizeKeywordsPayload(
+    {
+      now: naver.now,
+      keywords: naver.keywords,
+      news: data?.news ?? [],
+      sources: [
+        {
+          id: 'signal',
+          label: '네이버',
+          hint: '실시간 검색어',
+          now: naver.now,
+          keywords: naver.keywords,
+        },
+        {
+          id: 'google',
+          label: '구글',
+          hint: '한국 급상승 검색어',
+          now: data?.now ?? naver.now,
+          keywords: data?.sources?.find((source) => source.id === 'google')?.keywords ?? [],
+        },
+      ],
+    },
+    data
+  )
 }
 
 export function stabilizeKeywordsPayload(
   incoming: KeywordsPayload,
   previous?: KeywordsPayload | null
 ): KeywordsPayload {
-  if (!previous?.sources?.length) return incoming
-  const sources = incoming.sources.map((source) => {
-    const old = previous.sources.find((item) => item.id === source.id)
-    const keywords = stabilizeKeywordList(source.keywords, old?.keywords)
+  const ids: KeywordSourceId[] = ['signal', 'google']
+  const sources = ids.map((id) => {
+    const next = incoming.sources?.find((source) => source.id === id)
+    const old = previous?.sources?.find((source) => source.id === id)
+    const keywords = stabilizeKeywordList(next?.keywords, old?.keywords)
+    const keptOld = keywords.length > 0 && !(next?.keywords?.length)
     return {
-      ...source,
+      id,
+      label: next?.label ?? old?.label ?? (id === 'google' ? '구글' : '네이버'),
+      hint: id === 'google' ? '한국 급상승 검색어' : '실시간 검색어',
+      now: keptOld ? old?.now ?? next?.now ?? Date.now() : next?.now ?? old?.now ?? Date.now(),
       keywords,
-      ...(keywords.length ? { error: undefined } : {}),
+      ...(keywords.length ? {} : { error: next?.error ?? old?.error }),
     }
   })
   return limitKeywordsPayload({
-    ...incoming,
-    sources,
+    now: incoming.now || previous?.now || Date.now(),
     keywords: sources.find((source) => source.id === 'signal')?.keywords ?? incoming.keywords,
+    news: incoming.news?.length ? incoming.news : previous?.news ?? [],
+    sources,
   })
 }
 

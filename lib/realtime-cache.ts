@@ -24,7 +24,7 @@ export function peekRealtimeCache(): KeywordsPayload | null {
 }
 
 export function writeRealtimeCache(data: KeywordsPayload) {
-  memory = limitKeywordsPayload(data)
+  memory = limitKeywordsPayload(stabilizeKeywordsPayload(data, memory))
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(memory))
