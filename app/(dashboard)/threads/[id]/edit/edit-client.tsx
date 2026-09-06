@@ -8,7 +8,12 @@ import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/l
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
-import { isHamiOnline, requestHamiPublish } from '@/lib/threads-publish'
+import {
+  hamiSupportsMediaPublish,
+  isHamiOnline,
+  publishMediaUrl,
+  requestHamiPublish,
+} from '@/lib/threads-publish'
 import { EditToolbar } from './edit-toolbar'
 import { ModelPicker } from './model-picker'
 import { PublishModal } from './publish-modal'
@@ -260,11 +265,28 @@ export function EditClient({
       setMessage('발행하려면 하미 확장이 필요해요. chrome://extensions에서 켠 뒤 이 창을 다시 열어 주세요.')
       return
     }
+    const items = [
+      ...sourceMedia.filter((item) => !hiddenSource.includes(item.url)),
+      ...extraMedia,
+    ]
+    if (items.length && !hamiSupportsMediaPublish()) {
+      setMessage('영상·사진을 같이 올리려면 하미를 0.2.4로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
+      return
+    }
     setSaving(true)
-    setMessage('')
+    setMessage(items.length ? '영상·사진을 첨부해 올리는 중...' : '')
     const published = await requestHamiPublish({
       text: caption,
       username: selected.username,
+      media: items.map((item, index) => ({
+        url: publishMediaUrl(item.url),
+        sourceUrl: item.url.startsWith('http') ? item.url : undefined,
+        type: item.type,
+        filename:
+          item.type === 'video'
+            ? `video-${index + 1}.mp4`
+            : `image-${index + 1}.jpg`,
+      })),
     })
     if (!published.ok) {
       setSaving(false)

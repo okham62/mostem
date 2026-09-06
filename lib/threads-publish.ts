@@ -1,3 +1,12 @@
+export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.4'
+
+export type PublishMediaItem = {
+  url: string
+  sourceUrl?: string
+  type: 'image' | 'video'
+  filename: string
+}
+
 export function threadsIntentUrl(text: string) {
   const body = text.trim().slice(0, 500)
   return `https://www.threads.net/intent/post?text=${encodeURIComponent(body)}`
@@ -9,9 +18,36 @@ export function isHamiOnline() {
   return at > 0 && Date.now() - at < 4000
 }
 
+function parseVersion(value: string) {
+  return value.split('.').map((part) => Number(part.replace(/\D/g, '')) || 0)
+}
+
+export function hamiSupportsMediaPublish() {
+  if (typeof document === 'undefined') return false
+  const version = document.documentElement.getAttribute('data-hami-version') || ''
+  if (!version) return false
+  const [major = 0, minor = 0, patch = 0] = parseVersion(version)
+  const [needMajor, needMinor, needPatch] = parseVersion(HAMI_MEDIA_PUBLISH_VERSION)
+  if (major !== needMajor) return major > needMajor
+  if (minor !== needMinor) return minor > needMinor
+  return patch >= needPatch
+}
+
+export function publishMediaUrl(url: string) {
+  if (!url) return ''
+  if (url.startsWith('blob:') || url.startsWith('data:')) return url
+  if (url.startsWith('/')) {
+    if (typeof window === 'undefined') return url
+    return `${window.location.origin}${url}`
+  }
+  if (typeof window === 'undefined') return url
+  return `${window.location.origin}/api/media/proxy?url=${encodeURIComponent(url)}`
+}
+
 export function requestHamiPublish(input: {
   text: string
   username?: string
+  media?: PublishMediaItem[]
 }): Promise<{ ok: boolean; error?: string }> {
   if (typeof window === 'undefined') {
     return Promise.resolve({ ok: false, error: '브라우저에서만 발행할 수 있습니다.' })
@@ -25,6 +61,8 @@ export function requestHamiPublish(input: {
 
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const intentUrl = threadsIntentUrl(input.text)
+  const media = input.media?.filter((item) => item.url) ?? []
+  const timeoutMs = media.length ? 90_000 : 45_000
 
   return new Promise((resolve) => {
     const finish = (result: { ok: boolean; error?: string }) => {
@@ -61,13 +99,17 @@ export function requestHamiPublish(input: {
           username: input.username,
           intentUrl,
           autoPost: true,
+          media,
         },
       },
       '*'
     )
 
     const timer = window.setTimeout(() => {
-      finish({ ok: false, error: '확장프로그램이 응답하지 않습니다. 하미를 새로고침한 뒤 다시 시도해 주세요.' })
-    }, 45000)
+      finish({
+        ok: false,
+        error: '확장프로그램이 응답하지 않습니다. 하미를 새로고침한 뒤 다시 시도해 주세요.',
+      })
+    }, timeoutMs)
   })
 }
