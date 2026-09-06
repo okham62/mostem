@@ -21,12 +21,15 @@ import {
   formatGrowth,
   formatSearchVolume,
   formatTrendDate,
+  itemsForTab,
+  SHOP_CATEGORIES,
   type CompareWeeks,
   type TrendDetail,
   type TrendKeyword,
   type TrendsPayload,
   type TrendTab,
 } from '@/lib/trends'
+import { fetchTrends, peekTrendCache } from '@/lib/trend-cache'
 import { cn } from '@/lib/utils'
 import { logWork } from '@/lib/client-log'
 
@@ -56,8 +59,8 @@ const COMPARES: { id: CompareWeeks; label: string }[] = [
   { id: 4, label: '4주 전과 비교' },
 ]
 
-export function TrendsClient({ initial }: { initial: TrendsPayload }) {
-  const [data, setData] = useState(initial)
+export function TrendsClient({ initial = null }: { initial?: TrendsPayload | null }) {
+  const [data, setData] = useState<TrendsPayload | null>(() => initial ?? peekTrendCache())
   const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab] = useState<TrendTab>('rising')
   const [category, setCategory] = useState('all')
@@ -67,46 +70,36 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
   const [excludeBrand, setExcludeBrand] = useState(false)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<TrendKeyword | null>(null)
+  const reloading = useRef(false)
 
-  async function reload(next?: {
-    compare?: CompareWeeks
-    cat?: string
-    q?: string
-    timing?: (typeof TIMINGS)[number]['id']
-    tab?: TrendTab
-  }) {
-    setRefreshing(true)
-    const nextCompare = next?.compare ?? compare
-    const nextCat = next?.cat ?? category
-    const nextQ = next?.q ?? query
-    const nextTiming = next?.timing ?? timing
-    const nextTab = next?.tab ?? tab
+  async function reload(silent = false, fast = false) {
+    if (reloading.current && !fast) return
+    if (!fast) reloading.current = true
+    if (!silent && !data?.items.length) setRefreshing(true)
     try {
-      const params = new URLSearchParams()
-      params.set('compare', String(nextCompare))
-      params.set('tab', nextTab)
-      if (nextCat !== 'all') params.set('cat', nextCat)
-      if (nextQ.trim()) params.set('q', nextQ.trim())
-      if (nextTiming === 'now') params.set('timing', 'now')
-      const res = await fetch(`/api/trends?${params.toString()}`, { cache: 'no-store' })
-      if (!res.ok) return
-      const nextData = (await res.json()) as TrendsPayload
-      setData(nextData)
+      const nextData = await fetchTrends(fast)
+      if (nextData?.items?.length) setData(nextData)
+    } catch {
+      /* keep last list */
     } finally {
-      setRefreshing(false)
+      if (!fast) reloading.current = false
+      if (!silent) setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      void fetch('/api/trends?tab=popular', { cache: 'no-store' })
-    }, 800)
-    return () => window.clearTimeout(id)
-  }, [])
-
-  useEffect(() => {
+    const cached = peekTrendCache()
+    if (cached?.items.length && (!initial || cached.items.length >= (initial.items?.length ?? 0))) {
+      setData(cached)
+    } else if (initial?.items.length) {
+      setData(initial)
+    }
+    const hasList = Boolean(cached?.items.length || initial?.items.length)
+    void reload(hasList, true).then(() => {
+      void reload(true, false)
+    })
     const tick = () => {
-      if (document.visibilityState === 'visible') void reload()
+      if (document.visibilityState === 'visible') void reload(true, false)
     }
     const id = window.setInterval(tick, POLL_MS)
     document.addEventListener('visibilitychange', tick)
@@ -114,10 +107,11 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
       window.clearInterval(id)
       document.removeEventListener('visibilitychange', tick)
     }
-  }, [compare])
+  }, [])
 
   const filtered = useMemo(() => {
-    let rows = data.items
+    if (!data) return []
+    let rows = itemsForTab(data.items, tab)
     if (category !== 'all') {
       const label = data.categories.find((item) => item.id === category)?.label
       if (label) rows = rows.filter((item) => item.categoryPath.startsWith(label) || item.category === label)
@@ -132,7 +126,7 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
       rows = rows.filter((item) => item.keyword.toLowerCase().includes(q))
     }
     return rows
-  }, [data.items, data.categories, category, content, timing, excludeBrand, query])
+  }, [data, tab, category, content, timing, excludeBrand, query])
 
   const tabMeta = TABS.find((item) => item.id === tab)!
 
@@ -154,12 +148,16 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
             <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
             새로고침
           </button>
-          <p className="mt-2 text-[11px] text-white/35">
-            키워드 {data.stats.total}개 · 급상승 {data.stats.rising}개 · 신규 {data.stats.fresh}개
-          </p>
-          <p className="mt-2 text-[11px] text-white/30">
-            데이터 기준 {data.latestDate || formatTrendDate(data.now)} · 5분마다 자동 확인
-          </p>
+          {data ? (
+            <>
+              <p className="mt-2 text-[11px] text-white/35">
+                키워드 {data.stats.total}개 · 급상승 {data.stats.rising}개 · 신규 {data.stats.fresh}개
+              </p>
+              <p className="mt-2 text-[11px] text-white/30">
+                데이터 기준 {data.latestDate || formatTrendDate(data.now)} · 5분마다 자동 확인
+              </p>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -171,13 +169,7 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => {
-                  setTab(item.id)
-                  if (item.id !== 'rising') {
-                    setData((prev) => ({ ...prev, items: [] }))
-                  }
-                  void reload({ tab: item.id })
-                }}
+                onClick={() => setTab(item.id)}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition',
                   active ? 'bg-brand text-white shadow-[0_0_0_1px_rgba(139,92,246,0.35)]' : 'text-white/55 hover:text-white'
@@ -195,12 +187,12 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <HoverSelect
-            value={data.categories.find((item) => item.id === category)?.label || '전체 분야'}
-            options={data.categories.map((item) => ({ id: item.id, label: item.label }))}
-            onChange={(id) => {
-              setCategory(id)
-              void reload({ cat: id })
-            }}
+            value={(data?.categories ?? SHOP_CATEGORIES).find((item) => item.id === category)?.label || '전체 분야'}
+            options={(data?.categories?.length ? data.categories : SHOP_CATEGORIES).map((item) => ({
+              id: item.id,
+              label: item.label,
+            }))}
+            onChange={(id) => setCategory(id)}
           />
           <HoverSelect
             value={CONTENTS.find((item) => item.id === content)?.label || '모든 콘텐츠'}
@@ -210,20 +202,12 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
           <HoverSelect
             value={TIMINGS.find((item) => item.id === timing)?.label || '모든 타이밍'}
             options={TIMINGS.map((item) => ({ id: item.id, label: item.label }))}
-            onChange={(id) => {
-              const next = id as typeof timing
-              setTiming(next)
-              void reload({ timing: next })
-            }}
+            onChange={(id) => setTiming(id as typeof timing)}
           />
           <HoverSelect
             value={COMPARES.find((item) => item.id === compare)?.label || '1주 전과 비교'}
             options={COMPARES.map((item) => ({ id: String(item.id), label: item.label }))}
-            onChange={(id) => {
-              const next = Number(id) as CompareWeeks
-              setCompare(next)
-              void reload({ compare: next })
-            }}
+            onChange={(id) => setCompare(Number(id) as CompareWeeks)}
           />
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-xs text-white/55">
             <input
@@ -243,9 +227,8 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
                 setQuery(value)
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  if (query.trim()) logWork('keyword_search', { query: query.trim() })
-                  void reload({ q: query })
+                if (event.key === 'Enter' && query.trim()) {
+                  logWork('keyword_search', { query: query.trim() })
                 }
               }}
               placeholder="키워드 검색"
@@ -257,11 +240,7 @@ export function TrendsClient({ initial }: { initial: TrendsPayload }) {
         <div className="mt-2 divide-y divide-white/5">
           {filtered.length === 0 ? (
             <div className="py-16 text-center text-sm text-white/35">
-              {refreshing
-                ? tab === 'popular' || tab === 'new'
-                  ? '검색량 기준으로 키워드를 모으는 중'
-                  : '키워드를 불러오는 중'
-                : '조건에 맞는 키워드가 없습니다.'}
+              {!data?.items.length ? '키워드를 불러오는 중' : '조건에 맞는 키워드가 없습니다.'}
             </div>
           ) : (
             filtered.map((item, index) => (
