@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/lib/collect-media'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
@@ -73,12 +73,14 @@ function MediaThumb({ item }: { item: MediaPreview }) {
 
 function MediaHoverTile({
   item,
+  active,
   onPreview,
   onPreviewEnd,
   onRemove,
   removeLabel,
 }: {
   item: MediaPreview
+  active?: boolean
   onPreview: (item: MediaPreview) => void
   onPreviewEnd: () => void
   onRemove: () => void
@@ -86,11 +88,15 @@ function MediaHoverTile({
 }) {
   return (
     <div
-      className="relative h-24 w-24 shrink-0"
+      className="relative z-[90] h-24 w-24 shrink-0"
       onMouseEnter={() => onPreview(item)}
       onMouseLeave={onPreviewEnd}
     >
-      <div className="relative h-24 w-24 overflow-hidden rounded-lg bg-white/5">
+      <div
+        className={`relative h-24 w-24 overflow-hidden rounded-lg bg-white/5 ${
+          active ? 'ring-2 ring-brand ring-offset-2 ring-offset-[#141418]' : ''
+        }`}
+      >
         <MediaThumb item={item} />
         <button
           type="button"
@@ -109,14 +115,25 @@ function MediaHoverTile({
   )
 }
 
-function HoverPreview({ item }: { item: MediaPreview | null }) {
+function HoverPreview({
+  item,
+  anchor,
+}: {
+  item: MediaPreview | null
+  anchor: HTMLElement | null
+}) {
   if (!item) return null
 
   const src = displaySrc(item.url)
   const poster = displaySrc(item.poster)
+  const box = anchor?.getBoundingClientRect()
+  const top = box ? box.bottom + 10 : 160
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[80] flex items-center justify-center bg-black/70">
+    <div
+      className="pointer-events-none fixed left-1/2 z-[70] -translate-x-1/2"
+      style={{ top }}
+    >
       {item.type === 'video' ? (
         <video
           key={item.url}
@@ -134,7 +151,7 @@ function HoverPreview({ item }: { item: MediaPreview | null }) {
             const play = el.play()
             if (play) void play.catch(() => {})
           }}
-          className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
+          className="max-h-[62vh] max-w-[min(520px,72vw)] rounded-2xl object-contain shadow-2xl"
         />
       ) : (
         <img
@@ -142,7 +159,7 @@ function HoverPreview({ item }: { item: MediaPreview | null }) {
           src={src}
           alt=""
           referrerPolicy="no-referrer"
-          className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
+          className="max-h-[62vh] max-w-[min(520px,72vw)] rounded-2xl object-contain shadow-2xl"
         />
       )}
     </div>
@@ -173,6 +190,7 @@ export function EditClient({
   const [extraMedia, setExtraMedia] = useState<MediaPreview[]>([])
   const [hiddenSource, setHiddenSource] = useState<string[]>([])
   const [lightbox, setLightbox] = useState<MediaPreview | null>(null)
+  const mediaStripRef = useRef<HTMLDivElement>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [modelId, setModelId] = useState(DEFAULT_AI_MODEL.id)
   const [webSearch, setWebSearch] = useState(false)
@@ -539,11 +557,12 @@ export function EditClient({
                 {extraMedia.length ? ` · 추가 ${extraMedia.length}` : ''}
               </p>
             </div>
-            <div className="mb-3 flex gap-2 overflow-x-auto">
+            <div ref={mediaStripRef} className="relative z-[90] mb-3 flex gap-2 overflow-x-auto">
               {visibleSource.map((item, index) => (
                 <MediaHoverTile
                   key={`orig-${item.url}-${index}`}
                   item={item}
+                  active={lightbox?.url === item.url}
                   onPreview={setLightbox}
                   onPreviewEnd={() => setLightbox(null)}
                   onRemove={() => removeSource(item.url)}
@@ -554,6 +573,7 @@ export function EditClient({
                 <MediaHoverTile
                   key={`extra-${item.url}-${index}`}
                   item={item}
+                  active={lightbox?.url === item.url}
                   onPreview={setLightbox}
                   onPreviewEnd={() => setLightbox(null)}
                   onRemove={() => removeExtra(index)}
@@ -738,7 +758,7 @@ export function EditClient({
         </div>
       )}
 
-      <HoverPreview item={lightbox} />
+      <HoverPreview item={lightbox} anchor={mediaStripRef.current} />
 
       {templateOpen ? (
         <TemplateModal onClose={() => setTemplateOpen(false)} onInsert={insertTemplate} />
