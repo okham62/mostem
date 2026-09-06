@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/lib/collect-media'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
@@ -86,9 +86,9 @@ function MediaHoverTile({
 }) {
   return (
     <div
-      className="relative -mx-1 h-24 w-24 shrink-0 px-1"
-      onPointerEnter={() => onPreview(item)}
-      onPointerLeave={onPreviewEnd}
+      className="relative h-24 w-24 shrink-0"
+      onMouseEnter={() => onPreview(item)}
+      onMouseLeave={onPreviewEnd}
     >
       <div className="relative h-24 w-24 overflow-hidden rounded-lg bg-white/5">
         <MediaThumb item={item} />
@@ -96,6 +96,7 @@ function MediaHoverTile({
           type="button"
           onClick={(event) => {
             event.stopPropagation()
+            onPreviewEnd()
             onRemove()
           }}
           className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-[11px] text-white hover:bg-red-500"
@@ -109,62 +110,41 @@ function MediaHoverTile({
 }
 
 function HoverPreview({ item }: { item: MediaPreview | null }) {
-  const [shown, setShown] = useState<MediaPreview | null>(null)
-  const [open, setOpen] = useState(false)
+  if (!item) return null
 
-  useLayoutEffect(() => {
-    if (item) {
-      setShown(item)
-      setOpen(true)
-      return
-    }
-    setOpen(false)
-  }, [item])
-
-  if (!shown) return null
-
-  const src = displaySrc(shown.url)
-  const poster = displaySrc(shown.poster)
+  const src = displaySrc(item.url)
+  const poster = displaySrc(item.poster)
 
   return (
-    <div
-      className={`pointer-events-none fixed inset-0 z-[80] flex items-center justify-center bg-black/80 ${
-        open ? 'animate-media-preview-backdrop-in' : 'animate-media-preview-backdrop-out'
-      }`}
-      onAnimationEnd={(event) => {
-        if (event.target !== event.currentTarget) return
-        if (!open && !item) setShown(null)
-      }}
-    >
-      <div
-        key={shown.url}
-        className={open ? 'animate-media-preview-in' : 'animate-media-preview-out'}
-      >
-        {shown.type === 'video' ? (
-          <video
-            key={shown.url}
-            src={src}
-            poster={poster || undefined}
-            autoPlay
-            muted
-            playsInline
-            loop
-            preload="auto"
-            ref={(el) => {
-              el?.play().catch(() => {})
-            }}
-            className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
-          />
-        ) : (
-          <img
-            key={shown.url}
-            src={src}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
-          />
-        )}
-      </div>
+    <div className="pointer-events-none fixed inset-0 z-[80] flex items-center justify-center bg-black/70">
+      {item.type === 'video' ? (
+        <video
+          key={item.url}
+          src={src}
+          poster={poster || undefined}
+          autoPlay
+          muted
+          playsInline
+          loop
+          preload="auto"
+          ref={(el) => {
+            if (!el) return
+            el.muted = true
+            el.currentTime = 0
+            const play = el.play()
+            if (play) void play.catch(() => {})
+          }}
+          className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
+        />
+      ) : (
+        <img
+          key={item.url}
+          src={src}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
+        />
+      )}
     </div>
   )
 }
