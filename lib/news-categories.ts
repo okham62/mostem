@@ -78,7 +78,7 @@ export const NEWS_CATEGORIES: NewsCategory[] = [
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 const SIGNAL_URL = 'https://api.signal.bz/news/realtime'
-const CACHE_MS = 1_500
+const CACHE_MS = 10_000
 
 const NAVER_QUERY: Record<Exclude<NewsCategoryId, 'ranking'>, string[]> = {
   china: ['중국', '홍콩 대만'],
@@ -140,8 +140,13 @@ function attachImages(items: RankingNews[], extras: RankingNews[]) {
   }
 }
 
-function sortNewest(items: RankingNews[]) {
-  return [...items].sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
+function articleKey(office: string, aid: string) {
+  return `${office}:${Number(aid)}`
+}
+
+function originThumb(office: string, date: string, aid: string, ext: string) {
+  const day = decodeURIComponent(date).replace(/%2F/gi, '/')
+  return `https://imgnews.pstatic.net/image/origin/${office}/${day}/${Number(aid)}.${ext.toLowerCase()}`
 }
 
 function mergeNews(groups: RankingNews[][]) {
@@ -155,7 +160,7 @@ function mergeNews(groups: RankingNews[][]) {
       out.push(item)
     }
   }
-  return sortNewest(out)
+  return out
 }
 
 function decodeNaverText(value: string) {
@@ -165,13 +170,11 @@ function decodeNaverText(value: string) {
 function parseNaverSearch(html: string): RankingNews[] {
   const images = new Map<string, string>()
   for (const match of html.matchAll(
-    /imgnews\.pstatic\.net(?:\/image\/origin\/|%2Fimage%2Forigin%2F)(\d+)(?:\/|%2F)(\d{4}(?:\/|%2F)\d{2}(?:\/|%2F)\d{2})(?:\/|%2F)(\d+)\.(jpg|jpeg|png|webp)/gi
+    /(?:imgnews|mimgnews)\.pstatic\.net(?:\/image\/origin\/|%2Fimage%2Forigin%2F)(\d+)(?:\/|%2F)(\d{4}(?:\/|%2F)\d{2}(?:\/|%2F)\d{2})(?:\/|%2F)(\d+)\.(jpg|jpeg|png|webp)/gi
   )) {
-    const key = `${match[1]}:${Number(match[3])}`
+    const key = articleKey(match[1], match[3])
     if (images.has(key)) continue
-    const date = decodeURIComponent(match[2])
-    const origin = `https://imgnews.pstatic.net/image/origin/${match[1]}/${date}/${match[3]}.${match[4]}`
-    images.set(key, `https://search.pstatic.net/common/?src=${encodeURIComponent(origin)}&type=ofullfill300_200`)
+    images.set(key, originThumb(match[1], match[2], match[3], match[4]))
   }
 
   const items: RankingNews[] = []
@@ -179,17 +182,17 @@ function parseNaverSearch(html: string): RankingNews[] {
   const cardRe =
     /href="(https:\/\/n\.news\.naver\.com\/article\/(\d+)\/(\d+)[^"]*)"[\s\S]{0,1200}?sds-comps-text-type-headline1">([\s\S]*?)<\/span>/g
   for (const match of html.matchAll(cardRe)) {
-    const link = match[1]
+    const link = match[1].replace(/&amp;/g, '&')
     const title = decodeNaverText(match[4])
     if (!title || seen.has(link)) continue
     seen.add(link)
-    const image = images.get(`${match[2]}:${Number(match[3])}`) || ''
+    const image = images.get(articleKey(match[2], match[3])) || ''
     items.push({
       title,
       link,
       image,
       press: '네이버뉴스',
-      publishedAt: Date.now() - items.length,
+      publishedAt: items.length,
     })
   }
   return items

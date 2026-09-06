@@ -25,7 +25,7 @@ import { logWork } from '@/lib/client-log'
 import { NewsSkeleton } from './news-skeleton'
 
 const NEWS_BATCH = 20
-const POLL_MS = 1_000
+const POLL_MS = 10_000
 
 function scrollParentOf(el: HTMLElement | null) {
   let node = el?.parentElement ?? null
@@ -46,6 +46,7 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
   const [refreshing, setRefreshing] = useState(false)
   const [query, setQuery] = useState('')
   const [showTop, setShowTop] = useState(false)
+  const [clock, setClock] = useState(() => initial?.now ?? Date.now())
   const sentinelRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const categoryRef = useRef(category)
@@ -60,7 +61,10 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
       const res = await fetch(`/api/news?category=${id}`, { cache: 'no-store' })
       if (!res.ok) return
       const next = (await res.json()) as CategoryNewsPayload
-      setBucket((prev) => ({ ...prev, [id]: keepNewsImages(prev[id], next) }))
+      setBucket((prev) => {
+        const merged = keepNewsImages(prev[id], next)
+        return sameNews(prev[id], merged) ? prev : { ...prev, [id]: merged }
+      })
     } finally {
       if (!silent) setRefreshing(false)
     }
@@ -79,6 +83,11 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
     setVisible(NEWS_BATCH)
     if (!bucket[category]) void reload(category)
   }, [category])
+
+  useEffect(() => {
+    const id = window.setInterval(() => setClock(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     void reload(category)
@@ -141,7 +150,6 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
     return () => window.clearTimeout(id)
   }, [query])
 
-  const clock = data?.now ?? Date.now()
   if (!data && Object.keys(bucket).length === 0) return <NewsSkeleton />
 
   function jumpTop() {
@@ -192,7 +200,7 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
         <div className="mb-3 flex items-end justify-between">
           <div>
             <h2 className="text-sm font-semibold text-white">{active.label}</h2>
-            <p className="mt-0.5 text-xs text-white/40">{active.hint} · 1초마다 최신순 갱신</p>
+            <p className="mt-0.5 text-xs text-white/40">{active.hint} · 자동 갱신</p>
           </div>
           {filteredNews.length > 0 ? (
             <p className="text-xs text-white/40">{filteredNews.length}건</p>
@@ -204,9 +212,9 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {newsSlice.map((item, index) => (
+            {newsSlice.map((item) => (
               <a
-                key={`${item.link}-${index}`}
+                key={item.link}
                 href={item.link}
                 target="_blank"
                 rel="noreferrer"
@@ -255,6 +263,16 @@ function newsKey(title: string) {
   return title.replace(/\s+/g, '').replace(/[^\w가-힣]/g, '').slice(0, 22)
 }
 
+function sameNews(prev: CategoryNewsPayload | undefined, next: CategoryNewsPayload) {
+  if (!prev || prev.news.length !== next.news.length) return false
+  return prev.news.every(
+    (item, index) =>
+      item.link === next.news[index]?.link &&
+      item.image === next.news[index]?.image &&
+      item.title === next.news[index]?.title
+  )
+}
+
 function keepNewsImages(prev: CategoryNewsPayload | undefined, next: CategoryNewsPayload) {
   if (!prev?.news.length) return next
   const images = new Map<string, string>()
@@ -273,6 +291,9 @@ function keepNewsImages(prev: CategoryNewsPayload | undefined, next: CategoryNew
 
 function NewsThumb({ src }: { src?: string }) {
   const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
   if (!src || failed) {
     return <div className="flex h-full items-center justify-center text-xs text-white/30">이미지 없음</div>
   }
