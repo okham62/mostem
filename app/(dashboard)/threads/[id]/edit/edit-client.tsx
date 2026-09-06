@@ -8,7 +8,8 @@ import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/l
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
-import { readEditDraft, writeEditDraft } from '@/lib/edit-drafts'
+import { readEditDraft, writeEditDraft, type GenerateRun } from '@/lib/edit-drafts'
+import { GenerateHistoryModal } from './generate-history-modal'
 import {
   hamiSupportsMediaPublish,
   isHamiOnline,
@@ -210,6 +211,8 @@ export function EditClient({
   const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scheduleAt, setScheduleAt] = useState(() => new Date(Date.now() + 10 * 60 * 1000))
+  const [history, setHistory] = useState<GenerateRun[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   function pickSchedule(mins: number) {
     setScheduleAt(new Date(Date.now() + mins * 60 * 1000))
@@ -226,12 +229,14 @@ export function EditClient({
   const draftIndexRef = useRef(draftIndex)
   const hiddenSourceRef = useRef(hiddenSource)
   const sourceCaptionRef = useRef(sourceCaption)
+  const historyRef = useRef(history)
   const accountRef = useRef(selected?.username)
   captionRef.current = caption
   draftsRef.current = drafts
   draftIndexRef.current = draftIndex
   hiddenSourceRef.current = hiddenSource
   sourceCaptionRef.current = sourceCaption
+  historyRef.current = history
   accountRef.current = selected?.username
 
   function rememberDraft() {
@@ -244,6 +249,7 @@ export function EditClient({
       ],
       draftIndex: draftIndexRef.current,
       hiddenSource: hiddenSourceRef.current,
+      history: historyRef.current,
     })
   }
 
@@ -282,6 +288,7 @@ export function EditClient({
     setDraftIndex(stored.draftIndex)
     setCaption(stored.drafts[stored.draftIndex] || stored.drafts[0] || post.caption || '')
     setHiddenSource(stored.hiddenSource)
+    setHistory(stored.history)
   }, [post.id])
 
   useEffect(() => {
@@ -423,14 +430,24 @@ export function EditClient({
     }
     const next = (data.drafts as string[] | undefined) ?? [caption]
     const nextDrafts: [string, string, string] = [next[0] ?? '', next[1] ?? '', next[2] ?? '']
+    const run: GenerateRun = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      at: Date.now(),
+      model: typeof data.model === 'string' ? data.model : modelId,
+      instruction: instruction.trim(),
+      drafts: nextDrafts,
+    }
+    const nextHistory = [run, ...history].slice(0, 20)
     setDrafts(nextDrafts)
     setDraftIndex(0)
     setCaption(nextDrafts[0] || caption)
+    setHistory(nextHistory)
     writeEditDraft(post.id, {
       original: sourceCaption || post.caption || '',
       drafts: nextDrafts,
       draftIndex: 0,
       hiddenSource,
+      history: nextHistory,
     })
     setMessage('초안이 생성되었습니다.')
   }
@@ -755,9 +772,16 @@ export function EditClient({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setHistoryOpen(true)}
+                  className="ml-auto rounded-xl border border-white/15 px-3 py-2 text-xs text-white/80 hover:bg-white/5"
+                >
+                  기록{history.length ? ` ${history.length}` : ''}
+                </button>
+                <button
+                  type="button"
                   disabled={saving}
                   onClick={generate}
-                  className="ml-auto rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                  className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   {saving ? '생성 중' : '생성'}
                 </button>
@@ -822,6 +846,20 @@ export function EditClient({
 
       {templateOpen ? (
         <TemplateModal onClose={() => setTemplateOpen(false)} onInsert={insertTemplate} />
+      ) : null}
+
+      {historyOpen ? (
+        <GenerateHistoryModal
+          runs={history}
+          onClose={() => setHistoryOpen(false)}
+          onApply={(run) => {
+            setDrafts(run.drafts)
+            setDraftIndex(0)
+            setCaption(run.drafts[0] || '')
+            setHistoryOpen(false)
+            setMessage('이전 생성 기록을 불러왔습니다.')
+          }}
+        />
       ) : null}
 
       {showOriginalModal && (
