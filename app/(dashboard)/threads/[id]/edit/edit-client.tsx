@@ -211,7 +211,7 @@ export function EditClient({
       )}
 
       {tab === 'rewrite' && (
-        <div className="grid gap-4 p-4 lg:grid-cols-[220px_1fr_280px] md:p-6">
+        <div className="grid gap-4 p-4 lg:grid-cols-[200px_minmax(0,1fr)_minmax(420px,38vw)] md:p-6">
           <aside className="rounded-2xl border border-white/10 bg-[#141418] p-4">
             <p className="mb-3 text-xs text-white/40">내 계정</p>
             {accounts.length === 0 ? (
@@ -280,14 +280,14 @@ export function EditClient({
             {message && <p className="mt-2 text-xs text-gold">{message}</p>}
           </section>
 
-          <aside className="rounded-2xl border border-white/10 bg-[#141418] p-4">
+          <aside className="rounded-2xl border border-white/10 bg-[#141418] p-5">
             <p className="mb-3 text-xs text-white/40">발행하면 내 프로필에 이렇게 올라가요</p>
-            <div className="rounded-[28px] border border-white/10 bg-black p-4">
-              <p className="text-xs font-semibold text-white">{previewName}</p>
-              <p className="mt-1 text-[10px] text-white/30">지금</p>
-              <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{caption || '작성된 글이 여기에 보여요'}</p>
-              {thumb && <img src={thumb} alt="" className="mt-3 w-full rounded-lg object-cover" />}
-              <p className="mt-4 text-right text-[10px] text-white/30">{caption.length}/500</p>
+            <div className="mx-auto w-full max-w-[420px] rounded-[32px] border border-white/10 bg-black p-5">
+              <p className="text-sm font-semibold text-white">{previewName}</p>
+              <p className="mt-1 text-[11px] text-white/30">지금</p>
+              <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-white/80">{caption || '작성된 글이 여기에 보여요'}</p>
+              {thumb && <img src={thumb} alt="" className="mt-3 w-full rounded-xl object-cover" />}
+              <p className="mt-4 text-right text-[11px] text-white/30">{caption.length}/500</p>
             </div>
           </aside>
         </div>
