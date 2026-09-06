@@ -361,7 +361,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('영상·사진을 같이 올리려면 하미를 0.2.6으로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
+      setMessage('영상·사진을 같이 올리려면 하미를 0.2.7로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
       return
     }
     setSaving(true)
@@ -372,6 +372,9 @@ export function EditClient({
       media: items.map((item, index) => ({
         url: publishMediaUrl(item.url),
         sourceUrl: item.url.startsWith('http') ? item.url : undefined,
+        posterUrl: item.poster
+          ? publishMediaUrl(item.poster)
+          : undefined,
         type: item.type,
         filename:
           item.type === 'video'

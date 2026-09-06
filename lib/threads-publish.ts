@@ -1,8 +1,9 @@
-export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.6'
+export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.7'
 
 export type PublishMediaItem = {
   url: string
   sourceUrl?: string
+  posterUrl?: string
   type: 'image' | 'video'
   filename: string
 }
