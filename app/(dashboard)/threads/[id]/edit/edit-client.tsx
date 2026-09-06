@@ -217,10 +217,7 @@ export function EditClient({
 
   return (
     <div className="-m-3 min-h-full bg-[#0b0b0d] md:-m-4">
-      <div
-        className="flex min-h-full w-[840px] max-w-full flex-col"
-        style={{ width: 840, maxWidth: '100%' }}
-      >
+      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/threads" className="text-sm text-white/60 hover:text-white">
