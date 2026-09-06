@@ -361,26 +361,41 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('영상·사진을 같이 올리려면 하미를 0.2.7로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
+      setMessage('영상·사진을 같이 올리려면 하미를 0.2.8로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
       return
     }
+    // Threads web rejects most CDN videos after preview. Extension publish uses photos only
+    // (video → poster). Full video: use zip download and post manually.
+    const publishItems: Array<{
+      url: string
+      sourceUrl?: string
+      type: 'image'
+      filename: string
+    }> = []
+    const seen = new Set<string>()
+    for (const item of items) {
+      const raw = item.type === 'video' ? item.poster : item.url
+      if (!raw || seen.has(raw)) continue
+      seen.add(raw)
+      publishItems.push({
+        url: publishMediaUrl(raw),
+        sourceUrl: raw.startsWith('http') ? raw : undefined,
+        type: 'image',
+        filename: `image-${publishItems.length + 1}.jpg`,
+      })
+    }
     setSaving(true)
-    setMessage(items.length ? '영상·사진을 첨부해 올리는 중...' : '')
+    setMessage(
+      publishItems.length
+        ? items.some((item) => item.type === 'video')
+          ? '영상은 스레드가 자주 거절해서 사진으로 올리는 중...'
+          : '사진을 첨부해 올리는 중...'
+        : ''
+    )
     const published = await requestHamiPublish({
       text: caption,
       username: selected.username,
-      media: items.map((item, index) => ({
-        url: publishMediaUrl(item.url),
-        sourceUrl: item.url.startsWith('http') ? item.url : undefined,
-        posterUrl: item.poster
-          ? publishMediaUrl(item.poster)
-          : undefined,
-        type: item.type,
-        filename:
-          item.type === 'video'
-            ? `video-${index + 1}.mp4`
-            : `image-${index + 1}.jpg`,
-      })),
+      media: publishItems,
     })
     if (!published.ok) {
       setSaving(false)
