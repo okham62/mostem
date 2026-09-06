@@ -9,15 +9,23 @@ import {
   RotateCcw,
   Search,
 } from 'lucide-react'
-import { formatKeywordTime, formatKeywordTimeShort, type KeywordsPayload } from '@/lib/keywords'
-import { fetchRealtime, peekRealtimeCache } from '@/lib/realtime-cache'
+import type { RankingNews } from '@/lib/keywords'
+import {
+  NEWS_CATEGORIES,
+  formatNewsClock,
+  formatNewsClockShort,
+  isNewsCategory,
+  newsCategory,
+  type CategoryNewsPayload,
+  type NewsCategoryId,
+} from '@/lib/news-categories'
 import { PRESS_NAV_OUTLETS } from '@/lib/press'
 import { cn } from '@/lib/utils'
 import { logWork } from '@/lib/client-log'
 import { NewsSkeleton } from './news-skeleton'
 
 const NEWS_BATCH = 20
-const POLL_MS = 30_000
+const POLL_MS = 1_000
 
 function scrollParentOf(el: HTMLElement | null) {
   let node = el?.parentElement ?? null
@@ -29,34 +37,53 @@ function scrollParentOf(el: HTMLElement | null) {
   return document.scrollingElement as HTMLElement | null
 }
 
-export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
-  const [data, setData] = useState<KeywordsPayload | null>(initial ?? null)
+export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }) {
+  const [category, setCategory] = useState<NewsCategoryId>('ranking')
+  const [bucket, setBucket] = useState<Partial<Record<NewsCategoryId, CategoryNewsPayload>>>(
+    initial ? { [initial.category]: initial } : {}
+  )
   const [visible, setVisible] = useState(NEWS_BATCH)
   const [refreshing, setRefreshing] = useState(false)
   const [query, setQuery] = useState('')
   const [showTop, setShowTop] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const categoryRef = useRef(category)
+  categoryRef.current = category
 
-  async function reload() {
-    setRefreshing(true)
+  const data = bucket[category] ?? null
+  const active = newsCategory(category)
+
+  async function reload(id: NewsCategoryId, silent = false) {
+    if (!silent) setRefreshing(true)
     try {
-      const next = await fetchRealtime('news')
-      setData(next)
+      const res = await fetch(`/api/news?category=${id}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const next = (await res.json()) as CategoryNewsPayload
+      setBucket((prev) => ({ ...prev, [id]: next }))
     } finally {
-      setRefreshing(false)
+      if (!silent) setRefreshing(false)
     }
   }
 
   useLayoutEffect(() => {
-    const cached = peekRealtimeCache()
-    if (cached) setData(cached)
+    const next = new URLSearchParams(window.location.search).get('cat')
+    if (isNewsCategory(next)) setCategory(next)
   }, [])
 
   useEffect(() => {
-    void reload()
+    const url = new URL(window.location.href)
+    if (category === 'ranking') url.searchParams.delete('cat')
+    else url.searchParams.set('cat', category)
+    window.history.replaceState(null, '', url)
+    setVisible(NEWS_BATCH)
+    if (!bucket[category]) void reload(category)
+  }, [category])
+
+  useEffect(() => {
+    void reload(category)
     const tick = () => {
-      if (document.visibilityState === 'visible') void reload()
+      if (document.visibilityState === 'visible') void reload(categoryRef.current, true)
     }
     const id = window.setInterval(tick, POLL_MS)
     document.addEventListener('visibilitychange', tick)
@@ -64,14 +91,15 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
       window.clearInterval(id)
       document.removeEventListener('visibilitychange', tick)
     }
-  }, [])
+  }, [category])
 
   const filteredNews = useMemo(() => {
     const news = data?.news ?? []
     const q = query.trim().toLowerCase()
     if (!q) return news
     return news.filter(
-      item => item.title.toLowerCase().includes(q) || (item.press || '').toLowerCase().includes(q)
+      (item: RankingNews) =>
+        item.title.toLowerCase().includes(q) || (item.press || '').toLowerCase().includes(q)
     )
   }, [data?.news, query])
   const newsSlice = filteredNews.slice(0, visible)
@@ -113,7 +141,8 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
     return () => window.clearTimeout(id)
   }, [query])
 
-  if (!data) return <NewsSkeleton />
+  const clock = data?.now ?? Date.now()
+  if (!data && Object.keys(bucket).length === 0) return <NewsSkeleton />
 
   function jumpTop() {
     scrollParentOf(rootRef.current)?.scrollTo({ top: 0, behavior: 'smooth' })
@@ -123,12 +152,12 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
     <div ref={rootRef} className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="min-w-0 text-xs text-white/45 md:text-sm">
-          <span className="md:hidden">{formatKeywordTimeShort(data.now)}</span>
-          <span className="hidden md:inline">{formatKeywordTime(data.now)}</span>
+          <span className="md:hidden">{formatNewsClockShort(clock)}</span>
+          <span className="hidden md:inline">{formatNewsClock(clock)}</span>
         </p>
         <button
           type="button"
-          onClick={() => void reload()}
+          onClick={() => void reload(category)}
           className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-white/5 px-3 text-xs text-white/70 hover:bg-white/10"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
@@ -138,11 +167,29 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
 
       <NewsFilterBar query={query} onQuery={setQuery} />
 
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-thin md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+        {NEWS_CATEGORIES.map((item) => {
+          const current = item.id === category
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setCategory(item.id)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                current ? 'bg-white text-black' : 'bg-white/8 text-white/65 hover:bg-white/12 hover:text-white'
+              }`}
+            >
+              {item.label}
+            </button>
+          )
+        })}
+      </div>
+
       <section>
         <div className="mb-3 flex items-end justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">언론사별 가장 많이 본 뉴스</h2>
-            <p className="mt-0.5 text-xs text-white/40">각 언론사의 가장 많이 본 기사 1건</p>
+            <h2 className="text-sm font-semibold text-white">{active.label}</h2>
+            <p className="mt-0.5 text-xs text-white/40">{active.hint} · 1초마다 최신순 갱신</p>
           </div>
           {filteredNews.length > 0 ? (
             <p className="text-xs text-white/40">{filteredNews.length}건</p>
@@ -150,7 +197,7 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
         </div>
         {newsSlice.length === 0 ? (
           <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] py-16 text-center text-sm text-white/40">
-            검색 결과가 없습니다.
+            {data ? '검색 결과가 없습니다.' : '최신 뉴스를 불러오는 중...'}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -196,7 +243,7 @@ export function NewsClient({ initial }: { initial?: KeywordsPayload | null }) {
         {visible < filteredNews.length ? <div ref={sentinelRef} className="h-10" /> : null}
       </section>
 
-      <p className="pb-2 text-[11px] text-white/30">데이터 출처: 네이버 뉴스 랭킹</p>
+      <p className="pb-2 text-[11px] text-white/30">데이터 출처: {data?.source ?? active.source}</p>
 
       {showTop ? (
         <button

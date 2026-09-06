@@ -16,6 +16,7 @@ export interface RankingNews {
   image: string
   press: string
   pressImage?: string
+  publishedAt?: number
 }
 
 export interface KeywordSource {
