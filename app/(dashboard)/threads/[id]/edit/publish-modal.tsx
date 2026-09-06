@@ -6,6 +6,7 @@ import { isHamiOnline } from '@/lib/threads-publish'
 import type { ConnectedAccount } from '@/types'
 
 export function PublishModal({
+  title = '발행하기',
   account,
   saving,
   message,
@@ -13,12 +14,13 @@ export function PublishModal({
   onExtensionUpload,
   onDownload,
 }: {
+  title?: string
   account?: ConnectedAccount
   saving: boolean
   message?: string
   onClose: () => void
   onExtensionUpload: () => void
-  onDownload: () => void
+  onDownload?: () => void
 }) {
   const [hamiOn, setHamiOn] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -40,7 +42,7 @@ export function PublishModal({
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[2px]">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#121214] p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">발행하기</h2>
+          <h2 className="text-lg font-bold text-white">{title}</h2>
           <button type="button" onClick={onClose} className="text-white/40 hover:text-white">
             ✕
           </button>
@@ -95,6 +97,7 @@ export function PublishModal({
             </div>
           </div>
 
+          {onDownload && (
           <button
             type="button"
             onClick={onDownload}
@@ -113,6 +116,7 @@ export function PublishModal({
               </span>
             </span>
           </button>
+          )}
         </div>
 
         {message ? <p className="mt-3 text-xs text-gold">{message}</p> : null}

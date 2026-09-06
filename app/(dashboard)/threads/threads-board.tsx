@@ -28,6 +28,7 @@ import {
 } from '@/lib/collect-labels'
 import { imagePosterUrl, parseMediaItems } from '@/lib/collect-media'
 import { MediaDownloadButtons } from './media-download-buttons'
+import { ReuploadButton } from './reupload-button'
 import { ThreadCard } from './thread-card'
 import type { CollectedPost, CollectStatus, ConnectedAccount, PerformanceGrade } from '@/types'
 
@@ -355,11 +356,11 @@ export function ThreadsBoard({
       ) : view === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((post) => (
-            <ThreadCard key={post.id} post={post} onRemoved={onRemoved} />
+            <ThreadCard key={post.id} post={post} accounts={accounts} onRemoved={onRemoved} />
           ))}
         </div>
       ) : view === 'list' ? (
-        <ListView posts={filtered} onRemoved={onRemoved} />
+        <ListView posts={filtered} accounts={accounts} onRemoved={onRemoved} />
       ) : (
         <KanbanView posts={filtered} onRemoved={onRemoved} />
       )}
@@ -369,9 +370,11 @@ export function ThreadsBoard({
 
 function ListView({
   posts,
+  accounts,
   onRemoved,
 }: {
   posts: CollectedPost[]
+  accounts: ConnectedAccount[]
   onRemoved: (id: string) => void
 }) {
   return (
@@ -447,6 +450,13 @@ function ListView({
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
+                    )}
+                    {post.status === 'uploaded' && (
+                      <ReuploadButton
+                        post={post}
+                        accounts={accounts}
+                        className="rounded-lg border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/10"
+                      />
                     )}
                     <Link
                       href={`/threads/${post.id}/edit?tab=rewrite`}
