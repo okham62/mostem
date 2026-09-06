@@ -7,6 +7,7 @@ import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
+import { openThreadsComposer } from '@/lib/threads-publish'
 import { EditToolbar } from './edit-toolbar'
 import { ImportModal } from './import-modal'
 import { ModelPicker } from './model-picker'
@@ -113,6 +114,39 @@ export function EditClient({
     }
     router.refresh()
     return true
+  }
+
+  async function publishNow() {
+    if (!selected) {
+      setMessage('설정에서 올릴 스레드 아이디를 먼저 연결하세요.')
+      return
+    }
+    if (!caption.trim()) {
+      setMessage('올릴 글이 없습니다.')
+      return
+    }
+    setSaving(true)
+    setMessage('')
+    const res = await fetch('/api/threads/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postId: post.id,
+        caption,
+        username: selected.username,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setSaving(false)
+      setMessage(data.error || '발행 준비에 실패했습니다.')
+      return
+    }
+    await openThreadsComposer(caption, selected.username)
+    setSaving(false)
+    setPublishOpen(false)
+    setMessage(`@${selected.username} 스레드 작성창을 열었습니다. 올리면 바로 발행됩니다.`)
+    router.refresh()
   }
 
   async function generate() {
@@ -260,8 +294,9 @@ export function EditClient({
           </button>
           <button
             type="button"
-            onClick={() => openTab('publish')}
-            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white"
+            onClick={() => void publishNow()}
+            disabled={saving}
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
           >
             ⚡ 즉시발행
           </button>
@@ -429,19 +464,14 @@ export function EditClient({
             <div className="space-y-2">
               <button
                 type="button"
-                onClick={() => persist('uploaded')}
-                className="w-full rounded-xl border border-white/10 px-4 py-3 text-left"
+                disabled={saving || !selected}
+                onClick={() => void publishNow()}
+                className="w-full rounded-xl border border-brand/40 bg-brand/15 px-4 py-3 text-left disabled:opacity-50"
               >
-                <p className="text-sm font-semibold text-white">확장프로그램으로 업로드</p>
-                <p className="text-xs text-white/40">하미가 응답하면 이 글을 선택한 계정으로 올립니다.</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => persist('uploaded')}
-                className="w-full rounded-xl border border-white/10 px-4 py-3 text-left"
-              >
-                <p className="text-sm font-semibold text-white">Threads 공식 발행</p>
-                <p className="text-xs text-white/40">연결한 계정으로 서버에서 바로 올리는 경로입니다.</p>
+                <p className="text-sm font-semibold text-white">지금 스레드에 올리기</p>
+                <p className="text-xs text-white/40">
+                  작성창을 열고, 로그인된 스레드 계정으로 바로 올립니다.
+                </p>
               </button>
               <button
                 type="button"

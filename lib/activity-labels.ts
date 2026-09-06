@@ -13,6 +13,7 @@ export const ACTION_LABELS: Record<string, { label: string; icon: string }> = {
   threads_rewrite: { label: '스레드 글 재작성', icon: '✍️' },
   threads_edit: { label: '스레드 글 수정', icon: '✏️' },
   threads_account: { label: '스레드 계정 연결', icon: '🧵' },
+  threads_publish: { label: '스레드 즉시발행', icon: '⚡' },
   ai_generate: { label: 'AI 문구 생성', icon: '✨' },
   ai_tags: { label: 'AI 태그 생성', icon: '🏷️' },
 }
