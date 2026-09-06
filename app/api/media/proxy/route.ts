@@ -13,6 +13,18 @@ const VIDEO_RE = /\.(mp4|m3u8|webm|mov)(\?|$)/i
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Range, Content-Type',
+  }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() })
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url).searchParams.get('url')
   if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 })
@@ -59,6 +71,7 @@ export async function GET(req: Request) {
   )
   headers.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800')
   headers.set('Accept-Ranges', upstream.headers.get('accept-ranges') ?? 'bytes')
+  for (const [key, value] of Object.entries(corsHeaders())) headers.set(key, value)
   const contentRange = upstream.headers.get('content-range')
   if (contentRange) headers.set('Content-Range', contentRange)
   const contentLength = upstream.headers.get('content-length')
