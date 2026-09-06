@@ -60,7 +60,7 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
       const res = await fetch(`/api/news?category=${id}`, { cache: 'no-store' })
       if (!res.ok) return
       const next = (await res.json()) as CategoryNewsPayload
-      setBucket((prev) => ({ ...prev, [id]: next }))
+      setBucket((prev) => ({ ...prev, [id]: keepNewsImages(prev[id], next) }))
     } finally {
       if (!silent) setRefreshing(false)
     }
@@ -175,6 +175,9 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
               key={item.id}
               type="button"
               onClick={() => setCategory(item.id)}
+              onMouseEnter={() => {
+                if (!bucket[item.id]) void reload(item.id, true)
+              }}
               className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                 current ? 'bg-white text-black' : 'bg-white/8 text-white/65 hover:bg-white/12 hover:text-white'
               }`}
@@ -246,6 +249,26 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
       ) : null}
     </div>
   )
+}
+
+function newsKey(title: string) {
+  return title.replace(/\s+/g, '').replace(/[^\w가-힣]/g, '').slice(0, 22)
+}
+
+function keepNewsImages(prev: CategoryNewsPayload | undefined, next: CategoryNewsPayload) {
+  if (!prev?.news.length) return next
+  const images = new Map<string, string>()
+  for (const item of prev.news) {
+    if (!item.image) continue
+    images.set(item.link, item.image)
+    images.set(newsKey(item.title), item.image)
+  }
+  return {
+    ...next,
+    news: next.news.map((item) =>
+      item.image ? item : { ...item, image: images.get(item.link) || images.get(newsKey(item.title)) || '' }
+    ),
+  }
 }
 
 function NewsThumb({ src }: { src?: string }) {

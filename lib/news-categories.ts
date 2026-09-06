@@ -169,16 +169,6 @@ function pickRssImage(block: string) {
   return ''
 }
 
-function pickOgImage(html: string) {
-  const slice = html.slice(0, 120_000)
-  const match =
-    slice.match(/property=["']og:image(?::secure_url)?["'][^>]*content=["']([^"']+)/i) ||
-    slice.match(/content=["']([^"']+)["'][^>]*property=["']og:image(?::secure_url)?["']/i)
-  const image = match?.[1]?.trim() || ''
-  if (!image || image.startsWith('data:')) return ''
-  return httpsUrl(image)
-}
-
 function titleKey(title: string) {
   return title.replace(/\s+/g, '').replace(/[^\w가-힣]/g, '').slice(0, 22)
 }
@@ -205,36 +195,6 @@ function attachImages(items: RankingNews[], extras: RankingNews[]) {
       imageCache.set(item.link, matched)
     }
   }
-}
-
-async function enrichOgImages(items: RankingNews[], budgetMs = 900) {
-  const missing = items.filter((item) => !item.image).slice(0, 20)
-  if (!missing.length) return
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), budgetMs)
-  await Promise.all(
-    missing.map(async (item) => {
-      try {
-        const res = await fetch(item.link, {
-          headers: {
-            'User-Agent': BROWSER_UA,
-            Accept: 'text/html,application/xhtml+xml',
-          },
-          cache: 'no-store',
-          redirect: 'follow',
-          signal: ctrl.signal,
-        })
-        if (!res.ok) return
-        const image = pickOgImage(await res.text())
-        if (!image) return
-        item.image = image
-        imageCache.set(item.link, image)
-      } catch {
-        /* timeout or abort */
-      }
-    })
-  )
-  clearTimeout(timer)
 }
 
 function parseRssItems(xml: string): RankingNews[] {
@@ -291,10 +251,65 @@ async function fetchRss(url: string) {
       Accept: 'application/rss+xml,application/xml,text/xml,*/*;q=0.8',
     },
     cache: 'no-store',
-    signal: AbortSignal.timeout(4500),
+    signal: AbortSignal.timeout(2500),
   })
   if (!res.ok) return []
   return parseRssItems(await res.text())
+}
+
+function decodeNaverText(value: string) {
+  return decodeXml(value.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim()
+}
+
+function parseNaverSearch(html: string): RankingNews[] {
+  const images = new Map<string, string>()
+  for (const match of html.matchAll(
+    /imgnews\.pstatic\.net(?:\/image\/origin\/|%2Fimage%2Forigin%2F)(\d+)(?:\/|%2F)(\d{4}(?:\/|%2F)\d{2}(?:\/|%2F)\d{2})(?:\/|%2F)(\d+)\.(jpg|jpeg|png|webp)/gi
+  )) {
+    const key = `${match[1]}:${Number(match[3])}`
+    if (images.has(key)) continue
+    const date = decodeURIComponent(match[2])
+    const origin = `https://imgnews.pstatic.net/image/origin/${match[1]}/${date}/${match[3]}.${match[4]}`
+    images.set(key, `https://search.pstatic.net/common/?src=${encodeURIComponent(origin)}&type=ofullfill300_200`)
+  }
+
+  const items: RankingNews[] = []
+  const seen = new Set<string>()
+  const cardRe =
+    /href="(https:\/\/n\.news\.naver\.com\/article\/(\d+)\/(\d+)[^"]*)"[\s\S]{0,1200}?sds-comps-text-type-headline1">([\s\S]*?)<\/span>/g
+  for (const match of html.matchAll(cardRe)) {
+    const link = match[1]
+    const title = decodeNaverText(match[4])
+    if (!title || seen.has(link)) continue
+    seen.add(link)
+    const image = images.get(`${match[2]}:${Number(match[3])}`) || ''
+    items.push({
+      title,
+      link,
+      image,
+      press: '네이버뉴스',
+      publishedAt: Date.now() - items.length,
+    })
+  }
+  return items
+}
+
+async function fetchNaverNews(query: string): Promise<RankingNews[]> {
+  const pages = [1, 11].map((start) => {
+    const url = `https://m.search.naver.com/search.naver?where=m_news&query=${encodeURIComponent(query)}&start=${start}`
+    return fetch(url, {
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(2500),
+    })
+      .then(async (res) => (res.ok ? parseNaverSearch(await res.text()) : []))
+      .catch(() => [])
+  })
+  const groups = await Promise.all(pages)
+  return mergeNews(groups)
 }
 
 async function fetchRankingNews(): Promise<RankingNews[]> {
@@ -344,21 +359,21 @@ async function loadCategory(id: NewsCategoryId): Promise<CategoryNewsPayload> {
   if (id === 'ranking') {
     const news = await fetchRankingNews()
     attachImages(news, [])
-    await enrichOgImages(news)
     return { now: Date.now(), category: id, news, source: meta.source }
   }
-  const feeds = CATEGORY_FEEDS[id]
-  const [groups, bing] = await Promise.all([
-    Promise.all(feeds.map((url) => fetchRss(url).catch(() => []))),
-    fetchRss(bingSearch(BING_QUERY[id])).catch(() => []),
+  const query = BING_QUERY[id]
+  const [groups, bing, naver] = await Promise.all([
+    Promise.all(CATEGORY_FEEDS[id].map((url) => fetchRss(url).catch(() => []))),
+    fetchRss(bingSearch(query)).catch(() => []),
+    fetchNaverNews(query).catch(() => []),
   ])
-  const merged = mergeNews(groups)
-  attachImages(merged, bing)
+  const merged = mergeNews([naver, bing, ...groups])
+  attachImages(merged, [...naver, ...bing])
   const chinaOnly = merged.filter((item) => /중국|홍콩|대만|베이징|시진핑|중공/i.test(item.title))
   const aiOnly = merged.filter((item) => /AI|인공지능|챗GPT|ChatGPT|생성형|오픈AI|OpenAI|LLM/i.test(item.title))
   const news =
     id === 'china' && chinaOnly.length >= 6 ? chinaOnly : id === 'ai' && aiOnly.length >= 6 ? aiOnly : merged
-  await enrichOgImages(news)
+  news.sort((a, b) => Number(Boolean(b.image)) - Number(Boolean(a.image)) || (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
   return { now: Date.now(), category: id, news, source: meta.source }
 }
 
@@ -369,8 +384,17 @@ export async function getCategoryNews(id: NewsCategoryId): Promise<CategoryNewsP
   if (pending) return pending
   const job = loadCategory(id)
     .then((data) => {
-      cache.set(id, { at: Date.now(), data })
-      return data
+      const prev = cache.get(id)?.data
+      const news = data.news.map((item) => {
+        if (item.image) return item
+        const old = prev?.news.find(
+          (row) => row.image && (row.link === item.link || titleKey(row.title) === titleKey(item.title))
+        )
+        return old?.image ? { ...item, image: old.image } : item
+      })
+      const next = { ...data, news }
+      cache.set(id, { at: Date.now(), data: next })
+      return next
     })
     .finally(() => {
       inflight.delete(id)
