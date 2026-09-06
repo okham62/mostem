@@ -75,7 +75,7 @@ export function TrendsClient({ initial = null }: { initial?: TrendsPayload | nul
   async function reload(silent = false, fast = false) {
     if (reloading.current && !fast) return
     if (!fast) reloading.current = true
-    if (!silent && !data?.items.length) setRefreshing(true)
+    if (!silent && !data?.items?.length) setRefreshing(true)
     try {
       const nextData = await fetchTrends(fast)
       if (nextData?.items?.length) setData(nextData)
