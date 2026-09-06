@@ -211,18 +211,7 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
                 className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20"
               >
                 <div className="relative aspect-[16/9] bg-black/40">
-                  {item.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.image}
-                      alt=""
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-white/30">
-                      이미지 없음
-                    </div>
-                  )}
+                  <NewsThumb src={item.image} />
                 </div>
                 <div className="space-y-2 p-3.5">
                   <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">
@@ -256,6 +245,23 @@ export function NewsClient({ initial }: { initial?: CategoryNewsPayload | null }
         </button>
       ) : null}
     </div>
+  )
+}
+
+function NewsThumb({ src }: { src?: string }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return <div className="flex h-full items-center justify-center text-xs text-white/30">이미지 없음</div>
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      referrerPolicy="no-referrer"
+      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+      onError={() => setFailed(true)}
+    />
   )
 }
 

@@ -8,6 +8,7 @@ export type NewsCategoryId =
   | 'world'
   | 'coin'
   | 'stock'
+  | 'ai'
 
 export type NewsCategory = {
   id: NewsCategoryId
@@ -66,6 +67,12 @@ export const NEWS_CATEGORIES: NewsCategory[] = [
     hint: '코스피·증시·증권 최신 기사',
     source: '구글 뉴스',
   },
+  {
+    id: 'ai',
+    label: 'AI뉴스',
+    hint: '인공지능·챗GPT·생성형 AI 최신 기사',
+    source: '구글 뉴스',
+  },
 ]
 
 const BROWSER_UA =
@@ -96,6 +103,20 @@ const CATEGORY_FEEDS: Record<Exclude<NewsCategoryId, 'ranking'>, string[]> = {
     googleSearch('주식 OR 코스피 OR 코스닥 OR 증시 when:1d'),
     'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko',
   ],
+  ai: [
+    googleSearch('AI OR 인공지능 OR 챗GPT OR 생성형AI OR 오픈AI when:1d'),
+    'https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=ko&gl=KR&ceid=KR:ko',
+  ],
+}
+
+const BING_QUERY: Record<Exclude<NewsCategoryId, 'ranking'>, string> = {
+  china: '중국 뉴스',
+  semiconductor: '반도체',
+  celebrity: '연예',
+  world: '국제 뉴스',
+  coin: '비트코인',
+  stock: '주식',
+  ai: '인공지능',
 }
 
 const cache = new Map<NewsCategoryId, { at: number; data: CategoryNewsPayload }>()
@@ -103,6 +124,10 @@ const inflight = new Map<NewsCategoryId, Promise<CategoryNewsPayload>>()
 
 function googleSearch(query: string) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ko&gl=KR&ceid=KR:ko`
+}
+
+function bingSearch(query: string) {
+  return `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss&mkt=ko-KR`
 }
 
 export function isNewsCategory(value: string | null | undefined): value is NewsCategoryId {
@@ -124,6 +149,94 @@ function decodeXml(value: string) {
     .trim()
 }
 
+function httpsUrl(value: string) {
+  return value.replace(/^http:\/\//i, 'https://').trim()
+}
+
+function pickRssImage(block: string) {
+  const decoded = decodeXml(block)
+  const matchers = [
+    /<News:Image>([^<]+)<\/News:Image>/i,
+    /<media:content[^>]+url=["']([^"']+)/i,
+    /<media:thumbnail[^>]+url=["']([^"']+)/i,
+    /<enclosure[^>]+url=["']([^"']+)/i,
+    /<img[^>]+src=["']([^"']+)/i,
+  ]
+  for (const matcher of matchers) {
+    const hit = decoded.match(matcher)?.[1] || block.match(matcher)?.[1]
+    if (hit) return httpsUrl(decodeXml(hit))
+  }
+  return ''
+}
+
+function pickOgImage(html: string) {
+  const slice = html.slice(0, 120_000)
+  const match =
+    slice.match(/property=["']og:image(?::secure_url)?["'][^>]*content=["']([^"']+)/i) ||
+    slice.match(/content=["']([^"']+)["'][^>]*property=["']og:image(?::secure_url)?["']/i)
+  const image = match?.[1]?.trim() || ''
+  if (!image || image.startsWith('data:')) return ''
+  return httpsUrl(image)
+}
+
+function titleKey(title: string) {
+  return title.replace(/\s+/g, '').replace(/[^\w가-힣]/g, '').slice(0, 22)
+}
+
+const imageCache = new Map<string, string>()
+
+function attachImages(items: RankingNews[], extras: RankingNews[]) {
+  const byTitle = new Map<string, string>()
+  for (const extra of extras) {
+    if (!extra.image) continue
+    const key = titleKey(extra.title)
+    if (key) byTitle.set(key, extra.image)
+  }
+  for (const item of items) {
+    if (item.image) continue
+    const cached = imageCache.get(item.link)
+    if (cached) {
+      item.image = cached
+      continue
+    }
+    const matched = byTitle.get(titleKey(item.title))
+    if (matched) {
+      item.image = matched
+      imageCache.set(item.link, matched)
+    }
+  }
+}
+
+async function enrichOgImages(items: RankingNews[], budgetMs = 900) {
+  const missing = items.filter((item) => !item.image).slice(0, 20)
+  if (!missing.length) return
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), budgetMs)
+  await Promise.all(
+    missing.map(async (item) => {
+      try {
+        const res = await fetch(item.link, {
+          headers: {
+            'User-Agent': BROWSER_UA,
+            Accept: 'text/html,application/xhtml+xml',
+          },
+          cache: 'no-store',
+          redirect: 'follow',
+          signal: ctrl.signal,
+        })
+        if (!res.ok) return
+        const image = pickOgImage(await res.text())
+        if (!image) return
+        item.image = image
+        imageCache.set(item.link, image)
+      } catch {
+        /* timeout or abort */
+      }
+    })
+  )
+  clearTimeout(timer)
+}
+
 function parseRssItems(xml: string): RankingNews[] {
   const blocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? []
   const items: RankingNews[] = []
@@ -131,12 +244,11 @@ function parseRssItems(xml: string): RankingNews[] {
   for (const block of blocks) {
     const titleRaw = decodeXml((block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/) || [])[1] || '')
     const link = decodeXml((block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || '').trim()
-    const source = decodeXml((block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || '')
+    const source =
+      decodeXml((block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || '') ||
+      decodeXml((block.match(/<News:Source>([\s\S]*?)<\/News:Source>/) || [])[1] || '')
     const pub = decodeXml((block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '')
-    const image =
-      decodeXml((block.match(/<media:content[^>]+url="([^"]+)"/) || [])[1] || '') ||
-      decodeXml((block.match(/<enclosure[^>]+url="([^"]+)"/) || [])[1] || '') ||
-      decodeXml((block.match(/<img[^>]+src="([^"]+)"/) || [])[1] || '')
+    const image = pickRssImage(block)
     if (!titleRaw || !link || seen.has(link)) continue
     seen.add(link)
     const cut = titleRaw.lastIndexOf(' - ')
@@ -230,12 +342,23 @@ async function fetchRankingNews(): Promise<RankingNews[]> {
 async function loadCategory(id: NewsCategoryId): Promise<CategoryNewsPayload> {
   const meta = newsCategory(id)
   if (id === 'ranking') {
-    return { now: Date.now(), category: id, news: await fetchRankingNews(), source: meta.source }
+    const news = await fetchRankingNews()
+    attachImages(news, [])
+    await enrichOgImages(news)
+    return { now: Date.now(), category: id, news, source: meta.source }
   }
-  const groups = await Promise.all(CATEGORY_FEEDS[id].map((url) => fetchRss(url).catch(() => [])))
+  const feeds = CATEGORY_FEEDS[id]
+  const [groups, bing] = await Promise.all([
+    Promise.all(feeds.map((url) => fetchRss(url).catch(() => []))),
+    fetchRss(bingSearch(BING_QUERY[id])).catch(() => []),
+  ])
   const merged = mergeNews(groups)
+  attachImages(merged, bing)
   const chinaOnly = merged.filter((item) => /중국|홍콩|대만|베이징|시진핑|중공/i.test(item.title))
-  const news = id === 'china' && chinaOnly.length >= 6 ? chinaOnly : merged
+  const aiOnly = merged.filter((item) => /AI|인공지능|챗GPT|ChatGPT|생성형|오픈AI|OpenAI|LLM/i.test(item.title))
+  const news =
+    id === 'china' && chinaOnly.length >= 6 ? chinaOnly : id === 'ai' && aiOnly.length >= 6 ? aiOnly : merged
+  await enrichOgImages(news)
   return { now: Date.now(), category: id, news, source: meta.source }
 }
 
