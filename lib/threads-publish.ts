@@ -1,4 +1,4 @@
-export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.8'
+export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.9'
 
 export type PublishMediaItem = {
   url: string
@@ -8,9 +8,9 @@ export type PublishMediaItem = {
   filename: string
 }
 
-export function threadsIntentUrl(text: string) {
-  const body = text.trim().slice(0, 500)
-  return `https://www.threads.net/intent/post?text=${encodeURIComponent(body)}`
+export function threadsIntentUrl(_text?: string) {
+  // Do not put caption in the query string — Threads mangles emoji there into �.
+  return 'https://www.threads.net/intent/post'
 }
 
 export function isHamiOnline() {

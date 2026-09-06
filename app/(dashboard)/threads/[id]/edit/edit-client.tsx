@@ -361,7 +361,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('영상·사진을 같이 올리려면 하미를 0.2.8로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
+      setMessage('영상·사진을 같이 올리려면 하미를 0.2.9로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
       return
     }
     // Threads web rejects most CDN videos after preview. Extension publish uses photos only
