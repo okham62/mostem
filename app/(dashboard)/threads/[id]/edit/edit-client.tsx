@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
-import { parseMediaItems } from '@/lib/collect-media'
+import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/lib/collect-media'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
@@ -15,20 +15,49 @@ import { PublishModal } from './publish-modal'
 import { TemplateModal } from './template-modal'
 
 type Tab = 'original' | 'rewrite' | 'publish'
-type MediaPreview = { url: string; type: 'image' | 'video' }
+type MediaPreview = { url: string; type: 'image' | 'video'; poster?: string }
+
+function displaySrc(url?: string | null) {
+  if (!url) return ''
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/')) return url
+  return mediaSrc(url) || url
+}
 
 function originalMedia(post: CollectedPost): MediaPreview[] {
   const items: MediaPreview[] = []
   const seen = new Set<string>()
-  for (const item of [...(post.media_items ?? []), ...parseMediaItems(post)]) {
-    const play = item.videoUrl || (item.type === 'video' ? item.url : '')
-    const show = item.poster || item.url || play
-    if (!show || show.startsWith('[') || seen.has(show) || (play && seen.has(play))) continue
-    seen.add(show)
-    if (play) seen.add(play)
-    items.push({ url: play || show, type: play ? 'video' : 'image' })
+  for (const item of parseMediaItems(post)) {
+    const poster = imagePosterUrl(item.poster, item.url, post.thumbnail_url)
+    const video =
+      cleanMediaUrl(item.videoUrl) ??
+      (item.type === 'video' && isVideoFile(item.url) ? cleanMediaUrl(item.url) : null)
+    const key = poster || video
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    items.push({
+      url: video || poster || key,
+      poster: poster ?? undefined,
+      type: video ? 'video' : 'image',
+    })
+  }
+  if (!items.length) {
+    const thumb = imagePosterUrl(post.thumbnail_url)
+    if (thumb) items.push({ url: thumb, poster: thumb, type: 'image' })
   }
   return items
+}
+
+function MediaThumb({ item }: { item: MediaPreview }) {
+  const src = displaySrc(item.poster || (item.type === 'image' ? item.url : '') || item.url)
+  if (!src) return <div className="h-full w-full bg-white/10" />
+  return (
+    <>
+      <img src={src} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+      {item.type === 'video' ? (
+        <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] text-white">▶</span>
+      ) : null}
+    </>
+  )
 }
 
 export function EditClient({
@@ -197,11 +226,8 @@ export function EditClient({
   const previewName = selected ? `@${selected.username}` : '내 계정'
   const selectedGuide = guides.find((item) => item.id === guideId) ?? pickDefaultGuide(guides)
   const previewMedia = [...sourceMedia, ...extraMedia]
-  const previewThumb = previewMedia[0]?.url
-    ? previewMedia[0].url.startsWith('blob:')
-      ? previewMedia[0].url
-      : mediaSrc(previewMedia[0].url)
-    : thumb
+  const previewThumb =
+    displaySrc(previewMedia[0]?.poster || previewMedia[0]?.url) || thumb
 
   useEffect(() => {
     let alive = true
@@ -232,10 +258,11 @@ export function EditClient({
     if (!files.length) return
     setExtraMedia((prev) => [
       ...prev,
-      ...files.map((file) => ({
-        url: URL.createObjectURL(file),
-        type: (file.type.startsWith('video/') ? 'video' : 'image') as MediaPreview['type'],
-      })),
+      ...files.map((file) => {
+        const url = URL.createObjectURL(file)
+        const type = (file.type.startsWith('video/') ? 'video' : 'image') as MediaPreview['type']
+        return { url, type, poster: type === 'image' ? url : undefined }
+      }),
     ])
     setMessage('파일을 추가했습니다.')
   }
@@ -341,7 +368,14 @@ export function EditClient({
               )}
             </div>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/80">{originalCaption}</p>
-            {thumb && <img src={thumb} alt="" className="mt-4 w-full rounded-xl object-cover" />}
+            {(displaySrc(sourceMedia[0]?.poster || sourceMedia[0]?.url) || thumb) && (
+              <img
+                src={displaySrc(sourceMedia[0]?.poster || sourceMedia[0]?.url) || thumb || ''}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="mt-4 w-full rounded-xl object-cover"
+              />
+            )}
             <p className="mt-3 text-[11px] text-white/35">
               조회 {formatCount(post.views)} · 좋아요 {formatCount(post.likes)} · 팔로워 {formatCount(post.followers)}
             </p>
@@ -401,11 +435,7 @@ export function EditClient({
                   key={`orig-${item.url}-${index}`}
                   className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/5"
                 >
-                  {item.type === 'video' ? (
-                    <video src={item.url} muted className="h-full w-full object-cover" />
-                  ) : (
-                    <img src={mediaSrc(item.url) || item.url} alt="" className="h-full w-full object-cover" />
-                  )}
+                  <MediaThumb item={item} />
                 </div>
               ))}
               {extraMedia.map((item, index) => (
@@ -621,7 +651,14 @@ export function EditClient({
               )}
             </div>
             <p className="mt-4 whitespace-pre-wrap text-sm text-white/80">{originalCaption}</p>
-            {thumb && <img src={thumb} alt="" className="mt-4 w-full rounded-xl object-cover" />}
+            {(displaySrc(sourceMedia[0]?.poster || sourceMedia[0]?.url) || thumb) && (
+              <img
+                src={displaySrc(sourceMedia[0]?.poster || sourceMedia[0]?.url) || thumb || ''}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="mt-4 w-full rounded-xl object-cover"
+              />
+            )}
           </div>
         </div>
       )}
