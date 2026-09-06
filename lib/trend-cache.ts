@@ -1,23 +1,9 @@
 import type { TrendsPayload } from '@/lib/trends'
 
-const STORAGE_KEY = 'mostem:trends-v2'
+const STORAGE_KEY = 'mostem:trends-v1'
 let memory: TrendsPayload | null = null
 let warming = false
 let inflight: Promise<TrendsPayload> | null = null
-
-function slimPayload(data: TrendsPayload): TrendsPayload {
-  return {
-    now: data.now,
-    latestDate: data.latestDate,
-    categories: data.categories,
-    stats: data.stats,
-    items: data.items.slice(0, 120).map((item) => ({
-      ...item,
-      daily: [],
-      spark: Array.isArray(item.spark) ? item.spark.slice(-10) : [],
-    })),
-  }
-}
 
 function readStored(): TrendsPayload | null {
   if (typeof window === 'undefined') return null
@@ -41,25 +27,23 @@ export function peekTrendCache(): TrendsPayload | null {
 
 export function writeTrendCache(data: TrendsPayload) {
   if (!data?.items?.length) return
-  if (memory && data.items.length + 8 < memory.items.length) return
   memory = data
   if (typeof window === 'undefined') return
-  const slim = slimPayload(data)
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(slim))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   } catch {
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(slim))
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     } catch {
       /* ignore quota */
     }
   }
 }
 
-export async function fetchTrends(fast = false) {
-  if (inflight && !fast) return inflight
-  const job = (async () => {
-    const res = await fetch(fast ? '/api/trends?fast=1' : '/api/trends', { cache: 'no-store' })
+export async function fetchTrends() {
+  if (inflight) return inflight
+  inflight = (async () => {
+    const res = await fetch('/api/trends', { cache: 'no-store' })
     if (!res.ok) {
       const prev = peekTrendCache()
       if (prev) return prev
@@ -73,25 +57,16 @@ export async function fetchTrends(fast = false) {
     }
     writeTrendCache(data)
     return data
-  })()
-  if (!fast) {
-    inflight = job.finally(() => {
-      inflight = null
-    })
-    return inflight
-  }
-  return job
+  })().finally(() => {
+    inflight = null
+  })
+  return inflight
 }
 
 export function warmTrendCache() {
   if (typeof window === 'undefined' || warming) return
-  if (peekTrendCache()?.items.length && inflight) return
   warming = true
-  void fetchTrends(true)
-    .then((data) => {
-      if (data?.items?.length) writeTrendCache(data)
-      return fetchTrends(false)
-    })
+  void fetchTrends()
     .catch(() => {})
     .finally(() => {
       warming = false

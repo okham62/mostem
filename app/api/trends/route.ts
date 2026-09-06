@@ -1,20 +1,31 @@
 import { auth } from '@/auth'
-import { getShoppingTrends } from '@/lib/trends'
+import { getShoppingTrends, type TrendTab } from '@/lib/trends'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 20
+export const maxDuration = 60
 
-export async function GET(req: Request) {
+export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const fast = new URL(req.url).searchParams.get('fast') === '1'
+  const url = new URL(request.url)
+  const compare = Number(url.searchParams.get('compare') || '1')
+  const weeks = compare === 2 || compare === 4 ? compare : 1
+
+  const tabParam = url.searchParams.get('tab')
+  const tab: TrendTab | undefined =
+    tabParam === 'popular' || tabParam === 'new' || tabParam === 'rising' ? tabParam : undefined
 
   try {
-    const data = await getShoppingTrends(1, {}, { fast })
+    const data = await getShoppingTrends(weeks, {
+      cat: url.searchParams.get('cat') || undefined,
+      q: url.searchParams.get('q') || undefined,
+      timing: url.searchParams.get('timing') || undefined,
+      tab,
+    })
     return NextResponse.json(data, {
       headers: { 'Cache-Control': 'no-store' },
     })

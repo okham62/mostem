@@ -94,7 +94,7 @@ export const SHOP_CATEGORIES: ShopCategory[] = [
 const PRODUCT_RE =
   /원피스|자켓|티셔츠|팬티|신발|가방|크림|마스크|라면|꽃게|캐리어|패딩|니트|코트|바지|스커트|후드|맨투맨|운동화|골프|캠핑|블라우스|드로즈|트위드|바람막이/
 
-let cache: { at: number; key: string; data: TrendsPayload; partial?: boolean } | null = null
+let cache: { at: number; key: string; data: TrendsPayload } | null = null
 let inflight: Promise<TrendsPayload> | null = null
 let inflightKey: string | null = null
 const detailCache = new Map<string, { at: number; data: TrendDetail }>()
@@ -193,7 +193,7 @@ async function fetchHypeDuck(page: number, query: TrendQuery = {}): Promise<HdPa
   const res = await fetch(`${HD_URL}?${params.toString()}`, {
     headers: hdHeaders(),
     cache: 'no-store',
-    signal: AbortSignal.timeout(4500),
+    signal: AbortSignal.timeout(4000),
   })
   if (!res.ok) throw new Error(`hypeduck ${res.status}`)
   return (await res.json()) as HdPayload
@@ -243,28 +243,19 @@ function hdCategories(rows: { id: number; name: string }[] | undefined): ShopCat
   return [{ id: 'all', label: '전체 분야', cid: null }, ...cats]
 }
 
-export function emptyTrends(): TrendsPayload {
-  return {
-    now: Date.now(),
-    latestDate: seoulYmd(),
-    categories: SHOP_CATEGORIES,
-    items: [],
-    stats: { total: 0, fresh: 0, rising: 0 },
-  }
+type TrendCatalog = {
+  at: number
+  key: string
+  latestDate: string
+  categories: ShopCategory[]
+  items: TrendKeyword[]
+  total: number
 }
 
-export function itemsForTab(items: TrendKeyword[], tab: TrendTab) {
-  if (tab === 'popular') {
-    return [...items].sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth)
-  }
-  if (tab === 'new') {
-    const fresh = items.filter((item) => item.isNew)
-    const rising = items.filter((item) => item.multiplier >= 3 || item.growth >= 80)
-    const rows = fresh.length ? fresh : rising.length ? rising : items
-    return [...rows].sort((a, b) => b.growth - a.growth || b.multiplier - a.multiplier || b.searchTotal - a.searchTotal)
-  }
-  return items
-}
+let catalogCache: TrendCatalog | null = null
+let catalogInflight: { key: string; promise: Promise<TrendCatalog> } | null = null
+const CATALOG_MS = 10 * 60_000
+const CATALOG_CONCURRENCY = 20
 
 function payloadFromItems(
   items: TrendKeyword[],
@@ -286,65 +277,106 @@ function payloadFromItems(
   }
 }
 
-export async function getShoppingTrends(
-  _compareWeeks: CompareWeeks = 1,
-  _query: TrendQuery = {},
-  opts?: { fast?: boolean }
-): Promise<TrendsPayload> {
-  const cacheKey = 'base'
-  const fast = opts?.fast !== false
-  if (cache?.data && cache.key === cacheKey) {
-    const fresh = Date.now() - cache.at < CACHE_MS && !cache.partial
-    if (fast || fresh) return cache.data
+async function getTrendCatalog(query: TrendQuery = {}): Promise<TrendCatalog> {
+  const key = `${query.cat || 'all'}|${query.timing || 'all'}`
+  if (catalogCache && catalogCache.key === key && Date.now() - catalogCache.at < CATALOG_MS) {
+    return catalogCache
   }
+  if (catalogInflight?.key === key) return catalogInflight.promise
+  if (catalogInflight) {
+    await catalogInflight.promise.catch(() => undefined)
+    if (catalogCache && catalogCache.key === key && Date.now() - catalogCache.at < CATALOG_MS) {
+      return catalogCache
+    }
+  }
+
+  const promise = (async () => {
+    const first = await fetchHypeDuck(1, query)
+    if (!first.rows?.length) throw new Error('hypeduck empty')
+    const pageCount = Math.min(Number(first.pageCount) || 1, 4)
+    const pages: HdPayload[] = [first]
+    for (let start = 2; start <= pageCount; start += CATALOG_CONCURRENCY) {
+      const nums = Array.from(
+        { length: Math.min(CATALOG_CONCURRENCY, pageCount - start + 1) },
+        (_, index) => start + index
+      )
+      const batch = await Promise.all(nums.map((page) => fetchHypeDuck(page, query).catch(() => ({ rows: [] }))))
+      pages.push(...batch)
+    }
+    const seen = new Set<string>()
+    const items: TrendKeyword[] = []
+    const latestDate = first.meta?.latestDate || seoulYmd()
+    for (const page of pages) {
+      for (const row of page.rows ?? []) {
+        if (!row?.keyword || seen.has(row.keyword)) continue
+        seen.add(row.keyword)
+        items.push(mapHdRow(row, items.length + 1, latestDate))
+      }
+    }
+    const data: TrendCatalog = {
+      at: Date.now(),
+      key,
+      latestDate,
+      categories: hdCategories(first.categories),
+      items,
+      total: first.total || items.length,
+    }
+    catalogCache = data
+    return data
+  })().finally(() => {
+    if (catalogInflight?.promise === promise) catalogInflight = null
+  })
+
+  catalogInflight = { key, promise }
+  return promise
+}
+
+export async function getShoppingTrends(
+  compareWeeks: CompareWeeks = 1,
+  query: TrendQuery = {}
+): Promise<TrendsPayload> {
+  const tab = query.tab || 'rising'
+  const cacheKey = `${compareWeeks}|${tab}|${query.cat || 'all'}|${query.q || ''}|${query.timing || 'all'}`
+  if (cache && cache.key === cacheKey && Date.now() - cache.at < CACHE_MS) return cache.data
   if (inflight && inflightKey === cacheKey) return inflight
 
   inflightKey = cacheKey
-  inflight = refreshTrends(fast).finally(() => {
+  inflight = (async () => {
+    const pages = await Promise.all([1, 2].map((page) => fetchHypeDuck(page, query).catch(() => ({ rows: [] }))))
+    const first = pages[0]
+    if (!pages.some((page) => page.rows?.length)) {
+      if (cache?.data) return cache.data
+      return payloadFromItems([], seoulYmd(), SHOP_CATEGORIES, 0)
+    }
+    const seen = new Set<string>()
+    const items: TrendKeyword[] = []
+    for (const page of pages) {
+      for (const row of page.rows ?? []) {
+        if (!row?.keyword || seen.has(row.keyword)) continue
+        seen.add(row.keyword)
+        items.push(mapHdRow(row, items.length + 1, first.meta?.latestDate || seoulYmd()))
+      }
+    }
+    if (tab === 'popular') {
+      items.sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth)
+    }
+    if (tab === 'new') {
+      items.sort((a, b) => Number(b.isNew) - Number(a.isNew) || b.searchTotal - a.searchTotal)
+    }
+    const data = payloadFromItems(
+      tab === 'new' ? items.filter((item) => item.isNew) : items,
+      first.meta?.latestDate || seoulYmd(),
+      hdCategories(first.categories),
+      first.total || items.length
+    )
+    cache = { at: Date.now(), key: cacheKey, data }
+    return data
+  })().finally(() => {
     inflight = null
     inflightKey = null
   })
+
   return inflight
-}
-
-function mergeHdPages(pages: HdPayload[]): TrendsPayload {
-  const first = pages[0] ?? {}
-  const seen = new Set<string>()
-  const items: TrendKeyword[] = []
-  const endYmd = first.meta?.latestDate || seoulYmd()
-  for (const page of pages) {
-    for (const row of page.rows ?? []) {
-      if (!row?.keyword || seen.has(row.keyword)) continue
-      seen.add(row.keyword)
-      items.push(mapHdRow(row, items.length + 1, endYmd))
-    }
-  }
-  return payloadFromItems(
-    items,
-    first.meta?.latestDate || seoulYmd(),
-    hdCategories(first.categories),
-    first.total || items.length
-  )
-}
-
-async function refreshTrends(fast: boolean): Promise<TrendsPayload> {
-  try {
-    const first = await fetchHypeDuck(1).catch(() => ({ rows: [] as HdRow[] }))
-    if (!first.rows?.length) return cache?.data ?? emptyTrends()
-
-    const data = mergeHdPages([first])
-    cache = { at: Date.now(), key: 'base', data, partial: true }
-    if (fast) return data
-
-    const rest = await Promise.all(
-      [2, 3, 4].map((page) => fetchHypeDuck(page).catch(() => ({ rows: [] as HdRow[] })))
-    )
-    const next = rest.some((page) => page.rows?.length) ? mergeHdPages([first, ...rest]) : data
-    cache = { at: Date.now(), key: 'base', data: next, partial: false }
-    return next
-  } catch {
-    return cache?.data ?? emptyTrends()
-  }
 }
 
 type HdDetail = {
@@ -469,10 +501,6 @@ export function formatGrowth(value: number, isNew = false) {
   if (value > 1) return `+${((value - 1) * 100).toFixed(1)}%`
   if (value > 0 && value < 1) return `${((value - 1) * 100).toFixed(1)}%`
   return '보합'
-}
-
-export async function getShoppingTrendsFast() {
-  return getShoppingTrends(1, {}, { fast: true })
 }
 
 export function formatSearchVolume(value: number) {
