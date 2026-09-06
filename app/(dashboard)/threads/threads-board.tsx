@@ -138,6 +138,13 @@ export function ThreadsBoard({
   const [query, setQuery] = useState('')
   const [grade, setGrade] = useState<'all' | PerformanceGrade>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get('status')
+    if (status === 'all' || STATUS_ORDER.includes(status as CollectStatus)) {
+      setStatusFilter(status as StatusFilter)
+    }
+  }, [])
   const [sort, setSort] = useState<SortMode>('newest')
   const [refreshing, setRefreshing] = useState(false)
 

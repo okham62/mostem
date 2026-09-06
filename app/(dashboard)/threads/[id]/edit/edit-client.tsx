@@ -8,6 +8,7 @@ import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/l
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
+import { readEditDraft, writeEditDraft } from '@/lib/edit-drafts'
 import {
   hamiSupportsMediaPublish,
   isHamiOnline,
@@ -189,6 +190,9 @@ export function EditClient({
   const [caption, setCaption] = useState(post.caption ?? '')
   const [drafts, setDrafts] = useState<string[]>([post.caption ?? '', '', ''])
   const [draftIndex, setDraftIndex] = useState(0)
+  const [sourceCaption, setSourceCaption] = useState(
+    post.caption && post.caption !== post.author ? post.caption : ''
+  )
   const [instruction, setInstruction] = useState('')
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [guides, setGuides] = useState<AiGuide[]>(DEFAULT_AI_GUIDES)
@@ -215,8 +219,86 @@ export function EditClient({
   const selected = accounts.find((a) => a.id === accountId)
   const grade = post.grade ? GRADE_LABEL[post.grade] : null
   const date = post.collected_at ? new Date(post.collected_at).toISOString().slice(0, 10) : ''
-  const originalCaption =
-    post.caption && post.caption !== post.author ? post.caption : '본문 없음'
+  const originalCaption = sourceCaption || '본문 없음'
+  const statusLockRef = useRef(post.status === 'uploaded' || post.status === 'scheduled')
+  const captionRef = useRef(caption)
+  const draftsRef = useRef(drafts)
+  const draftIndexRef = useRef(draftIndex)
+  const hiddenSourceRef = useRef(hiddenSource)
+  const sourceCaptionRef = useRef(sourceCaption)
+  const accountRef = useRef(selected?.username)
+  captionRef.current = caption
+  draftsRef.current = drafts
+  draftIndexRef.current = draftIndex
+  hiddenSourceRef.current = hiddenSource
+  sourceCaptionRef.current = sourceCaption
+  accountRef.current = selected?.username
+
+  function rememberDraft() {
+    writeEditDraft(post.id, {
+      original: sourceCaptionRef.current || post.caption || '',
+      drafts: [
+        draftsRef.current[0] ?? '',
+        draftsRef.current[1] ?? '',
+        draftsRef.current[2] ?? '',
+      ],
+      draftIndex: draftIndexRef.current,
+      hiddenSource: hiddenSourceRef.current,
+    })
+  }
+
+  async function flushEditSave(keepalive = false) {
+    rememberDraft()
+    const body: Record<string, string> = {
+      caption: captionRef.current,
+    }
+    if (accountRef.current) body.collected_by = accountRef.current
+    if (!statusLockRef.current) body.status = 'editing'
+    try {
+      await fetch(`/api/threads/posts/${post.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        keepalive,
+      })
+    } catch {
+      /* leave still goes back */
+    }
+  }
+
+  useEffect(() => {
+    const stored = readEditDraft(post.id)
+    if (stored?.original) setSourceCaption(stored.original)
+    else if (post.caption && post.caption !== post.author) {
+      writeEditDraft(post.id, {
+        original: post.caption,
+        drafts: [post.caption, '', ''],
+        draftIndex: 0,
+        hiddenSource: [],
+      })
+    }
+    if (!stored) return
+    setDrafts(stored.drafts)
+    setDraftIndex(stored.draftIndex)
+    setCaption(stored.drafts[stored.draftIndex] || stored.drafts[0] || post.caption || '')
+    setHiddenSource(stored.hiddenSource)
+  }, [post.id])
+
+  useEffect(() => {
+    const onHide = () => {
+      void flushEditSave(true)
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onHide()
+    }
+    window.addEventListener('pagehide', onHide)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', onHide)
+      document.removeEventListener('visibilitychange', onVisibility)
+      void flushEditSave(true)
+    }
+  }, [post.id])
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'original', label: '원문 뜯어보기' },
@@ -248,6 +330,8 @@ export function EditClient({
       setMessage(data.error || '저장에 실패했습니다.')
       return false
     }
+    rememberDraft()
+    if (status === 'uploaded' || status === 'scheduled') statusLockRef.current = true
     router.refresh()
     return true
   }
@@ -310,6 +394,8 @@ export function EditClient({
     }
     setPublishOpen(false)
     setMessage(`@${selected.username} 스레드에 올렸습니다.`)
+    statusLockRef.current = true
+    rememberDraft()
     router.refresh()
   }
 
@@ -336,9 +422,16 @@ export function EditClient({
       return
     }
     const next = (data.drafts as string[] | undefined) ?? [caption]
-    setDrafts([next[0] ?? '', next[1] ?? '', next[2] ?? ''])
+    const nextDrafts: [string, string, string] = [next[0] ?? '', next[1] ?? '', next[2] ?? '']
+    setDrafts(nextDrafts)
     setDraftIndex(0)
-    setCaption(next[0] ?? caption)
+    setCaption(nextDrafts[0] || caption)
+    writeEditDraft(post.id, {
+      original: sourceCaption || post.caption || '',
+      drafts: nextDrafts,
+      draftIndex: 0,
+      hiddenSource,
+    })
     setMessage('초안이 생성되었습니다.')
   }
 
@@ -415,9 +508,10 @@ export function EditClient({
 
   function resetEditor() {
     if (!window.confirm('지금 쓴 글과 첨부를 처음 상태로 되돌릴까요?')) return
-    setDrafts([post.caption ?? '', '', ''])
+    const original = sourceCaption || post.caption || ''
+    setDrafts([original, '', ''])
     setDraftIndex(0)
-    setCaption(post.caption ?? '')
+    setCaption(original)
     setInstruction('')
     setExtraMedia((prev) => {
       for (const item of prev) {
@@ -427,6 +521,12 @@ export function EditClient({
     })
     setHiddenSource([])
     setLightbox(null)
+    writeEditDraft(post.id, {
+      original,
+      drafts: [original, '', ''],
+      draftIndex: 0,
+      hiddenSource: [],
+    })
     setMessage('처음 상태로 되돌렸습니다.')
   }
 
@@ -435,7 +535,17 @@ export function EditClient({
       <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/threads" className="text-sm text-white/60 hover:text-white">
+          <Link
+            href="/threads?status=editing"
+            className="text-sm text-white/60 hover:text-white"
+            onClick={(event) => {
+              event.preventDefault()
+              void (async () => {
+                await flushEditSave()
+                router.push('/threads?status=editing')
+              })()
+            }}
+          >
             ← 스레드
           </Link>
           {tabs.map((item) => (
