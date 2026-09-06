@@ -33,6 +33,7 @@ export const PAGE_LABELS: Record<string, string> = {
   '/links': '링크 변환',
   '/settings': '설정',
   '/admin': '회원 관리',
+  '/admin/guides': 'AI 지침서',
   '/upload': '업로드',
   '/accounts': '계정',
   '/history': '히스토리',

@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { caption, instruction, persona } = await req.json()
+  const { caption, instruction, persona, guide, guideName } = await req.json()
   if (!caption) return NextResponse.json({ error: '원문이 없습니다.' }, { status: 400 })
 
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -20,7 +20,13 @@ export async function POST(req: Request) {
     void logActivity(
       session.user.id,
       'threads_rewrite',
-      { caption: String(caption).slice(0, 800), instruction: instruction || '', persona: persona || '', drafts },
+      {
+        caption: String(caption).slice(0, 800),
+        instruction: instruction || '',
+        persona: persona || '',
+        guideName: guideName || '',
+        drafts,
+      },
       req
     )
     return NextResponse.json({ drafts })
@@ -35,6 +41,8 @@ export async function POST(req: Request) {
         role: 'user',
         content: `원문 스레드를 내 글로 3가지 안을 만들어 주세요.
 페르소나: ${persona || '일상 크리에이터'}
+지침서${guideName ? ` (${guideName})` : ''}:
+${guide || '없음'}
 추가 지시: ${instruction || '없음'}
 원문:
 ${caption}

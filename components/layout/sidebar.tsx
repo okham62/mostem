@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
+  BookOpen,
   Flame,
   Newspaper,
   TrendingUp,
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { warmMarketCharts } from '@/lib/market-cache'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
+import { warmTrendCache } from '@/lib/trend-cache'
 import { previewHideMarketTicker } from '@/components/layout/market-ticker'
 import type { Session } from 'next-auth'
 
@@ -81,7 +83,10 @@ function NavGroup({
       <ul className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          const isActive =
+            item.href === '/admin'
+              ? pathname === '/admin' || pathname.startsWith('/admin/users')
+              : pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <li key={item.href}>
               <Link
@@ -93,11 +98,13 @@ function NavGroup({
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
                   if (item.href === '/shopping') warmShoppingCache()
                   if (item.href === '/markets') warmMarketCharts()
+                  if (item.href === '/trends') warmTrendCache()
                 }}
                 onFocus={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
                   if (item.href === '/shopping') warmShoppingCache()
                   if (item.href === '/markets') warmMarketCharts()
+                  if (item.href === '/trends') warmTrendCache()
                 }}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -127,6 +134,7 @@ export function Sidebar({ session, onHide }: SidebarProps) {
     const id = window.setTimeout(() => {
       warmRealtimeCache()
       warmMarketCharts()
+      warmTrendCache()
     }, 300)
     return () => window.clearTimeout(id)
   }, [])
@@ -151,7 +159,10 @@ export function Sidebar({ session, onHide }: SidebarProps) {
         {isAdmin && (
           <NavGroup
             title="관리"
-            items={[{ href: '/admin', label: '회원 관리', icon: Users }]}
+            items={[
+              { href: '/admin', label: '회원 관리', icon: Users },
+              { href: '/admin/guides', label: 'AI 지침서', icon: BookOpen },
+            ]}
             pathname={pathname}
           />
         )}

@@ -2,28 +2,61 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
+import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
+import { EditToolbar } from './edit-toolbar'
+import { ImportModal } from './import-modal'
+import { TemplateModal } from './template-modal'
 
 type Tab = 'original' | 'rewrite' | 'publish'
+type MediaPreview = { url: string; type: 'image' | 'video' }
+
+function originalMedia(post: CollectedPost): MediaPreview[] {
+  const items: MediaPreview[] = []
+  for (const item of post.media_items ?? []) {
+    const url = item.poster || item.url || item.videoUrl
+    if (!url) continue
+    items.push({ url, type: item.type === 'video' ? 'video' : 'image' })
+  }
+  if (post.thumbnail_url && !items.some((item) => item.url === post.thumbnail_url)) {
+    items.unshift({ url: post.thumbnail_url, type: 'image' })
+  }
+  if (post.media_url && !items.some((item) => item.url === post.media_url)) {
+    items.push({
+      url: post.media_url,
+      type: /\.(mp4|webm|mov)(\?|$)/i.test(post.media_url) ? 'video' : 'image',
+    })
+  }
+  return items
+}
 
 export function EditClient({
   post,
   accounts,
   initialTab,
+  isAdmin = false,
 }: {
   post: CollectedPost
   accounts: ConnectedAccount[]
   initialTab?: Tab
+  isAdmin?: boolean
 }) {
   const router = useRouter()
+  const sourceMedia = useMemo(() => originalMedia(post), [post])
   const [tab, setTab] = useState<Tab>(initialTab ?? 'original')
   const [caption, setCaption] = useState(post.caption ?? '')
   const [drafts, setDrafts] = useState<string[]>([post.caption ?? '', '', ''])
   const [draftIndex, setDraftIndex] = useState(0)
   const [instruction, setInstruction] = useState('')
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
+  const [guides, setGuides] = useState<AiGuide[]>(DEFAULT_AI_GUIDES)
+  const [guideId, setGuideId] = useState(pickDefaultGuide(DEFAULT_AI_GUIDES).id)
+  const [mediaMode, setMediaMode] = useState<'original' | 'custom'>('original')
+  const [customMedia, setCustomMedia] = useState<MediaPreview[]>([])
+  const [templateOpen, setTemplateOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
@@ -87,6 +120,8 @@ export function EditClient({
       body: JSON.stringify({
         caption: originalCaption,
         instruction,
+        guide: selectedGuide?.content || '',
+        guideName: selectedGuide?.name || '',
         persona: selected?.intro || selected?.username,
       }),
     })
@@ -115,6 +150,64 @@ export function EditClient({
   }
 
   const previewName = selected ? `@${selected.username}` : '내 계정'
+  const selectedGuide = guides.find((item) => item.id === guideId) ?? pickDefaultGuide(guides)
+  const previewMedia = mediaMode === 'custom' ? customMedia : sourceMedia
+  const previewThumb = previewMedia[0]?.url ? mediaSrc(previewMedia[0].url) : thumb
+
+  useEffect(() => {
+    let alive = true
+    void fetch('/api/ai-guides', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!alive || !Array.isArray(data.guides) || !data.guides.length) return
+        setGuides(data.guides)
+        setGuideId((current) => {
+          if (data.guides.some((item: AiGuide) => item.id === current)) return current
+          return pickDefaultGuide(data.guides).id
+        })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  function insertTemplate(body: string) {
+    const next = caption.trim() ? `${caption.trim()}\n\n${body}` : body
+    setCaption(next)
+    setDrafts((prev) => prev.map((item, index) => (index === draftIndex ? next : item)))
+    setMessage('템플릿을 타래에 넣었습니다.')
+  }
+
+  function attachFiles(files: File[]) {
+    setCustomMedia((prev) => {
+      for (const item of prev) {
+        if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
+      }
+      return files.map((file) => ({
+        url: URL.createObjectURL(file),
+        type: file.type.startsWith('video/') ? 'video' : 'image',
+      }))
+    })
+    setMediaMode('custom')
+    setMessage('직접 첨부한 파일을 씁니다.')
+  }
+
+  function resetEditor() {
+    if (!window.confirm('지금 쓴 글과 첨부를 처음 상태로 되돌릴까요?')) return
+    setDrafts([post.caption ?? '', '', ''])
+    setDraftIndex(0)
+    setCaption(post.caption ?? '')
+    setInstruction('')
+    setMediaMode('original')
+    setCustomMedia((prev) => {
+      for (const item of prev) {
+        if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
+      }
+      return []
+    })
+    setMessage('처음 상태로 되돌렸습니다.')
+  }
 
   return (
     <div className="-m-4 md:-m-6 min-h-full bg-[#0b0b0d]">
@@ -211,28 +304,19 @@ export function EditClient({
       )}
 
       {tab === 'rewrite' && (
-        <div className="grid gap-4 p-4 lg:grid-cols-[220px_minmax(0,1fr)_280px] md:p-6">
-          <aside className="rounded-2xl border border-white/10 bg-[#141418] p-4">
-            <p className="mb-3 text-xs text-white/40">내 계정</p>
-            {accounts.length === 0 ? (
-              <Link href="/settings" className="block rounded-xl bg-gold/15 px-3 py-3 text-xs text-gold">
-                설정에서 스레드 아이디 연결
-              </Link>
-            ) : (
-              accounts.map((account) => (
-                <button
-                  key={account.id}
-                  type="button"
-                  onClick={() => setAccountId(account.id)}
-                  className={`mb-2 w-full rounded-xl px-3 py-2 text-left text-sm ${
-                    accountId === account.id ? 'bg-brand/20 text-white' : 'text-white/60 hover:bg-white/5'
-                  }`}
-                >
-                  @{account.username}
-                </button>
-              ))
-            )}
-          </aside>
+        <div className="grid gap-4 p-4 lg:grid-cols-[76px_minmax(0,1fr)_280px] md:p-6">
+          <EditToolbar
+            accounts={accounts}
+            accountId={accountId}
+            onAccount={setAccountId}
+            guides={guides}
+            guideId={selectedGuide.id}
+            onGuide={setGuideId}
+            isAdmin={isAdmin}
+            onImport={() => setImportOpen(true)}
+            onTemplate={() => setTemplateOpen(true)}
+            onReset={resetEditor}
+          />
 
           <section className="rounded-2xl border border-white/10 bg-[#141418] p-4">
             <div className="mb-3 flex gap-2">
@@ -252,6 +336,22 @@ export function EditClient({
                 </button>
               ))}
             </div>
+            {previewMedia.length ? (
+              <div className="mb-3 flex gap-2 overflow-x-auto">
+                {previewMedia.map((item, index) => (
+                  <div
+                    key={`${item.url}-${index}`}
+                    className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/5"
+                  >
+                    {item.type === 'video' ? (
+                      <video src={item.url} muted className="h-full w-full object-cover" />
+                    ) : (
+                      <img src={mediaSrc(item.url) || item.url} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <textarea
               value={caption}
               onChange={(e) => {
@@ -286,7 +386,7 @@ export function EditClient({
               <p className="text-xs font-semibold text-white">{previewName}</p>
               <p className="mt-1 text-[10px] text-white/30">지금</p>
               <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{caption || '작성된 글이 여기에 보여요'}</p>
-              {thumb && <img src={thumb} alt="" className="mt-3 w-full rounded-lg object-cover" />}
+              {previewThumb ? <img src={previewThumb} alt="" className="mt-3 w-full rounded-lg object-cover" /> : null}
               <p className="mt-4 text-right text-[10px] text-white/30">{caption.length}/500</p>
             </div>
           </aside>
@@ -424,6 +524,27 @@ export function EditClient({
           </div>
         </div>
       )}
+
+      {importOpen ? (
+        <ImportModal
+          onClose={() => setImportOpen(false)}
+          onUseOriginal={() => {
+            setMediaMode('original')
+            setCustomMedia((prev) => {
+              for (const item of prev) {
+                if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
+              }
+              return []
+            })
+            setMessage('원문 영상·사진을 그대로 씁니다.')
+          }}
+          onAttach={attachFiles}
+        />
+      ) : null}
+
+      {templateOpen ? (
+        <TemplateModal onClose={() => setTemplateOpen(false)} onInsert={insertTemplate} />
+      ) : null}
 
       {showOriginalModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">

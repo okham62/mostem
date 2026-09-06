@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
+  BookOpen,
   Flame,
   LineChart,
   LogOut,
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { warmMarketCharts } from '@/lib/market-cache'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
+import { warmTrendCache } from '@/lib/trend-cache'
 import { previewHideMarketTicker } from '@/components/layout/market-ticker'
 import { explore, publish, tools } from '@/components/layout/sidebar'
 import type { Session } from 'next-auth'
@@ -31,6 +33,7 @@ const PRIMARY = [
 ] as const
 
 function isActivePath(pathname: string, href: string) {
+  if (href === '/admin') return pathname === '/admin' || pathname.startsWith('/admin/users')
   return pathname === href || pathname.startsWith(href + '/')
 }
 
@@ -38,6 +41,7 @@ function warmPath(href: string) {
   if (href === '/keywords' || href === '/news') warmRealtimeCache()
   if (href === '/shopping') warmShoppingCache()
   if (href === '/markets') warmMarketCharts()
+  if (href === '/trends') warmTrendCache()
 }
 
 export function MobileNav({ session }: { session: Session | null }) {
@@ -50,6 +54,7 @@ export function MobileNav({ session }: { session: Session | null }) {
     const id = window.setTimeout(() => {
       warmRealtimeCache()
       warmMarketCharts()
+      warmTrendCache()
     }, 300)
     return () => window.clearTimeout(id)
   }, [])
@@ -77,7 +82,15 @@ export function MobileNav({ session }: { session: Session | null }) {
     { title: '발행', items: publish },
     { title: '도구', items: tools },
     ...(isAdmin
-      ? [{ title: '관리', items: [{ href: '/admin', label: '회원 관리', icon: Users }] }]
+      ? [
+          {
+            title: '관리',
+            items: [
+              { href: '/admin', label: '회원 관리', icon: Users },
+              { href: '/admin/guides', label: 'AI 지침서', icon: BookOpen },
+            ],
+          },
+        ]
       : []),
   ]
 

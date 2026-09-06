@@ -20,6 +20,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/links': '링크 변환',
   '/settings': '설정',
   '/admin': '회원 관리',
+  '/admin/guides': 'AI 지침서',
 }
 
 export function MobileHeader({ session }: { session: Session | null }) {

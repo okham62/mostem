@@ -42,6 +42,7 @@ export default async function ThreadEditPage({
       post={postRes.data as CollectedPost}
       accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
       initialTab={tab}
+      isAdmin={session?.user?.role === 'admin'}
     />
   )
 }
