@@ -47,17 +47,19 @@ export function parseMediaItems(post: CollectedPost): CollectMediaItem[] {
       if (Array.isArray(parsed) && parsed.length > 0) {
         return sortMediaVideoLeft(
           parsed
-            .map(item => {
+            .map((item) => {
               const url = cleanMediaUrl(item.url) ?? ''
               const videoUrl = cleanMediaUrl(item.videoUrl) ?? (isVideoFile(url) ? url : undefined)
               return {
                 ...item,
                 url,
-                poster: imagePosterUrl(item.poster, thumb, isVideoFile(url) ? null : url) ?? undefined,
+                poster:
+                  imagePosterUrl(item.poster, videoUrl ? null : url) ??
+                  (videoUrl ? thumb ?? undefined : undefined),
                 videoUrl,
               }
             })
-            .filter(item => item.url || item.poster || item.videoUrl)
+            .filter((item) => item.url || item.poster || item.videoUrl)
         )
       }
     } catch {

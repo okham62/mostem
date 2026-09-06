@@ -154,6 +154,23 @@ function keepText(next: string | null, prev: string | null | undefined) {
   return next || prev || null
 }
 
+function mediaLen(value?: string | null) {
+  if (!value?.trim().startsWith('[')) return 0
+  try {
+    const parsed = JSON.parse(value) as unknown[]
+    return Array.isArray(parsed) ? parsed.length : 0
+  } catch {
+    return 0
+  }
+}
+
+function pickMediaUrl(next: string | null, prev: string | null | undefined) {
+  if (mediaLen(next) > 0 || mediaLen(prev) > 0) {
+    return mediaLen(next) >= mediaLen(prev) ? next : prev ?? null
+  }
+  return keepText(next, prev)
+}
+
 function keepCount(next: number, prev: number | null | undefined) {
   return next > 0 ? next : prev ?? 0
 }
@@ -175,10 +192,7 @@ function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): Coll
     ...next,
     caption: keepText(next.caption, prev.caption as string | null),
     thumbnail_url: keepText(next.thumbnail_url, prev.thumbnail_url as string | null),
-    media_url:
-      next.media_url?.startsWith('[')
-        ? next.media_url
-        : keepText(next.media_url, prev.media_url as string | null),
+    media_url: pickMediaUrl(next.media_url, prev.media_url as string | null),
     url: keepText(next.url, prev.url as string | null),
     author: keepText(next.author, prev.author as string | null),
     views,

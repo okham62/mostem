@@ -27,16 +27,16 @@ function originalMedia(post: CollectedPost): MediaPreview[] {
   const items: MediaPreview[] = []
   const seen = new Set<string>()
   for (const item of parseMediaItems(post)) {
-    const poster = imagePosterUrl(item.poster, item.url, post.thumbnail_url)
     const video =
       cleanMediaUrl(item.videoUrl) ??
       (item.type === 'video' && isVideoFile(item.url) ? cleanMediaUrl(item.url) : null)
-    const key = poster || video
+    const image = imagePosterUrl(item.poster, video ? null : item.url)
+    const key = video || cleanMediaUrl(item.url) || image
     if (!key || seen.has(key)) continue
     seen.add(key)
     items.push({
-      url: video || poster || key,
-      poster: poster ?? undefined,
+      url: video || image || key,
+      poster: image ?? undefined,
       type: video ? 'video' : 'image',
     })
   }
