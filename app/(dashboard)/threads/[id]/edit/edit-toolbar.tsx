@@ -44,7 +44,7 @@ export function EditToolbar({
   return (
     <aside
       ref={root}
-      className="relative flex flex-row items-center justify-between gap-1 rounded-2xl border border-white/10 bg-[#141418] px-2 py-2 lg:min-h-[480px] lg:flex-col lg:items-center lg:justify-start lg:px-1.5 lg:py-3"
+      className="relative z-40 flex flex-row items-center justify-between gap-1 rounded-2xl border border-white/10 bg-[#141418] px-2 py-2 lg:min-h-[480px] lg:flex-col lg:items-center lg:justify-start lg:px-1.5 lg:py-3"
     >
       <ToolButton
         active={open === 'account'}
@@ -158,7 +158,7 @@ function ToolButton({
 
 function Popover({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute left-2 top-full z-30 mt-1 w-56 rounded-2xl border border-white/10 bg-[#1a1a20] p-2 shadow-[0_16px_40px_rgba(0,0,0,0.45)] lg:left-[calc(100%+8px)] lg:top-3 lg:mt-0">
+    <div className="absolute left-2 top-full z-[100] mt-1 w-56 rounded-2xl border border-white/10 bg-[#1a1a20] p-2 shadow-[0_16px_40px_rgba(0,0,0,0.45)] lg:left-[calc(100%+8px)] lg:top-3 lg:mt-0">
       {children}
     </div>
   )

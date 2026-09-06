@@ -88,7 +88,7 @@ function MediaHoverTile({
 }) {
   return (
     <div
-      className="relative z-[90] h-24 w-24 shrink-0"
+      className="relative h-24 w-24 shrink-0"
       onMouseEnter={() => onPreview(item)}
       onMouseLeave={onPreviewEnd}
     >
@@ -557,7 +557,7 @@ export function EditClient({
                 {extraMedia.length ? ` · 추가 ${extraMedia.length}` : ''}
               </p>
             </div>
-            <div ref={mediaStripRef} className="relative z-[90] mb-3 flex gap-2 overflow-x-auto">
+            <div ref={mediaStripRef} className="relative mb-3 flex gap-2 overflow-x-auto">
               {visibleSource.map((item, index) => (
                 <MediaHoverTile
                   key={`orig-${item.url}-${index}`}
