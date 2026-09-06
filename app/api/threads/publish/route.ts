@@ -31,16 +31,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '게시물을 찾을 수 없습니다.' }, { status: 404 })
   }
 
-  const { error } = await supabase
+  const payload = {
+    caption,
+    status: 'uploaded',
+    collected_by: username,
+    posted_at: new Date().toISOString(),
+  }
+  let { error } = await supabase
     .from('collected_posts')
-    .update({
-      caption,
-      status: 'uploaded',
-      collected_by: username,
-      posted_at: new Date().toISOString(),
-    })
+    .update(payload)
     .eq('id', postId)
     .eq('user_id', session.user.id)
+
+  if (error && /posted_at/i.test(error.message)) {
+    const { posted_at: _postedAt, ...withoutPosted } = payload
+    const retry = await supabase
+      .from('collected_posts')
+      .update(withoutPosted)
+      .eq('id', postId)
+      .eq('user_id', session.user.id)
+    error = retry.error
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
