@@ -3,6 +3,7 @@ import './globals.css'
 import { PreventFileDrop } from '@/components/prevent-file-drop'
 import { ExtensionStatusBanner } from '@/components/layout/extension-status-banner'
 import { ThemeProvider } from '@/components/theme-provider'
+import { ChunkErrorReload } from '@/components/chunk-error-reload'
 import { THEME_BOOT_SCRIPT } from '@/lib/theme'
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default function RootLayout({
       </head>
       <body className="flex h-full flex-col">
         <ThemeProvider>
+          <ChunkErrorReload />
           <PreventFileDrop />
           <ExtensionStatusBanner />
           <div className="min-h-0 flex-1">{children}</div>

@@ -176,6 +176,9 @@ function mergeKeywords(groups: RealtimeKeyword[][], limit = KEYWORD_LIMIT) {
 }
 
 export function limitKeywordsPayload(data: KeywordsPayload): KeywordsPayload {
+  if (!data || typeof data !== 'object') {
+    return { now: Date.now(), keywords: [], sources: [], news: [] }
+  }
   const sources = (data.sources ?? []).map((source) => ({
     ...source,
     hint: source.id === 'google' ? '한국 급상승 검색어' : '실시간 검색어',

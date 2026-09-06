@@ -35,8 +35,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const onChange = () => {
       if (choice === 'auto') applyResolvedTheme(resolveTheme('auto'))
     }
-    media.addEventListener('change', onChange)
-    return () => media.removeEventListener('change', onChange)
+    media.addEventListener?.('change', onChange)
+    return () => media.removeEventListener?.('change', onChange)
   }, [choice])
 
   const value = useMemo(

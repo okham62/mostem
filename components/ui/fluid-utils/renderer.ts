@@ -4,7 +4,8 @@ export function createRenderer({ canvas }: { canvas: HTMLCanvasElement }) {
   let disposed = false
   let fluid: WebGLFluidEnhanced | null = null
 
-  const ready = import("webgl-fluid-enhanced").then(({ default: Fluid }) => {
+  const ready = import("webgl-fluid-enhanced")
+    .then(({ default: Fluid }) => {
     if (disposed) return
     const container = canvas.parentElement
     if (!container) return
@@ -46,6 +47,9 @@ export function createRenderer({ canvas }: { canvas: HTMLCanvasElement }) {
     fluid.start()
     fluid.multipleSplats(12)
   })
+    .catch(() => {
+      /* keep a black canvas if WebGL or the chunk fails */
+    })
 
   return {
     ready,
