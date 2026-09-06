@@ -33,7 +33,7 @@ async function readStoredGuides(): Promise<AiGuide[] | null> {
     .order('created_at', { ascending: true })
   if (error) return null
   const guides = (data as TemplateRow[])
-    .filter((row) => (row.default_tags ?? []).includes(GUIDE_TAG))
+    .filter((row) => row.name !== '__gemini_key__' && (row.default_tags ?? []).includes(GUIDE_TAG))
     .map(fromRow)
   if (guides.length && !guides.some((item) => item.isDefault)) guides[0].isDefault = true
   return guides

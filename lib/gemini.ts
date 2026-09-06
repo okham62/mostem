@@ -1,4 +1,5 @@
 import { parseDrafts } from '@/lib/ai-models'
+import { resolveGeminiKey } from '@/lib/gemini-key'
 
 type GeminiResponse = {
   candidates?: { content?: { parts?: { text?: string }[] } }[]
@@ -6,8 +7,8 @@ type GeminiResponse = {
 }
 
 const FALLBACKS: Record<string, string[]> = {
-  'gemini-3.5-flash-lite': ['gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'],
-  'gemini-3.6-flash': ['gemini-2.5-flash', 'gemini-2.0-flash'],
+  'gemini-3.5-flash-lite': ['gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'],
+  'gemini-3.6-flash': ['gemini-3.5-flash', 'gemini-2.5-flash'],
   'gemini-3.1-flash-lite': ['gemini-3.5-flash-lite', 'gemini-2.5-flash-lite'],
 }
 
@@ -22,9 +23,9 @@ export async function generateWithGemini({
   fallbackCaption: string
   webSearch?: boolean
 }) {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || ''
-  if (!key || key.includes('your_')) {
-    throw new Error('제미나이 API 키가 없습니다. Vercel에 GEMINI_API_KEY를 넣어 주세요.')
+  const key = await resolveGeminiKey()
+  if (!key) {
+    throw new Error('제미나이 API 키가 없습니다. 설정에서 Gemini를 연결해 주세요.')
   }
 
   const tried = [model, ...(FALLBACKS[model] ?? [])]
