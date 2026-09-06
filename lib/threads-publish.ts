@@ -1,4 +1,4 @@
-export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.5'
+export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.6'
 
 export type PublishMediaItem = {
   url: string
@@ -62,7 +62,7 @@ export function requestHamiPublish(input: {
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const intentUrl = threadsIntentUrl(input.text)
   const media = input.media?.filter((item) => item.url) ?? []
-  const timeoutMs = media.length ? 90_000 : 45_000
+  const timeoutMs = media.length ? 150_000 : 45_000
 
   return new Promise((resolve) => {
     const finish = (result: { ok: boolean; error?: string }) => {
