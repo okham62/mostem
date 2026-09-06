@@ -240,7 +240,7 @@ export function TrendsClient({ initial = null }: { initial?: TrendsPayload | nul
         <div className="mt-2 divide-y divide-white/5">
           {filtered.length === 0 ? (
             <div className="py-16 text-center text-sm text-white/35">
-              {!data?.items.length ? '키워드를 불러오는 중' : '조건에 맞는 키워드가 없습니다.'}
+              {!data?.items?.length ? '키워드를 불러오는 중' : '조건에 맞는 키워드가 없습니다.'}
             </div>
           ) : (
             filtered.map((item, index) => (
