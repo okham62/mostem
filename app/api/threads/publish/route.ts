@@ -44,10 +44,13 @@ export async function POST(req: Request) {
     .eq('user_id', session.user.id)
 
   if (error && /posted_at/i.test(error.message)) {
-    const { posted_at: _postedAt, ...withoutPosted } = payload
     const retry = await supabase
       .from('collected_posts')
-      .update(withoutPosted)
+      .update({
+        caption: payload.caption,
+        status: payload.status,
+        collected_by: payload.collected_by,
+      })
       .eq('id', postId)
       .eq('user_id', session.user.id)
     error = retry.error
