@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchThreadsPostMedia, mergeRemoteMedia } from '@/lib/threads-remote-media'
 import { notFound } from 'next/navigation'
 import { EditClient } from './edit-client'
 import type { CollectedPost, ConnectedAccount } from '@/types'
@@ -32,6 +33,20 @@ export default async function ThreadEditPage({
 
   if (!postRes.data) notFound()
 
+  let post = postRes.data as CollectedPost
+  if (post.url) {
+    const remote = await fetchThreadsPostMedia(post.url).catch(() => [])
+    const merged = mergeRemoteMedia(post, remote)
+    if (merged.changed && merged.serialized) {
+      await supabase
+        .from('collected_posts')
+        .update({ media_url: merged.serialized })
+        .eq('id', post.id)
+        .eq('user_id', session!.user.id)
+      post = { ...post, media_url: merged.serialized }
+    }
+  }
+
   const tab =
     searchParams.tab === 'rewrite' || searchParams.tab === 'publish' || searchParams.tab === 'original'
       ? searchParams.tab
@@ -39,7 +54,7 @@ export default async function ThreadEditPage({
 
   return (
     <EditClient
-      post={postRes.data as CollectedPost}
+      post={post}
       accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
       initialTab={tab}
       isAdmin={session?.user?.role === 'admin'}

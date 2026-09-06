@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/lib/collect-media'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
@@ -48,15 +48,124 @@ function originalMedia(post: CollectedPost): MediaPreview[] {
 }
 
 function MediaThumb({ item }: { item: MediaPreview }) {
-  const src = displaySrc(item.poster || (item.type === 'image' ? item.url : '') || item.url)
-  if (!src) return <div className="h-full w-full bg-white/10" />
-  return (
-    <>
-      <img src={src} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-      {item.type === 'video' ? (
+  if (item.type === 'video') {
+    const src = displaySrc(item.url)
+    const poster = displaySrc(item.poster)
+    if (!src && !poster) return <div className="h-full w-full bg-white/10" />
+    return (
+      <>
+        <video
+          src={src || undefined}
+          poster={poster || undefined}
+          muted
+          playsInline
+          preload="auto"
+          className="h-full w-full object-cover"
+        />
         <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] text-white">▶</span>
-      ) : null}
-    </>
+      </>
+    )
+  }
+  const src = displaySrc(item.poster || item.url)
+  if (!src) return <div className="h-full w-full bg-white/10" />
+  return <img src={src} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+}
+
+function MediaHoverTile({
+  item,
+  onPreview,
+  onPreviewEnd,
+  onRemove,
+  removeLabel,
+}: {
+  item: MediaPreview
+  onPreview: (item: MediaPreview) => void
+  onPreviewEnd: () => void
+  onRemove: () => void
+  removeLabel: string
+}) {
+  return (
+    <div
+      className="relative -mx-1 h-24 w-24 shrink-0 px-1"
+      onPointerEnter={() => onPreview(item)}
+      onPointerLeave={onPreviewEnd}
+    >
+      <div className="relative h-24 w-24 overflow-hidden rounded-lg bg-white/5">
+        <MediaThumb item={item} />
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove()
+          }}
+          className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-[11px] text-white hover:bg-red-500"
+          aria-label={removeLabel}
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function HoverPreview({ item }: { item: MediaPreview | null }) {
+  const [shown, setShown] = useState<MediaPreview | null>(null)
+  const [open, setOpen] = useState(false)
+
+  useLayoutEffect(() => {
+    if (item) {
+      setShown(item)
+      setOpen(true)
+      return
+    }
+    setOpen(false)
+  }, [item])
+
+  if (!shown) return null
+
+  const src = displaySrc(shown.url)
+  const poster = displaySrc(shown.poster)
+
+  return (
+    <div
+      className={`pointer-events-none fixed inset-0 z-[80] flex items-center justify-center bg-black/80 ${
+        open ? 'animate-media-preview-backdrop-in' : 'animate-media-preview-backdrop-out'
+      }`}
+      onAnimationEnd={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (!open && !item) setShown(null)
+      }}
+    >
+      <div
+        key={shown.url}
+        className={open ? 'animate-media-preview-in' : 'animate-media-preview-out'}
+      >
+        {shown.type === 'video' ? (
+          <video
+            key={shown.url}
+            src={src}
+            poster={poster || undefined}
+            autoPlay
+            muted
+            playsInline
+            loop
+            preload="auto"
+            ref={(el) => {
+              el?.play().catch(() => {})
+            }}
+            className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
+          />
+        ) : (
+          <img
+            key={shown.url}
+            src={src}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="max-h-[88vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl"
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -82,6 +191,8 @@ export function EditClient({
   const [guides, setGuides] = useState<AiGuide[]>(DEFAULT_AI_GUIDES)
   const [guideId, setGuideId] = useState(pickDefaultGuide(DEFAULT_AI_GUIDES).id)
   const [extraMedia, setExtraMedia] = useState<MediaPreview[]>([])
+  const [hiddenSource, setHiddenSource] = useState<string[]>([])
+  const [lightbox, setLightbox] = useState<MediaPreview | null>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [modelId, setModelId] = useState(DEFAULT_AI_MODEL.id)
   const [webSearch, setWebSearch] = useState(false)
@@ -225,7 +336,8 @@ export function EditClient({
 
   const previewName = selected ? `@${selected.username}` : '내 계정'
   const selectedGuide = guides.find((item) => item.id === guideId) ?? pickDefaultGuide(guides)
-  const previewMedia = [...sourceMedia, ...extraMedia]
+  const visibleSource = sourceMedia.filter((item) => !hiddenSource.includes(item.url))
+  const previewMedia = [...visibleSource, ...extraMedia]
   const previewThumb =
     displaySrc(previewMedia[0]?.poster || previewMedia[0]?.url) || thumb
 
@@ -272,8 +384,14 @@ export function EditClient({
       const next = [...prev]
       const [removed] = next.splice(index, 1)
       if (removed?.url.startsWith('blob:')) URL.revokeObjectURL(removed.url)
+      if (lightbox && removed && lightbox.url === removed.url) setLightbox(null)
       return next
     })
+  }
+
+  function removeSource(url: string) {
+    setHiddenSource((prev) => (prev.includes(url) ? prev : [...prev, url]))
+    if (lightbox?.url === url) setLightbox(null)
   }
 
   function resetEditor() {
@@ -288,6 +406,8 @@ export function EditClient({
       }
       return []
     })
+    setHiddenSource([])
+    setLightbox(null)
     setMessage('처음 상태로 되돌렸습니다.')
   }
 
@@ -368,14 +488,17 @@ export function EditClient({
               )}
             </div>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/80">{originalCaption}</p>
-            {(displaySrc(sourceMedia[0]?.poster || sourceMedia[0]?.url) || thumb) && (
-              <img
-                src={displaySrc(sourceMedia[0]?.poster || sourceMedia[0]?.url) || thumb || ''}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="mt-4 w-full rounded-xl object-cover"
-              />
-            )}
+            {sourceMedia.length ? (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {sourceMedia.map((item, index) => (
+                  <div key={`${item.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl bg-black">
+                    <MediaThumb item={item} />
+                  </div>
+                ))}
+              </div>
+            ) : thumb ? (
+              <img src={thumb} alt="" className="mt-4 w-full rounded-xl object-cover" />
+            ) : null}
             <p className="mt-3 text-[11px] text-white/35">
               조회 {formatCount(post.views)} · 좋아요 {formatCount(post.likes)} · 팔로워 {formatCount(post.followers)}
             </p>
@@ -429,36 +552,35 @@ export function EditClient({
                 </button>
               ))}
             </div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] text-white/45">
+                원본 영상 {visibleSource.filter((item) => item.type === 'video').length} · 사진{' '}
+                {visibleSource.filter((item) => item.type === 'image').length}
+                {extraMedia.length ? ` · 추가 ${extraMedia.length}` : ''}
+              </p>
+            </div>
             <div className="mb-3 flex gap-2 overflow-x-auto">
-              {sourceMedia.map((item, index) => (
-                <div
+              {visibleSource.map((item, index) => (
+                <MediaHoverTile
                   key={`orig-${item.url}-${index}`}
-                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/5"
-                >
-                  <MediaThumb item={item} />
-                </div>
+                  item={item}
+                  onPreview={setLightbox}
+                  onPreviewEnd={() => setLightbox(null)}
+                  onRemove={() => removeSource(item.url)}
+                  removeLabel="이미지 삭제"
+                />
               ))}
               {extraMedia.map((item, index) => (
-                <div
+                <MediaHoverTile
                   key={`extra-${item.url}-${index}`}
-                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/5"
-                >
-                  {item.type === 'video' ? (
-                    <video src={item.url} muted className="h-full w-full object-cover" />
-                  ) : (
-                    <img src={item.url} alt="" className="h-full w-full object-cover" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeExtra(index)}
-                    className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[10px] text-white"
-                    aria-label="첨부 삭제"
-                  >
-                    ×
-                  </button>
-                </div>
+                  item={item}
+                  onPreview={setLightbox}
+                  onPreviewEnd={() => setLightbox(null)}
+                  onRemove={() => removeExtra(index)}
+                  removeLabel="첨부 삭제"
+                />
               ))}
-              <label className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed border-white/20 bg-white/5 text-xl text-white/40 hover:border-white/40 hover:text-white">
+              <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed border-white/20 bg-white/5 text-2xl text-white/40 hover:border-white/40 hover:text-white">
                 +
                 <input
                   type="file"
@@ -518,7 +640,17 @@ export function EditClient({
               <p className="text-xs font-semibold text-white">{previewName}</p>
               <p className="mt-1 text-[10px] text-white/30">지금</p>
               <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{caption || '작성된 글이 여기에 보여요'}</p>
-              {previewThumb ? <img src={previewThumb} alt="" className="mt-3 w-full rounded-lg object-cover" /> : null}
+              {previewMedia.length ? (
+                <div className="mt-3 grid grid-cols-2 gap-1.5">
+                  {previewMedia.map((item, index) => (
+                    <div key={`${item.url}-${index}`} className="relative aspect-square overflow-hidden rounded-lg bg-white/5">
+                      <MediaThumb item={item} />
+                    </div>
+                  ))}
+                </div>
+              ) : previewThumb ? (
+                <img src={previewThumb} alt="" className="mt-3 w-full rounded-lg object-cover" />
+              ) : null}
               <p className="mt-4 text-right text-[10px] text-white/30">{caption.length}/500</p>
             </div>
           </aside>
@@ -625,6 +757,8 @@ export function EditClient({
           </div>
         </div>
       )}
+
+      <HoverPreview item={lightbox} />
 
       {templateOpen ? (
         <TemplateModal onClose={() => setTemplateOpen(false)} onInsert={insertTemplate} />
