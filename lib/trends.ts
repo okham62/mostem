@@ -193,7 +193,7 @@ async function fetchHypeDuck(page: number, query: TrendQuery = {}): Promise<HdPa
   const res = await fetch(`${HD_URL}?${params.toString()}`, {
     headers: hdHeaders(),
     cache: 'no-store',
-    signal: AbortSignal.timeout(4000),
+    signal: AbortSignal.timeout(12000),
   })
   if (!res.ok) throw new Error(`hypeduck ${res.status}`)
   return (await res.json()) as HdPayload
@@ -293,7 +293,7 @@ async function getTrendCatalog(query: TrendQuery = {}): Promise<TrendCatalog> {
   const promise = (async () => {
     const first = await fetchHypeDuck(1, query)
     if (!first.rows?.length) throw new Error('hypeduck empty')
-    const pageCount = Math.min(Number(first.pageCount) || 1, 4)
+    const pageCount = Math.min(Number(first.pageCount) || 1, 280)
     const pages: HdPayload[] = [first]
     for (let start = 2; start <= pageCount; start += CATALOG_CONCURRENCY) {
       const nums = Array.from(
@@ -342,12 +342,19 @@ export async function getShoppingTrends(
 
   inflightKey = cacheKey
   inflight = (async () => {
-    const pages = await Promise.all([1, 2].map((page) => fetchHypeDuck(page, query).catch(() => ({ rows: [] }))))
-    const first = pages[0]
-    if (!pages.some((page) => page.rows?.length)) {
-      if (cache?.data) return cache.data
-      return payloadFromItems([], seoulYmd(), SHOP_CATEGORIES, 0)
+    if ((tab === 'popular' || tab === 'new') && !query.q?.trim()) {
+      const catalog = await getTrendCatalog(query)
+      let items = catalog.items
+      if (tab === 'new') items = items.filter((item) => item.isNew)
+      items = [...items].sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth).slice(0, 80)
+      const data = payloadFromItems(items, catalog.latestDate, catalog.categories, catalog.total)
+      cache = { at: Date.now(), key: cacheKey, data }
+      return data
     }
+
+    const pages = await Promise.all([1, 2].map((page) => fetchHypeDuck(page, query)))
+    const first = pages[0]
+    if (!pages.some((page) => page.rows?.length)) throw new Error('hypeduck empty')
     const seen = new Set<string>()
     const items: TrendKeyword[] = []
     for (const page of pages) {
