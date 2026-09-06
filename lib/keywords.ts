@@ -45,6 +45,7 @@ const NATE_URL = 'https://www.nate.com/js/data/jsonLiveKeywordDataV1.js'
 const ZUM_URL = 'https://zum.com/'
 const DAUM_URL = 'https://www.daum.net/'
 export const KEYWORD_LIMIT = 10
+export const KEYWORD_RANK_LABEL = '1~10위'
 const FRESH_MS = 45_000
 const STALE_MS = 15 * 60_000
 const BROWSER_UA =
@@ -297,6 +298,8 @@ function parseSignalKeywords(raw: SignalPayload): RealtimeKeyword[] {
     })
     .filter((item): item is RealtimeKeyword => item != null)
     .sort((a, b) => a.rank - b.rank)
+    .slice(0, KEYWORD_LIMIT)
+    .map((item, index) => ({ ...item, rank: index + 1 }))
 }
 
 function parseGoogleRss(xml: string): RealtimeKeyword[] {
@@ -366,6 +369,7 @@ function parseNateKeywords(text: string): RealtimeKeyword[] {
       })
     })
     .filter((item): item is RealtimeKeyword => item != null)
+    .slice(0, KEYWORD_LIMIT)
 }
 
 function parseZumKeywords(html: string): RealtimeKeyword[] {
@@ -387,6 +391,7 @@ function parseZumKeywords(html: string): RealtimeKeyword[] {
         searchUrl: naverSearch(keyword),
       })
     )
+    if (keywords.length >= KEYWORD_LIMIT) break
   }
   return keywords
 }
@@ -410,6 +415,7 @@ function parseDaumKeywords(html: string): RealtimeKeyword[] {
         searchUrl: naverSearch(keyword),
       })
     )
+    if (keywords.length >= KEYWORD_LIMIT) break
   }
   return keywords
 }

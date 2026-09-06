@@ -9,6 +9,7 @@ import {
   formatKeywordTimeShort,
   formatSearchTraffic,
   KEYWORD_LIMIT,
+  KEYWORD_RANK_LABEL,
   type KeywordSource,
   type KeywordState,
   type KeywordsPayload,
@@ -197,7 +198,7 @@ function KeywordPanel({
           </span>
         </h2>
         <span className="shrink-0 rounded-full bg-white/6 px-2 py-1 text-[10px] font-medium text-white/50 md:px-2.5 md:text-[11px]">
-          {hint} · 1~10위
+          {hint} · {KEYWORD_RANK_LABEL}
         </span>
       </div>
       {keywords.length === 0 ? (

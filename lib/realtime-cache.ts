@@ -6,7 +6,7 @@ import {
   type KeywordsPayload,
 } from '@/lib/keywords'
 
-const STORAGE_KEY = 'mostem:realtime-v2'
+const STORAGE_KEY = 'mostem:realtime-v3'
 let memory: KeywordsPayload | null = null
 let warming = false
 
