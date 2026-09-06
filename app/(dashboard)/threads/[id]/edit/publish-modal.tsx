@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { isHamiOnline } from '@/lib/threads-publish'
 import type { ConnectedAccount } from '@/types'
 
@@ -20,6 +21,9 @@ export function PublishModal({
   onDownload: () => void
 }) {
   const [hamiOn, setHamiOn] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     const tick = () => setHamiOn(isHamiOnline())
@@ -30,8 +34,10 @@ export function PublishModal({
 
   const handle = account ? `@${account.username}` : '@계정 미선택'
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+  if (!mounted) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[2px]">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#121214] p-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">발행하기</h2>
@@ -111,6 +117,7 @@ export function PublishModal({
 
         {message ? <p className="mt-3 text-xs text-gold">{message}</p> : null}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

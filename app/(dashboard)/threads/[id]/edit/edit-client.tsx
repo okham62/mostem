@@ -12,6 +12,7 @@ import { isHamiOnline, requestHamiPublish } from '@/lib/threads-publish'
 import { EditToolbar } from './edit-toolbar'
 import { ModelPicker } from './model-picker'
 import { PublishModal } from './publish-modal'
+import { ScheduleModal } from './schedule-modal'
 import { TemplateModal } from './template-modal'
 
 type Tab = 'original' | 'rewrite' | 'publish'
@@ -199,11 +200,9 @@ export function EditClient({
   const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
   const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const [scheduleMins, setScheduleMins] = useState(10)
   const [scheduleAt, setScheduleAt] = useState(() => new Date(Date.now() + 10 * 60 * 1000))
 
   function pickSchedule(mins: number) {
-    setScheduleMins(mins)
     setScheduleAt(new Date(Date.now() + mins * 60 * 1000))
   }
 
@@ -445,6 +444,7 @@ export function EditClient({
           <button
             type="button"
             onClick={() => {
+              setLightbox(null)
               pickSchedule(10)
               setScheduleOpen(true)
             }}
@@ -670,92 +670,20 @@ export function EditClient({
       )}
 
       {scheduleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#141418] p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-white">예약 발행</h2>
-              <button type="button" onClick={() => setScheduleOpen(false)} className="text-white/40">
-                ✕
-              </button>
-            </div>
-
-            <div className="mb-4 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold">
-                {(selected?.username?.[0] ?? '나').toUpperCase()}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-white">@{selected?.username ?? '계정 미선택'}</p>
-                <p className="text-xs text-white/45">이 계정에 예약돼요</p>
-              </div>
-            </div>
-
-            <p className="mb-2 text-xs text-white/40">예약 시작</p>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {[
-                [10, '10분 뒤'],
-                [30, '30분 뒤'],
-                [60, '1시간 뒤'],
-                [120, '2시간 뒤'],
-                [180, '3시간 뒤'],
-              ].map(([mins, label]) => (
-                <button
-                  key={String(label)}
-                  type="button"
-                  onClick={() => pickSchedule(Number(mins))}
-                  className={`rounded-full px-3 py-1.5 text-xs ${
-                    scheduleMins === Number(mins)
-                      ? 'bg-white text-black'
-                      : 'bg-white/8 text-white/80 hover:bg-white/12'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="mb-4 text-sm text-white">
-              📅 {scheduleAt.toLocaleString('ko-KR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                weekday: 'short',
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </p>
-
-            <div className="mb-3 rounded-xl border border-white/10 bg-black/30 p-3">
-              <p className="flex items-center gap-2 text-sm font-semibold text-white">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Threads 공식 API로 예약
-              </p>
-              <p className="mt-1 text-xs text-white/40">
-                공식 API가 예약 시각에 발행해요. 브라우저나 노드를 켜둘 필요가 없어요.
-              </p>
-            </div>
-
-            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              확장이 응답하지 않으면 크롬 확장 관리에서 하미를 새로고침한 뒤 다시 시도해 주세요.
-            </div>
-
-            <button
-              type="button"
-              disabled={saving || !selected}
-              onClick={async () => {
-                const ok = await persist('scheduled')
-                if (ok) {
-                  setMessage(`${scheduleAt.toLocaleString('ko-KR')}에 @${selected?.username} 계정으로 예약했습니다.`)
-                  setScheduleOpen(false)
-                }
-              }}
-              className="w-full rounded-xl bg-gold py-3 text-sm font-bold text-black disabled:opacity-50"
-            >
-              🗓️ (확장프로그램 방식) 이 시각에 예약하기
-            </button>
-            {!selected && (
-              <p className="mt-2 text-xs text-gold">설정에서 업로드할 스레드 아이디를 먼저 연결하세요.</p>
-            )}
-          </div>
-        </div>
+        <ScheduleModal
+          account={selected}
+          saving={saving}
+          initialAt={scheduleAt}
+          onClose={() => setScheduleOpen(false)}
+          onConfirm={async (when) => {
+            setScheduleAt(when)
+            const ok = await persist('scheduled')
+            if (ok) {
+              setMessage(`${when.toLocaleString('ko-KR')}에 @${selected?.username} 계정으로 예약했습니다.`)
+              setScheduleOpen(false)
+            }
+          }}
+        />
       )}
 
       <HoverPreview item={lightbox} anchor={mediaStripRef.current} />

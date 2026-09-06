@@ -33,6 +33,25 @@ const config: Config = {
         tiktok: '#010101',
         instagram: '#E1306C',
       },
+      keyframes: {
+        scheduleBackdropIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        scheduleCardIn: {
+          '0%': { opacity: '0', transform: 'translateY(18px) scale(0.96)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        scheduleTick: {
+          '0%': { opacity: '0.4', transform: 'scale(0.92) translateY(5px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
+      },
+      animation: {
+        'schedule-backdrop-in': 'scheduleBackdropIn 180ms ease-out both',
+        'schedule-card-in': 'scheduleCardIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both',
+        'schedule-tick': 'scheduleTick 180ms cubic-bezier(0.22, 1, 0.36, 1) both',
+      },
     },
   },
   plugins: [],
