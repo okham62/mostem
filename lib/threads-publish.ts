@@ -9,41 +9,65 @@ export function isHamiOnline() {
   return at > 0 && Date.now() - at < 4000
 }
 
-export async function openThreadsComposer(text: string, username?: string) {
-  const intentUrl = threadsIntentUrl(text)
-  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-
-  if (isHamiOnline()) {
-    const ok = await new Promise<boolean>((resolve) => {
-      function onMessage(event: MessageEvent) {
-        const data = event.data as { source?: string; type?: string; id?: string; ok?: boolean }
-        if (event.source !== window) return
-        if (data?.source !== 'hami-extension' || data.type !== 'publish-result') return
-        if (data.id !== requestId) return
-        window.removeEventListener('message', onMessage)
-        resolve(Boolean(data.ok))
-      }
-      window.addEventListener('message', onMessage)
-      window.postMessage(
-        {
-          source: 'mostem',
-          type: 'threads-publish',
-          id: requestId,
-          payload: { text, username, intentUrl },
-        },
-        '*'
-      )
-      window.setTimeout(() => {
-        window.removeEventListener('message', onMessage)
-        resolve(false)
-      }, 2200)
+export function requestHamiPublish(input: {
+  text: string
+  username?: string
+}): Promise<{ ok: boolean; error?: string }> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve({ ok: false, error: '브라우저에서만 발행할 수 있습니다.' })
+  }
+  if (!isHamiOnline()) {
+    return Promise.resolve({
+      ok: false,
+      error: '발행하려면 하미 확장이 필요해요. chrome://extensions에서 켠 뒤 이 창을 다시 열어 주세요.',
     })
-    if (ok) return { opened: true, via: 'hami' as const, intentUrl }
   }
 
-  const popup = window.open(intentUrl, '_blank', 'noopener,noreferrer')
-  if (!popup) {
-    window.location.href = intentUrl
-  }
-  return { opened: true, via: 'intent' as const, intentUrl }
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const intentUrl = threadsIntentUrl(input.text)
+
+  return new Promise((resolve) => {
+    const finish = (result: { ok: boolean; error?: string }) => {
+      window.clearTimeout(timer)
+      window.removeEventListener('message', onMessage)
+      resolve(result)
+    }
+
+    function onMessage(event: MessageEvent) {
+      const data = event.data as {
+        source?: string
+        type?: string
+        id?: string
+        ok?: boolean
+        error?: string
+      }
+      if (event.source !== window) return
+      if (data?.source !== 'hami-extension' || data.type !== 'publish-result') return
+      if (data.id !== requestId) return
+      finish({
+        ok: Boolean(data.ok),
+        error: data.ok ? undefined : data.error || '스레드 업로드에 실패했습니다.',
+      })
+    }
+
+    window.addEventListener('message', onMessage)
+    window.postMessage(
+      {
+        source: 'mostem',
+        type: 'threads-publish',
+        id: requestId,
+        payload: {
+          text: input.text,
+          username: input.username,
+          intentUrl,
+          autoPost: true,
+        },
+      },
+      '*'
+    )
+
+    const timer = window.setTimeout(() => {
+      finish({ ok: false, error: '확장프로그램이 응답하지 않습니다. 하미를 새로고침한 뒤 다시 시도해 주세요.' })
+    }, 45000)
+  })
 }

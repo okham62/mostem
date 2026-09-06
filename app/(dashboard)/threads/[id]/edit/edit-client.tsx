@@ -7,10 +7,11 @@ import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
-import { openThreadsComposer } from '@/lib/threads-publish'
+import { isHamiOnline, requestHamiPublish } from '@/lib/threads-publish'
 import { EditToolbar } from './edit-toolbar'
 import { ImportModal } from './import-modal'
 import { ModelPicker } from './model-picker'
+import { PublishModal } from './publish-modal'
 import { TemplateModal } from './template-modal'
 
 type Tab = 'original' | 'rewrite' | 'publish'
@@ -116,7 +117,7 @@ export function EditClient({
     return true
   }
 
-  async function publishNow() {
+  async function publishViaExtension() {
     if (!selected) {
       setMessage('설정에서 올릴 스레드 아이디를 먼저 연결하세요.')
       return
@@ -125,8 +126,21 @@ export function EditClient({
       setMessage('올릴 글이 없습니다.')
       return
     }
+    if (!isHamiOnline()) {
+      setMessage('발행하려면 하미 확장이 필요해요. chrome://extensions에서 켠 뒤 이 창을 다시 열어 주세요.')
+      return
+    }
     setSaving(true)
     setMessage('')
+    const published = await requestHamiPublish({
+      text: caption,
+      username: selected.username,
+    })
+    if (!published.ok) {
+      setSaving(false)
+      setMessage(published.error || '업로드에 실패했습니다.')
+      return
+    }
     const res = await fetch('/api/threads/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -137,15 +151,13 @@ export function EditClient({
       }),
     })
     const data = await res.json().catch(() => ({}))
+    setSaving(false)
     if (!res.ok) {
-      setSaving(false)
-      setMessage(data.error || '발행 준비에 실패했습니다.')
+      setMessage(data.error || '올렸지만 상태 저장에 실패했습니다.')
       return
     }
-    await openThreadsComposer(caption, selected.username)
-    setSaving(false)
     setPublishOpen(false)
-    setMessage(`@${selected.username} 스레드 작성창을 열었습니다. 올리면 바로 발행됩니다.`)
+    setMessage(`@${selected.username} 스레드에 올렸습니다.`)
     router.refresh()
   }
 
@@ -294,7 +306,10 @@ export function EditClient({
           </button>
           <button
             type="button"
-            onClick={() => void publishNow()}
+            onClick={() => {
+              setMessage('')
+              setPublishOpen(true)
+            }}
             disabled={saving}
             className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
           >
@@ -449,41 +464,14 @@ export function EditClient({
       </div>
 
       {publishOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#141418] p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-white">발행하기</h2>
-              <button type="button" onClick={() => setPublishOpen(false)} className="text-white/40">
-                ✕
-              </button>
-            </div>
-            <div className="mb-4 rounded-xl bg-white/5 p-3">
-              <p className="text-sm font-semibold text-white">@{selected?.username ?? '계정 미선택'}</p>
-              <p className="text-xs text-white/45">이 계정에 올라가요</p>
-            </div>
-            <div className="space-y-2">
-              <button
-                type="button"
-                disabled={saving || !selected}
-                onClick={() => void publishNow()}
-                className="w-full rounded-xl border border-brand/40 bg-brand/15 px-4 py-3 text-left disabled:opacity-50"
-              >
-                <p className="text-sm font-semibold text-white">지금 스레드에 올리기</p>
-                <p className="text-xs text-white/40">
-                  작성창을 열고, 로그인된 스레드 계정으로 바로 올립니다.
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={downloadZip}
-                className="w-full rounded-xl border border-white/10 px-4 py-3 text-left"
-              >
-                <p className="text-sm font-semibold text-white">압축파일로 다운로드</p>
-                <p className="text-xs text-white/40">글·원문 링크를 저장한 뒤 직접 게시하세요.</p>
-              </button>
-            </div>
-          </div>
-        </div>
+        <PublishModal
+          account={selected}
+          saving={saving}
+          message={message}
+          onClose={() => setPublishOpen(false)}
+          onExtensionUpload={() => void publishViaExtension()}
+          onDownload={downloadZip}
+        />
       )}
 
       {scheduleOpen && (
