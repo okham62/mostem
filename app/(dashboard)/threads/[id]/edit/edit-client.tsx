@@ -6,8 +6,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
+import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
 import { EditToolbar } from './edit-toolbar'
 import { ImportModal } from './import-modal'
+import { ModelPicker } from './model-picker'
 import { TemplateModal } from './template-modal'
 
 type Tab = 'original' | 'rewrite' | 'publish'
@@ -57,6 +59,8 @@ export function EditClient({
   const [customMedia, setCustomMedia] = useState<MediaPreview[]>([])
   const [templateOpen, setTemplateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [modelId, setModelId] = useState(DEFAULT_AI_MODEL.id)
+  const [webSearch, setWebSearch] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
@@ -123,6 +127,8 @@ export function EditClient({
         guide: selectedGuide?.content || '',
         guideName: selectedGuide?.name || '',
         persona: selected?.intro || selected?.username,
+        model: modelId,
+        webSearch,
       }),
     })
     const data = await res.json().catch(() => ({}))
@@ -361,21 +367,33 @@ export function EditClient({
               rows={14}
               className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm text-white outline-none focus:border-brand"
             />
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-3 space-y-2">
               <input
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
-                placeholder="(선택) 어떻게 바꿀까요? 첫 문장 더 세게..."
-                className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none"
+                placeholder="(선택) 어떻게 바꿀까요? — 첫 문장 더 세게, 원문 줄바꿈 그대로... 안 써도 생성돼요"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none"
               />
-              <button
-                type="button"
-                disabled={saving}
-                onClick={generate}
-                className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
-              >
-                생성
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <ModelPicker value={modelId} onChange={setModelId} />
+                <button
+                  type="button"
+                  onClick={() => setWebSearch((value) => !value)}
+                  className={`rounded-lg px-2.5 py-1.5 text-[11px] ${
+                    webSearch ? 'bg-brand/20 text-brand' : 'bg-white/8 text-white/55 hover:text-white'
+                  }`}
+                >
+                  웹검색
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={generate}
+                  className="ml-auto rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {saving ? '생성 중' : '생성'}
+                </button>
+              </div>
             </div>
             {message && <p className="mt-2 text-xs text-gold">{message}</p>}
           </section>
