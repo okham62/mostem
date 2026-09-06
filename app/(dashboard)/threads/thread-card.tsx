@@ -5,17 +5,14 @@ import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
 import { MediaDownloadButtons } from './media-download-buttons'
-import { ReuploadButton } from './reupload-button'
 import { ThreadMedia } from './thread-media'
-import type { CollectedPost, ConnectedAccount } from '@/types'
+import type { CollectedPost } from '@/types'
 
 export function ThreadCard({
   post,
-  accounts = [],
   onRemoved,
 }: {
   post: CollectedPost
-  accounts?: ConnectedAccount[]
   onRemoved?: (id: string) => void
 }) {
   const collected = post.collected_at ? new Date(post.collected_at) : null
@@ -135,7 +132,6 @@ export function ThreadCard({
               원본
             </a>
           )}
-          {post.status === 'uploaded' && <ReuploadButton post={post} accounts={accounts} />}
           <Link
             href={`/threads/${post.id}/edit?tab=rewrite`}
             className="rounded-lg bg-brand px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand/90"
