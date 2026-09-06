@@ -183,34 +183,35 @@ function Sparkline({
 }) {
   const gid = useId().replace(/:/g, '')
   const [hover, setHover] = useState<{ x: number; y: number; value: number } | null>(null)
+  const series: number[] = points ?? []
 
-  if (!points || points.length < 2) {
+  if (series.length < 2) {
     return <div className="mt-4 h-12 w-full rounded-md bg-white/[0.04]" />
   }
 
-  const min = Math.min(...points)
-  const max = Math.max(...points)
+  const min = Math.min(...series)
+  const max = Math.max(...series)
   const span = max - min || 1
   const w = 200
   const h = 48
   const toY = (value: number) => h - ((value - min) / span) * (h - 6) - 3
-  const path = points
+  const path = series
     .map((value, index) => {
-      const x = (index / (points.length - 1)) * w
+      const x = (index / (series.length - 1)) * w
       return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${toY(value).toFixed(1)}`
     })
     .join(' ')
-  const up = points[points.length - 1] >= points[0]
+  const up = series[series.length - 1] >= series[0]
   const color = up ? 'var(--change-up)' : 'var(--change-down)'
 
   function onMove(event: PointerEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-    const pos = ratio * (points.length - 1)
+    const pos = ratio * (series.length - 1)
     const left = Math.floor(pos)
-    const right = Math.min(points.length - 1, left + 1)
+    const right = Math.min(series.length - 1, left + 1)
     const t = pos - left
-    const value = points[left] * (1 - t) + points[right] * t
+    const value = (series[left] ?? 0) * (1 - t) + (series[right] ?? 0) * t
     setHover({ x: ratio * w, y: toY(value), value })
   }
 

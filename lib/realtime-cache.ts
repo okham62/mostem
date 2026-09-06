@@ -1,5 +1,7 @@
 import {
+  applyBrowserGoogle,
   applyBrowserNaver,
+  fetchBrowserGoogle,
   fetchBrowserNaver,
   limitKeywordsPayload,
   stabilizeKeywordsPayload,
@@ -54,9 +56,11 @@ export function warmRealtimeCache() {
   if (typeof window === 'undefined' || warming) return
   warming = true
   void Promise.all([
-    fetchBrowserNaver().then((local) => {
-      if (!local) return
-      writeRealtimeCache(applyBrowserNaver(peekRealtimeCache(), local))
+    Promise.all([fetchBrowserNaver(), fetchBrowserGoogle()]).then(([naver, google]) => {
+      let next = peekRealtimeCache()
+      if (naver) next = applyBrowserNaver(next, naver)
+      if (google) next = applyBrowserGoogle(next, google)
+      if (next) writeRealtimeCache(next)
     }),
     fetchRealtime('fast').then(() => fetchRealtime('full')),
   ])

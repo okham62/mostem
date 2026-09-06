@@ -243,6 +243,73 @@ export function applyBrowserNaver(
   )
 }
 
+export async function fetchBrowserGoogle() {
+  if (typeof window === 'undefined') return null
+  const rssUrl = GOOGLE_RSS_URLS[0]
+  const urls = [
+    rssUrl,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
+    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
+  ]
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' })
+      if (!res.ok) continue
+      const text = await res.text()
+      const fromRss = parseGoogleRss(text).slice(0, KEYWORD_LIMIT)
+      if (fromRss.length) return { now: Date.now(), keywords: fromRss }
+      const json = JSON.parse(text) as { items?: Array<{ title?: string }> }
+      const fromJson = (json.items ?? [])
+        .map((item, index) => {
+          const keyword = item.title?.trim()
+          if (!keyword) return null
+          return toKeyword(keyword, {
+            rank: index + 1,
+            summaryUrl: googleTrends(keyword),
+            searchUrl: googleSearch(keyword),
+          })
+        })
+        .filter((item): item is RealtimeKeyword => item != null)
+        .slice(0, KEYWORD_LIMIT)
+      if (fromJson.length) return { now: Date.now(), keywords: fromJson }
+    } catch {
+      /* try next */
+    }
+  }
+  return null
+}
+
+export function applyBrowserGoogle(
+  data: KeywordsPayload | null,
+  google: { now: number; keywords: RealtimeKeyword[] }
+): KeywordsPayload {
+  const naver = data?.sources?.find((source) => source.id === 'signal')
+  return stabilizeKeywordsPayload(
+    {
+      now: google.now,
+      keywords: naver?.keywords ?? data?.keywords ?? [],
+      news: data?.news ?? [],
+      sources: [
+        naver ?? {
+          id: 'signal',
+          label: '네이버',
+          hint: '실시간 검색어',
+          now: data?.now ?? google.now,
+          keywords: [],
+        },
+        {
+          id: 'google',
+          label: '구글',
+          hint: '한국 급상승 검색어',
+          now: google.now,
+          keywords: google.keywords.slice(0, KEYWORD_LIMIT),
+        },
+      ],
+    },
+    data
+  )
+}
+
 export function stabilizeKeywordsPayload(
   incoming: KeywordsPayload,
   previous?: KeywordsPayload | null

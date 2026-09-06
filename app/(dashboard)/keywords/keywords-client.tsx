@@ -3,13 +3,16 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
+  applyBrowserGoogle,
   applyBrowserNaver,
+  fetchBrowserGoogle,
   fetchBrowserNaver,
   formatKeywordTime,
   formatKeywordTimeShort,
   formatSearchTraffic,
   KEYWORD_LIMIT,
   KEYWORD_RANK_LABEL,
+  stabilizeKeywordsPayload,
   type KeywordSource,
   type KeywordState,
   type KeywordsPayload,
@@ -59,14 +62,22 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
   const naver = sources.find(s => s.id === 'signal')
   const google = sources.find(s => s.id === 'google')
 
-  async function pullNaver() {
-    const local = await fetchBrowserNaver()
-    if (!local) return
-    setData((prev) => {
-      const merged = applyBrowserNaver(prev ?? peekRealtimeCache(), local)
-      writeRealtimeCache(merged)
-      return merged
-    })
+  function applyLocal(
+    prev: KeywordsPayload | null,
+    naver: { now: number; keywords: RealtimeKeyword[] } | null,
+    google: { now: number; keywords: RealtimeKeyword[] } | null
+  ) {
+    let next = prev ?? peekRealtimeCache()
+    if (naver) next = applyBrowserNaver(next, naver)
+    if (google) next = applyBrowserGoogle(next, google)
+    if (next) writeRealtimeCache(next)
+    return next
+  }
+
+  async function pullLocal() {
+    const [naver, google] = await Promise.all([fetchBrowserNaver(), fetchBrowserGoogle()])
+    if (!naver && !google) return
+    setData((prev) => applyLocal(prev, naver, google) ?? prev)
   }
 
   async function reload(scope: 'fast' | 'full' = 'full') {
@@ -74,14 +85,15 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
     reloading = true
     setRefreshing(true)
     try {
-      const [next, local] = await Promise.all([
+      const [next, naver, google] = await Promise.all([
         fetchRealtime(scope).catch(() => peekRealtimeCache()),
         fetchBrowserNaver(),
+        fetchBrowserGoogle(),
       ])
       setData((prev) => {
         const base = next ?? prev ?? peekRealtimeCache()
-        if (!base) return prev
-        const merged = local ? applyBrowserNaver(base, local) : base
+        const merged = applyLocal(base, naver, google)
+        if (!merged) return prev
         const kept = stabilizeKeywordsPayload(merged, prev ?? peekRealtimeCache())
         writeRealtimeCache(kept)
         return kept
@@ -98,7 +110,7 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
   }, [])
 
   useEffect(() => {
-    void pullNaver()
+    void pullLocal()
     const boot = async () => {
       if (peekRealtimeCache()) {
         void reload('full')
@@ -203,7 +215,7 @@ function KeywordPanel({
       </div>
       {keywords.length === 0 ? (
         <div className="py-10 text-center text-sm text-white/40">
-          {source?.error || '불러오는 중...'}
+          {source?.error ? empty : '불러오는 중...'}
         </div>
       ) : (
         <KeywordColumn items={keywords} source={source?.label || ''} />
