@@ -97,7 +97,6 @@ const PRODUCT_RE =
 let cache: { at: number; key: string; data: TrendsPayload; partial?: boolean } | null = null
 let inflight: Promise<TrendsPayload> | null = null
 let inflightKey: string | null = null
-let filling: Promise<void> | null = null
 const detailCache = new Map<string, { at: number; data: TrendDetail }>()
 const detailInflight = new Map<string, Promise<TrendDetail>>()
 const itemCache = new Map<string, TrendKeyword>()
@@ -244,6 +243,16 @@ function hdCategories(rows: { id: number; name: string }[] | undefined): ShopCat
   return [{ id: 'all', label: '전체 분야', cid: null }, ...cats]
 }
 
+export function emptyTrends(): TrendsPayload {
+  return {
+    now: Date.now(),
+    latestDate: seoulYmd(),
+    categories: SHOP_CATEGORIES,
+    items: [],
+    stats: { total: 0, fresh: 0, rising: 0 },
+  }
+}
+
 export function itemsForTab(items: TrendKeyword[], tab: TrendTab) {
   if (tab === 'popular') {
     return [...items].sort((a, b) => b.searchTotal - a.searchTotal || b.growth - a.growth)
@@ -283,31 +292,15 @@ export async function getShoppingTrends(
   opts?: { fast?: boolean }
 ): Promise<TrendsPayload> {
   const cacheKey = 'base'
-  const fresh = cache && cache.key === cacheKey && Date.now() - cache.at < CACHE_MS && !cache.partial
-  if (cache?.data && (fresh || opts?.fast)) {
-    if (!fresh && !inflight && !filling) {
-      inflightKey = cacheKey
-      inflight = refreshTrends().finally(() => {
-        inflight = null
-        inflightKey = null
-      })
-    }
-    return cache.data
-  }
-  if (cache?.data) {
-    if (!inflight && !filling) {
-      inflightKey = cacheKey
-      inflight = refreshTrends().finally(() => {
-        inflight = null
-        inflightKey = null
-      })
-    }
-    return cache.data
+  const fast = opts?.fast !== false
+  if (cache?.data && cache.key === cacheKey) {
+    const fresh = Date.now() - cache.at < CACHE_MS && !cache.partial
+    if (fast || fresh) return cache.data
   }
   if (inflight && inflightKey === cacheKey) return inflight
 
   inflightKey = cacheKey
-  inflight = refreshTrends().finally(() => {
+  inflight = refreshTrends(fast).finally(() => {
     inflight = null
     inflightKey = null
   })
@@ -334,31 +327,24 @@ function mergeHdPages(pages: HdPayload[]): TrendsPayload {
   )
 }
 
-async function refreshTrends(): Promise<TrendsPayload> {
-  const restPromise = Promise.all(
-    [2, 3, 4].map((page) => fetchHypeDuck(page).catch(() => ({ rows: [] as HdRow[] })))
-  )
-  const first = await fetchHypeDuck(1).catch(() => ({ rows: [] as HdRow[] }))
-  if (!first.rows?.length) {
-    if (cache?.data) return cache.data
-    throw new Error('hypeduck empty')
+async function refreshTrends(fast: boolean): Promise<TrendsPayload> {
+  try {
+    const first = await fetchHypeDuck(1).catch(() => ({ rows: [] as HdRow[] }))
+    if (!first.rows?.length) return cache?.data ?? emptyTrends()
+
+    const data = mergeHdPages([first])
+    cache = { at: Date.now(), key: 'base', data, partial: true }
+    if (fast) return data
+
+    const rest = await Promise.all(
+      [2, 3, 4].map((page) => fetchHypeDuck(page).catch(() => ({ rows: [] as HdRow[] })))
+    )
+    const next = rest.some((page) => page.rows?.length) ? mergeHdPages([first, ...rest]) : data
+    cache = { at: Date.now(), key: 'base', data: next, partial: false }
+    return next
+  } catch {
+    return cache?.data ?? emptyTrends()
   }
-  const data = mergeHdPages([first])
-  cache = { at: Date.now(), key: 'base', data, partial: true }
-
-  filling = restPromise
-    .then((rest) => {
-      const next = rest.some((page) => page.rows?.length) ? mergeHdPages([first, ...rest]) : data
-      cache = { at: Date.now(), key: 'base', data: next, partial: false }
-    })
-    .catch(() => {
-      if (cache) cache.partial = false
-    })
-    .finally(() => {
-      filling = null
-    })
-
-  return data
 }
 
 type HdDetail = {

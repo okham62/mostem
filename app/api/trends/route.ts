@@ -3,8 +3,7 @@ import { getShoppingTrends } from '@/lib/trends'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 15
-export const preferredRegion = ['icn1', 'hnd1']
+export const maxDuration = 20
 
 export async function GET(req: Request) {
   const session = await auth()

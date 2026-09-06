@@ -29,7 +29,7 @@ import {
   type TrendsPayload,
   type TrendTab,
 } from '@/lib/trends'
-import { fetchTrends, peekTrendCache } from '@/lib/trend-cache'
+import { fetchTrends, peekTrendCache, writeTrendCache } from '@/lib/trend-cache'
 import { cn } from '@/lib/utils'
 import { logWork } from '@/lib/client-log'
 
@@ -59,8 +59,12 @@ const COMPARES: { id: CompareWeeks; label: string }[] = [
   { id: 4, label: '4주 전과 비교' },
 ]
 
-export function TrendsClient({ initial = null }: { initial?: TrendsPayload | null }) {
-  const [data, setData] = useState<TrendsPayload | null>(() => initial ?? peekTrendCache())
+export function TrendsClient({ initial }: { initial: TrendsPayload }) {
+  const [data, setData] = useState<TrendsPayload>(() => {
+    const cached = peekTrendCache()
+    if (cached?.items.length && cached.items.length >= (initial.items?.length ?? 0)) return cached
+    return initial
+  })
   const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab] = useState<TrendTab>('rising')
   const [category, setCategory] = useState('all')
@@ -75,7 +79,7 @@ export function TrendsClient({ initial = null }: { initial?: TrendsPayload | nul
   async function reload(silent = false, fast = false) {
     if (reloading.current && !fast) return
     if (!fast) reloading.current = true
-    if (!silent && !data?.items?.length) setRefreshing(true)
+    if (!silent && !data.items.length) setRefreshing(true)
     try {
       const nextData = await fetchTrends(fast)
       if (nextData?.items?.length) setData(nextData)
@@ -89,12 +93,13 @@ export function TrendsClient({ initial = null }: { initial?: TrendsPayload | nul
 
   useEffect(() => {
     const cached = peekTrendCache()
-    if (cached?.items.length && (!initial || cached.items.length >= (initial.items?.length ?? 0))) {
+    if (cached?.items.length && cached.items.length >= (initial.items?.length ?? 0)) {
       setData(cached)
-    } else if (initial?.items.length) {
+    } else if (initial.items.length) {
+      writeTrendCache(initial)
       setData(initial)
     }
-    const hasList = Boolean(cached?.items.length || initial?.items.length)
+    const hasList = Boolean(cached?.items.length || initial.items.length)
     void reload(hasList, true).then(() => {
       void reload(true, false)
     })
@@ -110,7 +115,6 @@ export function TrendsClient({ initial = null }: { initial?: TrendsPayload | nul
   }, [])
 
   const filtered = useMemo(() => {
-    if (!data) return []
     let rows = itemsForTab(data.items, tab)
     if (category !== 'all') {
       const label = data.categories.find((item) => item.id === category)?.label
@@ -148,16 +152,12 @@ export function TrendsClient({ initial = null }: { initial?: TrendsPayload | nul
             <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
             새로고침
           </button>
-          {data ? (
-            <>
-              <p className="mt-2 text-[11px] text-white/35">
-                키워드 {data.stats.total}개 · 급상승 {data.stats.rising}개 · 신규 {data.stats.fresh}개
-              </p>
-              <p className="mt-2 text-[11px] text-white/30">
-                데이터 기준 {data.latestDate || formatTrendDate(data.now)} · 5분마다 자동 확인
-              </p>
-            </>
-          ) : null}
+          <p className="mt-2 text-[11px] text-white/35">
+            키워드 {data.stats.total}개 · 급상승 {data.stats.rising}개 · 신규 {data.stats.fresh}개
+          </p>
+          <p className="mt-2 text-[11px] text-white/30">
+            데이터 기준 {data.latestDate || formatTrendDate(data.now)} · 5분마다 자동 확인
+          </p>
         </div>
       </div>
 
@@ -240,7 +240,7 @@ export function TrendsClient({ initial = null }: { initial?: TrendsPayload | nul
         <div className="mt-2 divide-y divide-white/5">
           {filtered.length === 0 ? (
             <div className="py-16 text-center text-sm text-white/35">
-              {!data?.items?.length ? '키워드를 불러오는 중' : '조건에 맞는 키워드가 없습니다.'}
+              {!data.items.length ? '키워드를 불러오는 중' : '조건에 맞는 키워드가 없습니다.'}
             </div>
           ) : (
             filtered.map((item, index) => (
