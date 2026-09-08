@@ -8,7 +8,7 @@ export type PublishMediaItem = {
   filename: string
 }
 
-export function threadsIntentUrl(_text?: string) {
+export function threadsIntentUrl() {
   // Do not put caption in the query string — Threads mangles emoji there into �.
   return 'https://www.threads.net/intent/post'
 }
@@ -61,7 +61,7 @@ export function requestHamiPublish(input: {
   }
 
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const intentUrl = threadsIntentUrl(input.text)
+  const intentUrl = threadsIntentUrl()
   const media = input.media?.filter((item) => item.url) ?? []
   const timeoutMs = media.length ? 180_000 : 45_000
 

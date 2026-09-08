@@ -55,7 +55,8 @@ export async function PATCH(
     .eq('user_id', session.user.id)
 
   if (error && /scheduled_at/i.test(error.message)) {
-    const { scheduled_at: _ignored, ...withoutSchedule } = update
+    const withoutSchedule = { ...update }
+    delete withoutSchedule.scheduled_at
     const retry = await supabase
       .from('collected_posts')
       .update(withoutSchedule)
