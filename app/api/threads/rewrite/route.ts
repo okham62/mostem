@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { logActivity } from '@/lib/log'
 import { claudeKey, findAiModel, parseDrafts, rewritePrompt } from '@/lib/ai-models'
-import { generateWithGemini } from '@/lib/gemini'
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -22,15 +21,7 @@ export async function POST(req: Request) {
   })
 
   try {
-    const drafts =
-      chosen.provider === 'gemini'
-        ? await generateWithGemini({
-            model: chosen.id,
-            prompt,
-            fallbackCaption: caption,
-            webSearch: Boolean(webSearch),
-          })
-        : await generateWithClaude(prompt, caption)
+    const drafts = await generateWithClaude(prompt, caption)
 
     void logActivity(
       session.user.id,

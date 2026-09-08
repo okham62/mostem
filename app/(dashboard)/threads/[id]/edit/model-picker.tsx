@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Search, Sparkles } from 'lucide-react'
-import { AI_MODELS, DEFAULT_AI_MODEL, type AiModelOption } from '@/lib/ai-models'
+import { Check, ChevronDown, Search } from 'lucide-react'
+import { AI_MODELS, DEFAULT_AI_MODEL } from '@/lib/ai-models'
 import { cn } from '@/lib/utils'
 
 export function ModelPicker({
@@ -39,7 +39,7 @@ export function ModelPicker({
         onClick={() => setOpen((value) => !value)}
         className="inline-flex h-9 max-w-[220px] items-center gap-1.5 rounded-lg bg-white/8 px-2.5 text-[11px] text-white/75 hover:bg-white/12"
       >
-        <ModelIcon provider={selected.provider} />
+        <ModelIcon />
         <span className="truncate">
           {selected.label}
           {selected.isDefault ? ' (기본)' : ''}
@@ -54,7 +54,7 @@ export function ModelPicker({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="모델 검색 — 예: gpt, claude, gemini..."
+              placeholder="모델 검색 — 예: claude..."
               className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/30"
             />
           </label>
@@ -77,7 +77,7 @@ export function ModelPicker({
                     item.id === selected.id && 'bg-white/[0.04]'
                   )}
                 >
-                  <ModelIcon provider={item.provider} />
+                  <ModelIcon />
                   <span className="min-w-0 flex-1 truncate text-xs text-white">{item.label}</span>
                   <span className="shrink-0 text-[10px] text-white/40">{item.credits}크레딧</span>
                   {item.id === selected.id ? <Check className="h-3.5 w-3.5 text-white" /> : null}
@@ -91,17 +91,10 @@ export function ModelPicker({
   )
 }
 
-function ModelIcon({ provider }: { provider: AiModelOption['provider'] }) {
-  if (provider === 'claude') {
-    return (
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/20 text-[10px] text-orange-300">
-        ✱
-      </span>
-    )
-  }
+function ModelIcon() {
   return (
-    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/20 text-sky-300">
-      <Sparkles className="h-3 w-3" />
+    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/20 text-[10px] text-orange-300">
+      ✱
     </span>
   )
 }

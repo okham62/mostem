@@ -1,4 +1,4 @@
-export type AiProvider = 'gemini' | 'claude'
+export type AiProvider = 'claude'
 
 export type AiModelOption = {
   id: string
@@ -11,33 +11,12 @@ export type AiModelOption = {
 
 export const AI_MODELS: AiModelOption[] = [
   {
-    id: 'gemini-3.5-flash-lite',
-    label: 'Gemini 3.5 Flash Lite',
-    provider: 'gemini',
-    credits: 2,
-    recommended: true,
-    isDefault: true,
-  },
-  {
-    id: 'gemini-3.6-flash',
-    label: 'Gemini 3.6 Flash',
-    provider: 'gemini',
-    credits: 4,
-    recommended: true,
-  },
-  {
-    id: 'gemini-3.1-flash-lite',
-    label: 'Gemini 3.1 Flash Lite',
-    provider: 'gemini',
-    credits: 2,
-    recommended: true,
-  },
-  {
     id: 'claude-haiku-4-5-20251001',
     label: 'Claude Haiku 4.5',
     provider: 'claude',
     credits: 3,
     recommended: true,
+    isDefault: true,
   },
 ]
 
@@ -94,11 +73,6 @@ export function parseDrafts(text: string, fallback: string) {
     }
   }
   return [raw || fallback, '', '']
-}
-
-export function geminiKey() {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || ''
-  return key && !key.includes('your_') ? key : ''
 }
 
 export function claudeKey() {
