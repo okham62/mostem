@@ -381,7 +381,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('영상·사진을 같이 올리려면 하미를 0.2.10으로 다시 받고 chrome://extensions에서 새로고침해 주세요.')
+      setMessage('바로 업로드하려면 하미 0.2.11이 필요합니다. chrome://extensions에서 하미를 새로고침해 주세요.')
       return
     }
     const publishItems: Array<{
@@ -410,10 +410,10 @@ export function EditClient({
     setSaving(true)
     setMessage(
       publishItems.some((item) => item.type === 'video')
-        ? '영상·사진을 첨부해 올리는 중... (영상이 길면 1~2분 걸릴 수 있어요)'
+        ? 'Threads 작성창을 여는 중입니다. 영상은 작성창에서 자동 첨부됩니다.'
         : publishItems.length
-          ? '사진을 첨부해 올리는 중...'
-          : ''
+          ? 'Threads 작성창을 여는 중입니다. 사진은 자동 첨부됩니다.'
+          : 'Threads 작성창을 여는 중입니다.'
     )
     const published = await requestHamiPublish({
       text: caption,
