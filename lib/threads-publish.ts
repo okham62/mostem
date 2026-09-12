@@ -1,4 +1,4 @@
-export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.21'
+export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.22'
 
 export type PublishMediaItem = {
   url: string
@@ -34,7 +34,7 @@ export function hamiSupportsMediaPublish() {
   return patch >= needPatch
 }
 
-export function publishMediaUrl(url: string) {
+export function publishMediaUrl(url: string, kind?: 'image' | 'video') {
   if (!url) return ''
   if (url.startsWith('blob:') || url.startsWith('data:')) return url
   if (url.startsWith('/')) {
@@ -42,7 +42,8 @@ export function publishMediaUrl(url: string) {
     return `${window.location.origin}${url}`
   }
   if (typeof window === 'undefined') return url
-  return `${window.location.origin}/api/media/proxy?url=${encodeURIComponent(url)}`
+  const base = `${window.location.origin}/api/media/proxy?url=${encodeURIComponent(url)}`
+  return kind === 'video' ? `${base}&kind=video` : base
 }
 
 export function requestHamiPublish(input: {

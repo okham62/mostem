@@ -45,7 +45,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'host not allowed' }, { status: 400 })
   }
 
-  const isVideo = VIDEO_RE.test(parsed.pathname) || VIDEO_RE.test(parsed.search)
+  const kind = new URL(req.url).searchParams.get('kind')
+  const isVideo =
+    kind === 'video' ||
+    VIDEO_RE.test(parsed.pathname) ||
+    VIDEO_RE.test(parsed.search) ||
+    /\/o1\/v\//i.test(parsed.pathname) ||
+    /\/v\/t\d+\//i.test(parsed.pathname)
   const range = req.headers.get('range')
   const upstream = await fetch(parsed.toString(), {
     headers: {
