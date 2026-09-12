@@ -381,7 +381,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('정확한 업로드 확인을 사용하려면 하미 0.2.18이 필요합니다. chrome://extensions에서 하미를 새로고침해 주세요.')
+      setMessage('깨진 영상 없이 올리려면 하미 0.2.19가 필요합니다. chrome://extensions에서 하미를 새로고침해 주세요.')
       return
     }
     const publishItems: Array<{
