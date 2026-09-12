@@ -381,7 +381,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('하미 0.2.23이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 Threads 탭을 모두 닫고 다시 열어 주세요.')
+      setMessage('하미 0.2.24이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 Threads 탭을 모두 닫고 다시 열어 주세요.')
       return
     }
     const publishItems: Array<{
@@ -407,13 +407,16 @@ export function EditClient({
             : `image-${publishItems.length + 1}.jpg`,
       })
     }
-    // Threads web often fails when a still frame is attached next to the video.
+    // Prefer video first; still send photos from the same post when present.
     const videos = publishItems.filter((item) => item.type === 'video')
-    const mediaForPublish = videos.length ? videos : publishItems
+    const images = publishItems.filter((item) => item.type === 'image')
+    const mediaForPublish = videos.length ? [...videos, ...images] : publishItems
     setSaving(true)
     setMessage(
       mediaForPublish.some((item) => item.type === 'video')
-        ? 'Threads 작성창을 여는 중입니다. 영상만 자동 첨부합니다.'
+        ? mediaForPublish.some((item) => item.type === 'image')
+          ? 'Threads 작성창을 여는 중입니다. 영상·사진을 자동 첨부합니다.'
+          : 'Threads 작성창을 여는 중입니다. 영상만 자동 첨부합니다.'
         : mediaForPublish.length
           ? 'Threads 작성창을 여는 중입니다. 사진은 자동 첨부됩니다.'
           : 'Threads 작성창을 여는 중입니다.'
