@@ -1,4 +1,4 @@
-export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.26'
+export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.27'
 
 export type PublishMediaItem = {
   url: string
