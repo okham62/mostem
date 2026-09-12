@@ -381,7 +381,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('안정적인 영상 업로드를 사용하려면 하미 0.2.16이 필요합니다. chrome://extensions에서 하미를 새로고침해 주세요.')
+      setMessage('호환 영상 업로드를 사용하려면 하미 0.2.17이 필요합니다. chrome://extensions에서 하미를 새로고침해 주세요.')
       return
     }
     const publishItems: Array<{
