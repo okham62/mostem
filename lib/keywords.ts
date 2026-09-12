@@ -88,6 +88,7 @@ type SignalPayload = {
 
 let cache: { at: number; data: KeywordsPayload } | null = null
 let inflight: Promise<KeywordsPayload> | null = null
+let fullInflight: Promise<KeywordsPayload> | null = null
 
 function mapState(value: string | undefined): KeywordState {
   if (!value) return 'same'
@@ -206,6 +207,7 @@ export async function fetchBrowserNaver() {
     const res = await fetch(SIGNAL_URL, {
       cache: 'no-store',
       headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(3000),
     })
     if (!res.ok) return null
     const raw = (await res.json()) as SignalPayload
@@ -255,10 +257,14 @@ export async function fetchBrowserGoogle() {
     `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
     `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
   ]
-  for (const url of urls) {
+
+  async function fetchOne(url: string) {
     try {
-      const res = await fetch(url, { cache: 'no-store' })
-      if (!res.ok) continue
+      const res = await fetch(url, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(3500),
+      })
+      if (!res.ok) throw new Error('google browser source failed')
       const text = await res.text()
       const fromRss = parseGoogleRss(text).slice(0, KEYWORD_LIMIT)
       if (fromRss.length) return { now: Date.now(), keywords: fromRss }
@@ -276,11 +282,17 @@ export async function fetchBrowserGoogle() {
         .filter((item): item is RealtimeKeyword => item != null)
         .slice(0, KEYWORD_LIMIT)
       if (fromJson.length) return { now: Date.now(), keywords: fromJson }
+      throw new Error('google browser source empty')
     } catch {
-      /* try next */
+      throw new Error('google browser source failed')
     }
   }
-  return null
+
+  try {
+    return await Promise.any(urls.map(fetchOne))
+  } catch {
+    return null
+  }
 }
 
 export function applyBrowserGoogle(
@@ -739,8 +751,18 @@ async function fetchGoogleHtml() {
 let lastGoogle: { now: number; keywords: RealtimeKeyword[] } | null = null
 
 async function fetchGoogle(): Promise<{ now: number; keywords: RealtimeKeyword[] }> {
-  const [rssKeywords, htmlKeywords] = await Promise.all([fetchGoogleRss(), fetchGoogleHtml()])
-  const keywords = mergeKeywords([htmlKeywords, rssKeywords, lastGoogle?.keywords ?? []])
+  const attempts = [fetchGoogleRss(), fetchGoogleHtml()].map(async (request) => {
+    const keywords = await request
+    if (!keywords.length) throw new Error('google source empty')
+    return keywords
+  })
+  let fresh: RealtimeKeyword[] = []
+  try {
+    fresh = await Promise.any(attempts)
+  } catch {
+    /* use the most recent successful ranking below */
+  }
+  const keywords = mergeKeywords([fresh, lastGoogle?.keywords ?? []])
   if (keywords.length === 0) {
     if (lastGoogle?.keywords.length) return lastGoogle
     throw new Error('google empty')
@@ -837,6 +859,14 @@ async function refreshKeywords(mode: 'fast' | 'full' = 'full'): Promise<Keywords
 }
 
 export async function getRealtimeKeywords(mode: 'fast' | 'full' | 'news' = 'full'): Promise<KeywordsPayload> {
+  if (mode === 'full') {
+    if (fullInflight) return fullInflight
+    fullInflight = refreshKeywords('full').finally(() => {
+      fullInflight = null
+    })
+    return fullInflight
+  }
+
   const age = cache ? Date.now() - cache.at : Infinity
   if (mode === 'news') {
     if (cache && age < FRESH_MS) return cache.data
@@ -856,16 +886,9 @@ export async function getRealtimeKeywords(mode: 'fast' | 'full' | 'news' = 'full
   }
 
   if (cache && age < FRESH_MS) return cache.data
-  if (cache && age < STALE_MS) {
-    if (!inflight) {
-      inflight = refreshKeywords(mode === 'fast' ? 'fast' : 'full').finally(() => {
-        inflight = null
-      })
-    }
-    return cache.data
-  }
+  if (cache && age < STALE_MS) return cache.data
   if (inflight) return inflight
-  inflight = refreshKeywords(mode === 'fast' ? 'fast' : 'full').finally(() => {
+  inflight = refreshKeywords('fast').finally(() => {
     inflight = null
   })
   return inflight

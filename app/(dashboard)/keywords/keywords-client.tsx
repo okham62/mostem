@@ -3,10 +3,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
-  applyBrowserGoogle,
-  applyBrowserNaver,
-  fetchBrowserGoogle,
-  fetchBrowserNaver,
   formatKeywordTime,
   formatKeywordTimeShort,
   formatSearchTraffic,
@@ -62,63 +58,33 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
   const naver = sources.find(s => s.id === 'signal')
   const google = sources.find(s => s.id === 'google')
 
-  function applyLocal(
-    prev: KeywordsPayload | null,
-    naver: { now: number; keywords: RealtimeKeyword[] } | null,
-    google: { now: number; keywords: RealtimeKeyword[] } | null
-  ) {
-    let next = prev ?? peekRealtimeCache()
-    if (naver) next = applyBrowserNaver(next, naver)
-    if (google) next = applyBrowserGoogle(next, google)
-    if (next) writeRealtimeCache(next)
-    return next
-  }
-
-  async function pullLocal() {
-    const [naver, google] = await Promise.all([fetchBrowserNaver(), fetchBrowserGoogle()])
-    if (!naver && !google) return
-    setData((prev) => applyLocal(prev, naver, google) ?? prev)
-  }
-
-  async function reload(scope: 'fast' | 'full' = 'full') {
+  async function reload(scope: 'fast' | 'full' = 'full', showIndicator = false) {
     if (reloading) return
     reloading = true
-    setRefreshing(true)
+    if (showIndicator) setRefreshing(true)
     try {
-      const [next, naver, google] = await Promise.all([
-        fetchRealtime(scope).catch(() => peekRealtimeCache()),
-        fetchBrowserNaver(),
-        fetchBrowserGoogle(),
-      ])
+      const next = await fetchRealtime(scope).catch(() => peekRealtimeCache())
       setData((prev) => {
         const base = next ?? prev ?? peekRealtimeCache()
-        const merged = applyLocal(base, naver, google)
-        if (!merged) return prev
-        const kept = stabilizeKeywordsPayload(merged, prev ?? peekRealtimeCache())
+        if (!base) return prev
+        const kept = stabilizeKeywordsPayload(base, prev ?? peekRealtimeCache())
         writeRealtimeCache(kept)
         return kept
       })
     } finally {
       reloading = false
-      setRefreshing(false)
+      if (showIndicator) setRefreshing(false)
     }
   }
 
   useLayoutEffect(() => {
+    if (initial) return
     const cached = peekRealtimeCache()
     if (cached) setData(cached)
-  }, [])
+  }, [initial])
 
   useEffect(() => {
-    void pullLocal()
-    const boot = async () => {
-      if (peekRealtimeCache()) {
-        void reload('full')
-        return
-      }
-      await reload('fast')
-    }
-    void boot()
+    void reload('full')
     const tick = () => {
       if (document.visibilityState === 'visible') void reload('full')
     }
@@ -151,7 +117,7 @@ export function KeywordsClient({ initial }: { initial?: KeywordsPayload | null }
         </div>
         <button
           type="button"
-          onClick={() => void reload('full')}
+          onClick={() => void reload('full', true)}
           className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-white/5 px-3 text-xs text-white/70 hover:bg-white/10"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
