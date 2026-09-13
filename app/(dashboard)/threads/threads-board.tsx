@@ -299,24 +299,34 @@ export function ThreadsBoard({
           </Link>
         </div>
         {accounts.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2">
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="inline-flex w-fit max-w-[220px] items-center gap-2 rounded-xl border border-white/8 bg-gradient-to-r from-[#1b1b22] via-[#16161c] to-brand/20 px-2.5 py-1.5"
+                className="mostem-account-banner flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 sm:px-4"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
-                  {account.username[0]?.toUpperCase() ?? 'U'}
+                <div className="relative shrink-0">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-sm font-bold text-white ring-1 ring-white/20 backdrop-blur-sm">
+                    {account.username[0]?.toUpperCase() ?? 'U'}
+                  </div>
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0b1220] bg-emerald-400"
+                    aria-hidden
+                  />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">@{account.username}</p>
-                  <p className="truncate text-[11px] text-white/40">{account.display_name || '스레드 계정'}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold tracking-tight text-white drop-shadow-sm">
+                    @{account.username}
+                  </p>
+                  <p className="truncate text-[11px] text-white/70">
+                    {account.display_name || '스레드 계정'} · 확장 연동됨 · 발행가능
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="w-fit rounded-xl border border-dashed border-white/10 px-3 py-2 text-xs text-white/40">
+          <div className="w-full rounded-2xl border border-dashed border-white/10 px-4 py-3 text-xs text-white/40">
             연결된 스레드 계정이 없습니다. 계정 재연결에서 아이디를 추가하세요.
           </div>
         )}

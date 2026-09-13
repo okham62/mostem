@@ -798,3 +798,108 @@ html[data-theme='light'] .bg-brand .text-white {
     0 1px 0 #4c2fd4,
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+
+/* Connected-account banner: flowing aurora like HypeDuck */
+.mostem-account-banner {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(105deg, rgba(8, 18, 28, 0.72), rgba(12, 10, 24, 0.55) 42%, rgba(18, 12, 32, 0.7)),
+    linear-gradient(
+      120deg,
+      #0b3d4a 0%,
+      #164e63 18%,
+      #312e81 38%,
+      #6b21a8 55%,
+      #9d174d 72%,
+      #0e7490 88%,
+      #0b3d4a 100%
+    );
+  background-size:
+    100% 100%,
+    280% 280%;
+  animation: mostem-account-aurora 9s ease-in-out infinite;
+}
+
+.mostem-account-banner::before {
+  content: '';
+  position: absolute;
+  inset: -40% -20%;
+  z-index: 0;
+  background: radial-gradient(circle at 30% 40%, rgba(56, 189, 248, 0.35), transparent 42%),
+    radial-gradient(circle at 70% 50%, rgba(168, 85, 247, 0.32), transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(244, 114, 182, 0.18), transparent 40%);
+  animation: mostem-account-bloom 7s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.mostem-account-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.08) 48%,
+    transparent 68%
+  );
+  transform: translateX(-120%);
+  animation: mostem-account-sheen 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.mostem-account-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes mostem-account-aurora {
+  0% {
+    background-position:
+      0 0,
+      0% 50%;
+  }
+  50% {
+    background-position:
+      0 0,
+      100% 50%;
+  }
+  100% {
+    background-position:
+      0 0,
+      0% 50%;
+  }
+}
+
+@keyframes mostem-account-bloom {
+  0% {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(5%, 3%, 0) scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes mostem-account-sheen {
+  0%,
+  28% {
+    transform: translateX(-120%);
+  }
+  58%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mostem-account-banner,
+  .mostem-account-banner::before,
+  .mostem-account-banner::after {
+    animation: none !important;
+  }
+}
