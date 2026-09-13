@@ -1,8 +1,9 @@
 import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { logActivity } from '@/lib/log'
-import { claudeKey, findAiModel, parseDrafts, rewritePrompt } from '@/lib/ai-models'
+import { findAiModel, rewritePrompt } from '@/lib/ai-models'
+import { generateDrafts } from '@/lib/ai-generate'
+import { scrubSecrets } from '@/lib/ai-keys'
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
   })
 
   try {
-    const drafts = await generateWithClaude(prompt, caption)
+    const { drafts } = await generateDrafts({ prompt, fallback: caption, modelId: chosen.id })
 
     void logActivity(
       session.user.id,
@@ -40,24 +41,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ drafts, model: chosen.id })
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '생성에 실패했습니다.' },
+      { error: scrubSecrets(error instanceof Error ? error.message : '생성에 실패했습니다.') },
       { status: 502 }
     )
   }
-}
-
-async function generateWithClaude(prompt: string, fallback: string) {
-  const apiKey = claudeKey()
-  if (!apiKey) {
-    throw new Error('Claude API 키가 없습니다. ANTHROPIC_API_KEY를 넣어 주세요.')
-  }
-  const anthropic = new Anthropic({ apiKey })
-  const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1200,
-    messages: [{ role: 'user', content: prompt }],
-  })
-  const content = message.content[0]
-  if (content.type !== 'text') throw new Error('생성 실패')
-  return parseDrafts(content.text, fallback)
 }

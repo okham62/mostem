@@ -1,4 +1,4 @@
-export type AiProvider = 'claude'
+export type AiProvider = 'claude' | 'gemini'
 
 export type AiModelOption = {
   id: string
@@ -17,6 +17,20 @@ export const AI_MODELS: AiModelOption[] = [
     credits: 3,
     recommended: true,
     isDefault: true,
+  },
+  {
+    id: 'gemini-3.6-flash',
+    label: 'Gemini 3.6 Flash',
+    provider: 'gemini',
+    credits: 2,
+    recommended: true,
+  },
+  {
+    id: 'gemini-3.8-flash',
+    label: 'Gemini 3.8 Flash',
+    provider: 'gemini',
+    credits: 3,
+    recommended: true,
   },
 ]
 
@@ -73,9 +87,4 @@ export function parseDrafts(text: string, fallback: string) {
     }
   }
   return [raw || fallback, '', '']
-}
-
-export function claudeKey() {
-  const key = process.env.ANTHROPIC_API_KEY || ''
-  return key && !key.includes('your_') ? key : ''
 }

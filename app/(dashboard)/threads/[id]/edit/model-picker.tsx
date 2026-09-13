@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Search } from 'lucide-react'
-import { AI_MODELS, DEFAULT_AI_MODEL } from '@/lib/ai-models'
+import { AI_MODELS, DEFAULT_AI_MODEL, type AiModelOption } from '@/lib/ai-models'
 import { cn } from '@/lib/utils'
 
 export function ModelPicker({
@@ -14,15 +14,15 @@ export function ModelPicker({
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [models, setModels] = useState<AiModelOption[]>(AI_MODELS)
   const root = useRef<HTMLDivElement>(null)
-  const selected = AI_MODELS.find((item) => item.id === value) ?? DEFAULT_AI_MODEL
+  const selected = models.find((item) => item.id === value) ?? DEFAULT_AI_MODEL
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = q
-      ? AI_MODELS.filter((item) => `${item.label} ${item.id}`.toLowerCase().includes(q))
-      : AI_MODELS.filter((item) => item.recommended)
-    return list
-  }, [query])
+    return q
+      ? models.filter((item) => `${item.label} ${item.id}`.toLowerCase().includes(q))
+      : models.filter((item) => item.recommended)
+  }, [models, query])
 
   useEffect(() => {
     function onDoc(event: MouseEvent) {
@@ -32,6 +32,24 @@ export function ModelPicker({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
 
+  // The server only lists models whose provider key is configured, so an operator
+  // can never pick a model that will fail on generate.
+  useEffect(() => {
+    let alive = true
+    fetch('/api/ai-models', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { models?: AiModelOption[] } | null) => {
+        if (!alive || !data?.models?.length) return
+        setModels(data.models)
+      })
+      .catch(() => {
+        /* keep the built-in list */
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   return (
     <div ref={root} className="relative">
       <button
@@ -39,7 +57,7 @@ export function ModelPicker({
         onClick={() => setOpen((value) => !value)}
         className="inline-flex h-9 max-w-[220px] items-center gap-1.5 rounded-lg bg-white/8 px-2.5 text-[11px] text-white/75 hover:bg-white/12"
       >
-        <ModelIcon />
+        <ModelIcon provider={selected.provider} />
         <span className="truncate">
           {selected.label}
           {selected.isDefault ? ' (기본)' : ''}
@@ -54,7 +72,7 @@ export function ModelPicker({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="모델 검색 — 예: claude..."
+              placeholder="모델 검색 — 예: claude, gemini..."
               className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/30"
             />
           </label>
@@ -77,7 +95,7 @@ export function ModelPicker({
                     item.id === selected.id && 'bg-white/[0.04]'
                   )}
                 >
-                  <ModelIcon />
+                  <ModelIcon provider={item.provider} />
                   <span className="min-w-0 flex-1 truncate text-xs text-white">{item.label}</span>
                   <span className="shrink-0 text-[10px] text-white/40">{item.credits}크레딧</span>
                   {item.id === selected.id ? <Check className="h-3.5 w-3.5 text-white" /> : null}
@@ -91,10 +109,16 @@ export function ModelPicker({
   )
 }
 
-function ModelIcon() {
+function ModelIcon({ provider }: { provider: AiModelOption['provider'] }) {
+  const gemini = provider === 'gemini'
   return (
-    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/20 text-[10px] text-orange-300">
-      ✱
+    <span
+      className={cn(
+        'flex h-5 w-5 items-center justify-center rounded-full text-[10px]',
+        gemini ? 'bg-sky-500/20 text-sky-300' : 'bg-orange-500/20 text-orange-300'
+      )}
+    >
+      {gemini ? '◆' : '✱'}
     </span>
   )
 }
