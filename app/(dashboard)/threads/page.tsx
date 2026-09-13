@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { attachScheduleTimes, readScheduleMap } from '@/lib/schedule-store'
 import { ThreadsBoard } from './threads-board'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 
@@ -7,7 +8,7 @@ export default async function ThreadsPage() {
   const session = await auth()
   const supabase = createAdminClient()
 
-  const [postsRes, accountsRes] = await Promise.all([
+  const [postsRes, accountsRes, scheduleMap] = await Promise.all([
     supabase
       .from('collected_posts')
       .select('*')
@@ -20,11 +21,17 @@ export default async function ThreadsPage() {
       .eq('user_id', session!.user.id)
       .eq('platform', 'threads')
       .order('created_at', { ascending: true }),
+    readScheduleMap(session!.user.id),
   ])
+
+  const posts = attachScheduleTimes(
+    (postsRes.data ?? []) as CollectedPost[],
+    scheduleMap,
+  )
 
   return (
     <ThreadsBoard
-      posts={(postsRes.data ?? []) as CollectedPost[]}
+      posts={posts}
       accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
     />
   )

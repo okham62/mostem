@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   BarChart3,
@@ -27,6 +27,7 @@ import {
   mediaSrc,
 } from '@/lib/collect-labels'
 import { imagePosterUrl, parseMediaItems } from '@/lib/collect-media'
+import { formatScheduleBadgeTime, hydrateScheduledPosts, resolveScheduledAt } from '@/lib/post-schedule'
 import { MediaDownloadButtons } from './media-download-buttons'
 import { ThreadCard } from './thread-card'
 import type { CollectedPost, CollectStatus, ConnectedAccount, PerformanceGrade } from '@/types'
@@ -107,6 +108,46 @@ export function ThreadsBoard({
   const [posts, setPosts] = useState(initialPosts)
   const [hiddenIds, setHiddenIds] = useState<string[]>([])
   const [view, setView] = useState<ViewMode>('grid')
+  const backfilledRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    setPosts(hydrateScheduledPosts(initialPosts))
+  }, [initialPosts])
+
+  // Restore scheduled_at into DB when we only have localStorage (older collect wiped it).
+  useEffect(() => {
+    const missing = posts.filter((post) => {
+      if (post.status !== 'scheduled' || post.scheduled_at) return false
+      if (backfilledRef.current.has(post.id)) return false
+      return Boolean(resolveScheduledAt(post))
+    })
+    if (!missing.length) return
+    let cancelled = false
+    void (async () => {
+      for (const post of missing) {
+        const iso = resolveScheduledAt(post)
+        if (!iso || cancelled) continue
+        backfilledRef.current.add(post.id)
+        const res = await fetch(`/api/threads/posts/${post.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'scheduled', scheduled_at: iso }),
+        })
+        if (!res.ok || cancelled) continue
+        const data = await res.json().catch(() => ({}))
+        const saved =
+          typeof data?.post?.scheduled_at === 'string' ? data.post.scheduled_at : iso
+        if (!cancelled) {
+          setPosts((prev) =>
+            prev.map((row) => (row.id === post.id ? { ...row, scheduled_at: saved } : row)),
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [posts])
 
   useEffect(() => {
     const saved = window.localStorage.getItem('mostem-threads-view')
@@ -120,7 +161,11 @@ export function ThreadsBoard({
       if (!res.ok || !alive) return
       const data = await res.json()
       if (Array.isArray(data.posts) && alive) {
-        setPosts(data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)))
+        setPosts(
+          hydrateScheduledPosts(
+            data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)),
+          ),
+        )
       }
     }
     void pull()
@@ -185,7 +230,11 @@ export function ThreadsBoard({
       if (!res.ok) return
       const data = await res.json()
       if (Array.isArray(data.posts)) {
-        setPosts(data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)))
+        setPosts(
+          hydrateScheduledPosts(
+            data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)),
+          ),
+        )
       }
     } finally {
       setRefreshing(false)
@@ -357,7 +406,7 @@ export function ThreadsBoard({
           <p className="text-sm text-white/50">아직 수집된 스레드가 없습니다.</p>
         </div>
       ) : view === 'grid' ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((post) => (
             <ThreadCard key={post.id} post={post} onRemoved={onRemoved} onUpdated={onUpdated} />
           ))}
@@ -447,9 +496,21 @@ function ListView({
                 <td className="px-3 py-3 text-sm text-white">{formatCount(stats.likes)}</td>
                 <td className="px-3 py-3 text-sm text-white">{formatCount(stats.comments)}</td>
                 <td className="px-3 py-3">
-                  <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[post.status]}`}>
-                    {STATUS_LABEL[post.status]}
-                  </span>
+                  {(() => {
+                    const scheduleIso =
+                      post.status === 'scheduled' ? resolveScheduledAt(post) : null
+                    const scheduleTime = scheduleIso ? formatScheduleBadgeTime(scheduleIso) : ''
+                    return (
+                      <span
+                        className={`inline-flex items-baseline gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[post.status]}`}
+                      >
+                        {STATUS_LABEL[post.status]}
+                        {scheduleTime ? (
+                          <span className="text-[9px] font-medium opacity-75">{scheduleTime}</span>
+                        ) : null}
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td className="px-3 py-3">
                   <GradePill post={post} />

@@ -187,9 +187,11 @@ function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): Coll
     next.grade ??
     (typeof prev.grade === 'string' ? prev.grade : null) ??
     (multiplier != null ? gradeFromMultiplier(multiplier) : null)
-  const prevStatus = typeof prev.status === 'string' ? prev.status : 'collected'
+  // Existing rows keep their stored status: overwriting with 'collected' races with
+  // 예약발행 and drops the reservation (and its scheduled_at) on the next collect.
   return {
     ...next,
+    status: typeof prev.status === 'string' && prev.status ? prev.status : next.status,
     caption: keepText(next.caption, prev.caption as string | null),
     thumbnail_url: keepText(next.thumbnail_url, prev.thumbnail_url as string | null),
     media_url: pickMediaUrl(next.media_url, prev.media_url as string | null),
@@ -211,9 +213,8 @@ function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): Coll
     multiplier,
     grade,
     posted_at: next.posted_at ?? (typeof prev.posted_at === 'string' ? prev.posted_at : null),
-    status: prevStatus !== 'collected' ? prevStatus : next.status,
     collected_at: (prev.collected_at as string) ?? next.collected_at,
-  }
+  } as CollectRow
 }
 
 export async function POST(req: Request) {
@@ -259,11 +260,14 @@ export async function POST(req: Request) {
   let { error } = await supabase.from('collected_posts').upsert(merged, {
     onConflict: 'user_id,platform,post_id',
   })
-  if (error && /posted_at/i.test(error.message)) {
-    const withoutPosted = merged.map((row) =>
-      Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'posted_at'))
+  // Ignore unknown optional columns (older DBs) so metrics sync still works.
+  if (error && /scheduled_at|posted_at/i.test(error.message)) {
+    const stripped = merged.map((row) =>
+      Object.fromEntries(
+        Object.entries(row).filter(([key]) => key !== 'posted_at' && key !== 'scheduled_at'),
+      ),
     )
-    const retry = await supabase.from('collected_posts').upsert(withoutPosted, {
+    const retry = await supabase.from('collected_posts').upsert(stripped, {
       onConflict: 'user_id,platform,post_id',
     })
     error = retry.error

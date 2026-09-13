@@ -1,5 +1,10 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  attachScheduleTimes,
+  readScheduleMap,
+  setStoredScheduleAt,
+} from '@/lib/schedule-store'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -24,7 +29,13 @@ export async function GET(
     return NextResponse.json({ error: '게시물을 찾을 수 없습니다.' }, { status: 404 })
   }
 
-  return NextResponse.json({ post: data })
+  const map = await readScheduleMap(session.user.id)
+  const [post] = attachScheduleTimes([data], map)
+  return NextResponse.json({ post })
+}
+
+function missingScheduledAtColumn(message?: string) {
+  return Boolean(message && /scheduled_at/i.test(message))
 }
 
 export async function PATCH(
@@ -44,29 +55,65 @@ export async function PATCH(
   const update: Record<string, unknown> = {}
   if (typeof body.caption === 'string') update.caption = body.caption
   if (typeof body.status === 'string') update.status = body.status
-  if (typeof body.collected_by === 'string') update.collected_by = body.collected_by.replace(/^@/, '').toLowerCase()
+  if (typeof body.collected_by === 'string') {
+    update.collected_by = body.collected_by.replace(/^@/, '').toLowerCase()
+  }
+
+  const wantsSchedule =
+    body.scheduled_at === null || typeof body.scheduled_at === 'string'
   if (body.scheduled_at === null) update.scheduled_at = null
   else if (typeof body.scheduled_at === 'string') update.scheduled_at = body.scheduled_at
 
-  let { error } = await supabase
+  if (!Object.keys(update).length) {
+    return NextResponse.json({ error: '변경할 내용이 없습니다.' }, { status: 400 })
+  }
+
+  let { data, error } = await supabase
     .from('collected_posts')
     .update(update)
     .eq('id', id)
     .eq('user_id', session.user.id)
+    .select('*')
+    .single()
 
-  if (error && /scheduled_at/i.test(error.message)) {
-    const withoutSchedule = { ...update }
-    delete withoutSchedule.scheduled_at
+  // Production DB may not have scheduled_at yet — save status without it, keep time in storage.
+  if (error && missingScheduledAtColumn(error.message) && wantsSchedule) {
+    const fallback = { ...update }
+    delete fallback.scheduled_at
     const retry = await supabase
       .from('collected_posts')
-      .update(withoutSchedule)
+      .update(fallback)
       .eq('id', id)
       .eq('user_id', session.user.id)
+      .select('*')
+      .single()
+    data = retry.data
     error = retry.error
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  if (!data) return NextResponse.json({ error: '게시물을 찾을 수 없습니다.' }, { status: 404 })
+
+  if (wantsSchedule) {
+    const iso = typeof body.scheduled_at === 'string' ? body.scheduled_at : null
+    try {
+      await setStoredScheduleAt(session.user.id, id, iso)
+    } catch (storeError) {
+      return NextResponse.json(
+        {
+          error:
+            storeError instanceof Error
+              ? storeError.message
+              : '예약 시각 저장에 실패했습니다.',
+        },
+        { status: 500 },
+      )
+    }
+  }
+
+  const map = await readScheduleMap(session.user.id)
+  const [post] = attachScheduleTimes([data], map)
+  return NextResponse.json({ ok: true, post })
 }
 
 export async function DELETE(
@@ -86,5 +133,12 @@ export async function DELETE(
     .eq('user_id', session.user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  try {
+    await setStoredScheduleAt(session.user.id, params.id, null)
+  } catch {
+    // ignore storage cleanup failures
+  }
+
   return NextResponse.json({ ok: true })
 }

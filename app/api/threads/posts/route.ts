@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { attachScheduleTimes, readScheduleMap } from '@/lib/schedule-store'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -19,8 +20,12 @@ export async function GET() {
     .order('collected_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const map = await readScheduleMap(session.user.id)
+  const posts = attachScheduleTimes(data ?? [], map)
+
   return NextResponse.json(
-    { posts: data ?? [] },
+    { posts },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }

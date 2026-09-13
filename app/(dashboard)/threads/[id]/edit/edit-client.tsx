@@ -9,12 +9,21 @@ import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guid
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
 import { readEditDraft, writeEditDraft, type GenerateRun } from '@/lib/edit-drafts'
+import {
+  clearStoredSchedule,
+  formatScheduleNotice,
+  parseScheduleDate,
+  readStoredSchedule,
+  writeStoredSchedule,
+} from '@/lib/post-schedule'
 import { GenerateHistoryModal } from './generate-history-modal'
 import {
   hamiSupportsMediaPublish,
+  hamiSupportsNativeSchedule,
   isHamiOnline,
   publishMediaUrl,
   requestHamiPublish,
+  requestHamiSchedule,
 } from '@/lib/threads-publish'
 import { EditToolbar } from './edit-toolbar'
 import { ModelPicker } from './model-picker'
@@ -210,7 +219,13 @@ export function EditClient({
   const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
   const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const [scheduleAt, setScheduleAt] = useState(() => new Date(Date.now() + 10 * 60 * 1000))
+  const [scheduleAt, setScheduleAt] = useState(() => {
+    const saved = parseScheduleDate(post.scheduled_at)
+    return saved ?? new Date(Date.now() + 10 * 60 * 1000)
+  })
+  const [resolvedSchedule, setResolvedSchedule] = useState<Date | null>(() =>
+    parseScheduleDate(post.scheduled_at)
+  )
   const [postStatus, setPostStatus] = useState(post.status)
   const [history, setHistory] = useState<GenerateRun[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -293,6 +308,35 @@ export function EditClient({
   }, [post.id])
 
   useEffect(() => {
+    setPostStatus(post.status)
+    const fromPost = parseScheduleDate(post.scheduled_at)
+    if (fromPost) {
+      setScheduleAt(fromPost)
+      setResolvedSchedule(fromPost)
+      writeStoredSchedule(post.id, fromPost.toISOString())
+      return
+    }
+    if (post.status !== 'scheduled') {
+      setResolvedSchedule(null)
+      return
+    }
+    const fromStore = parseScheduleDate(readStoredSchedule(post.id))
+    if (fromStore) {
+      setScheduleAt(fromStore)
+      setResolvedSchedule(fromStore)
+      // Backfill DB when column was missing at schedule time.
+      void fetch(`/api/threads/posts/${post.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'scheduled',
+          scheduled_at: fromStore.toISOString(),
+        }),
+      })
+    }
+  }, [post.id, post.scheduled_at, post.status])
+
+  useEffect(() => {
     const onHide = () => {
       void flushEditSave(true)
     }
@@ -307,6 +351,11 @@ export function EditClient({
       void flushEditSave(true)
     }
   }, [post.id])
+
+  const scheduleNotice =
+    postStatus === 'scheduled' && resolvedSchedule
+      ? formatScheduleNotice(resolvedSchedule, selected?.username || post.collected_by)
+      : ''
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'original', label: '원문 뜯어보기' },
@@ -326,6 +375,12 @@ export function EditClient({
   ) {
     setSaving(true)
     setMessage('')
+    if (status === 'scheduled' && scheduledAt) {
+      writeStoredSchedule(post.id, scheduledAt)
+    }
+    if (status === 'ready' || status === 'editing') {
+      clearStoredSchedule(post.id)
+    }
     const body: Record<string, unknown> = {
       caption,
       status,
@@ -337,11 +392,24 @@ export function EditClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    const data = await res.json().catch(() => ({}))
     setSaving(false)
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
       setMessage(data.error || '저장에 실패했습니다.')
       return false
+    }
+    const savedAt =
+      typeof data?.post?.scheduled_at === 'string' ? data.post.scheduled_at : scheduledAt
+    if (status === 'scheduled' && savedAt) {
+      writeStoredSchedule(post.id, savedAt)
+      const when = parseScheduleDate(savedAt)
+      if (when) {
+        setResolvedSchedule(when)
+        setScheduleAt(when)
+      }
+    }
+    if (status === 'ready' || status === 'editing') {
+      setResolvedSchedule(null)
     }
     rememberDraft()
     setPostStatus(status)
@@ -352,11 +420,8 @@ export function EditClient({
   }
 
   async function cancelReservation() {
-    try {
-      window.localStorage.removeItem(`mostem-schedule:${post.id}`)
-    } catch {
-      // ignore
-    }
+    clearStoredSchedule(post.id)
+    setResolvedSchedule(null)
     const ok = await persist('ready', null)
     if (ok) {
       setMessage('예약을 취소했습니다. 발행대기 상태로 돌아갔습니다.')
@@ -381,7 +446,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('하미 0.2.28이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 Threads 탭을 모두 닫고 다시 열어 주세요.')
+      setMessage('하미 0.2.30이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 Threads 탭을 모두 닫고 다시 열어 주세요.')
       return
     }
     const publishItems: Array<{
@@ -452,6 +517,97 @@ export function EditClient({
     statusLockRef.current = true
     rememberDraft()
     router.refresh()
+  }
+
+  function collectPublishMedia() {
+    const items = [
+      ...sourceMedia.filter((item) => !hiddenSource.includes(item.url)),
+      ...extraMedia,
+    ]
+    const publishItems: Array<{
+      url: string
+      sourceUrl?: string
+      posterUrl?: string
+      type: 'image' | 'video'
+      filename: string
+    }> = []
+    const seen = new Set<string>()
+    for (const item of items) {
+      const raw = item.url
+      if (!raw || seen.has(raw)) continue
+      seen.add(raw)
+      publishItems.push({
+        url: publishMediaUrl(raw, item.type),
+        sourceUrl: raw.startsWith('http') ? raw : undefined,
+        posterUrl: item.poster ? publishMediaUrl(item.poster, 'image') : undefined,
+        type: item.type,
+        filename:
+          item.type === 'video'
+            ? `video-${publishItems.length + 1}.mp4`
+            : `image-${publishItems.length + 1}.jpg`,
+      })
+    }
+    const videos = publishItems.filter((item) => item.type === 'video')
+    const images = publishItems.filter((item) => item.type === 'image')
+    return videos.length ? [...videos, ...images] : publishItems
+  }
+
+  async function scheduleViaExtension(when: Date) {
+    if (!selected) {
+      setMessage('설정에서 올릴 스레드 아이디를 먼저 연결하세요.')
+      return false
+    }
+    if (!caption.trim()) {
+      setMessage('예약할 글이 없습니다.')
+      return false
+    }
+    if (!isHamiOnline()) {
+      setMessage('예약하려면 하미 확장이 필요해요. chrome://extensions에서 켠 뒤 이 창을 다시 열어 주세요.')
+      return false
+    }
+    if (!hamiSupportsNativeSchedule()) {
+      setMessage('하미 0.2.30이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
+      return false
+    }
+    const mediaForPublish = collectPublishMedia()
+    if (mediaForPublish.length && !hamiSupportsMediaPublish()) {
+      setMessage('하미 0.2.30이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
+      return false
+    }
+
+    // Save Mostem schedule first so the board always shows the time.
+    const iso = when.toISOString()
+    writeStoredSchedule(post.id, iso)
+    setResolvedSchedule(when)
+    setScheduleAt(when)
+    const saved = await persist('scheduled', iso)
+    if (!saved) return false
+
+    setSaving(true)
+    setMessage(
+      mediaForPublish.length
+        ? 'Threads에 예약을 등록하는 중입니다. 미디어를 올리는 중일 수 있어요.'
+        : 'Threads에 예약을 등록하는 중입니다.'
+    )
+    const scheduled = await requestHamiSchedule({
+      text: caption,
+      username: selected.username,
+      media: mediaForPublish,
+      scheduleAt: when,
+    })
+    setSaving(false)
+    if (!scheduled.ok) {
+      setMessage(
+        scheduled.error
+          ? `모스템에는 예약됐어요. Threads 등록 실패: ${scheduled.error}`
+          : '모스템에는 예약됐어요. Threads 등록에 실패했습니다.',
+      )
+      return true
+    }
+    setMessage('')
+    rememberDraft()
+    router.refresh()
+    return true
   }
 
   async function generate() {
@@ -845,7 +1001,10 @@ export function EditClient({
                 </button>
               </div>
             </div>
-            {message && <p className="mt-2 text-xs text-gold">{message}</p>}
+            {scheduleNotice ? <p className="mt-2 text-xs text-gold">{scheduleNotice}</p> : null}
+            {message && message !== scheduleNotice ? (
+              <p className="mt-2 text-xs text-gold">{message}</p>
+            ) : null}
           </section>
 
           <aside className="rounded-2xl border border-white/10 bg-[#141418] p-4">
@@ -890,17 +1049,8 @@ export function EditClient({
           initialAt={scheduleAt}
           onClose={() => setScheduleOpen(false)}
           onConfirm={async (when) => {
-            setScheduleAt(when)
-            const ok = await persist('scheduled', when.toISOString())
-            if (ok) {
-              try {
-                window.localStorage.setItem(`mostem-schedule:${post.id}`, when.toISOString())
-              } catch {
-                // ignore
-              }
-              setMessage(`${when.toLocaleString('ko-KR')}에 @${selected?.username} 계정으로 예약했습니다.`)
-              setScheduleOpen(false)
-            }
+            const ok = await scheduleViaExtension(when)
+            if (ok) setScheduleOpen(false)
           }}
         />
       )}

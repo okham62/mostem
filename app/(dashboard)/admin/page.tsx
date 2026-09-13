@@ -90,12 +90,9 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">회원 관리</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          가입 승인·삭제, 로그인·작업 기록, 수집·업로드·채널 상세는 관리자만 볼 수 있습니다.
-        </p>
-      </div>
+      <p className="text-sm text-[var(--muted)]">
+        가입 승인·삭제, 로그인·작업 기록, 수집·업로드·채널 상세는 관리자만 볼 수 있습니다.
+      </p>
 
       <div className="grid grid-cols-3 gap-4">
         <Card className="text-center">

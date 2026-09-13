@@ -4,6 +4,12 @@ import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
+import {
+  clearStoredSchedule,
+  formatScheduleBadgeTime,
+  formatScheduleCardDate,
+  resolveScheduledAt,
+} from '@/lib/post-schedule'
 import { MediaDownloadButtons } from './media-download-buttons'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
@@ -18,17 +24,13 @@ export function ThreadCard({
   onUpdated?: (post: CollectedPost) => void
 }) {
   const scheduled = post.status === 'scheduled'
-  const scheduleAt = post.scheduled_at ? new Date(post.scheduled_at) : null
+  const scheduleIso = resolveScheduledAt(post)
+  const scheduleTime = scheduled && scheduleIso ? formatScheduleBadgeTime(scheduleIso) : ''
+  const scheduleAt = scheduleIso ? new Date(scheduleIso) : null
   const collected = post.collected_at ? new Date(post.collected_at) : null
   const date =
     scheduled && scheduleAt && !Number.isNaN(scheduleAt.getTime())
-      ? scheduleAt.toLocaleString('ko-KR', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
+      ? formatScheduleCardDate(scheduleIso!)
       : collected
         ? collected.toISOString().slice(0, 10)
         : ''
@@ -41,6 +43,18 @@ export function ThreadCard({
       ? post.caption
       : '본문 없음'
   const initial = (post.author?.[0] ?? 'U').toUpperCase()
+  const captionNodes =
+    caption === '본문 없음'
+      ? caption
+      : splitCaption(caption).map((part, index) =>
+          isHashtag(part) ? (
+            <span key={`${part}-${index}`} className="text-[#1d9bf0]">
+              {part}
+            </span>
+          ) : (
+            <span key={`${part}-${index}`}>{part}</span>
+          ),
+        )
 
   function remove() {
     if (onRemoved) {
@@ -53,11 +67,7 @@ export function ThreadCard({
   async function cancelSchedule() {
     const next = { ...post, status: 'ready' as const, scheduled_at: null }
     onUpdated?.(next)
-    try {
-      window.localStorage.removeItem(`mostem-schedule:${post.id}`)
-    } catch {
-      // ignore
-    }
+    clearStoredSchedule(post.id)
     const res = await fetch(`/api/threads/posts/${post.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -69,22 +79,27 @@ export function ThreadCard({
   }
 
   return (
-    <article className="flex flex-col rounded-2xl border border-[var(--card-border)] bg-[#141418] p-4">
-      <div className="mb-3 flex items-start justify-between gap-2">
+    <article className="flex h-full flex-col rounded-2xl border border-[var(--card-border)] bg-[#141418] p-4">
+      <div className="mb-3 flex h-9 items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
             {initial}
           </div>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               <Link
                 href={`/threads/${post.id}/edit?tab=original`}
                 className="truncate text-sm font-semibold text-white hover:underline"
               >
                 @{post.author || 'unknown'}
               </Link>
-              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[post.status]}`}>
+              <span
+                className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[post.status]}`}
+              >
                 {STATUS_LABEL[post.status]}
+                {scheduleTime ? (
+                  <span className="text-[10px] font-semibold text-amber-50">{scheduleTime}</span>
+                ) : null}
               </span>
             </div>
             <p className="text-[11px] text-white/35">{date}</p>
@@ -110,25 +125,32 @@ export function ThreadCard({
         </div>
       </div>
 
-      <p className="mb-3 whitespace-pre-wrap text-[15px] leading-[1.45] text-[#f3f5f7]">
-        {caption === '본문 없음'
-          ? caption
-          : splitCaption(caption).map((part, index) =>
-              isHashtag(part) ? (
-                <span key={`${part}-${index}`} className="text-[#1d9bf0]">
-                  {part}
-                </span>
-              ) : (
-                <span key={`${part}-${index}`}>{part}</span>
-              )
-            )}
-      </p>
-
-      {mediaItems.length > 0 && (
-        <div className="mb-3">
-          <ThreadMedia items={mediaItems} />
+      <div className="group/caption relative mb-3 h-[44px]">
+        <p
+          className="whitespace-pre-wrap break-words text-[15px] leading-[1.45] text-[#f3f5f7]"
+          style={{
+            display: '-webkit-box',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 2,
+            overflow: 'hidden',
+          }}
+        >
+          {captionNodes}
+        </p>
+        <div className="invisible absolute -left-2 -top-2 z-30 w-[calc(100%+1rem)] max-h-[320px] overflow-y-auto rounded-xl border border-white/15 bg-[#1b1b21] p-3 text-[15px] leading-[1.45] text-[#f3f5f7] opacity-0 shadow-2xl transition-opacity duration-100 group-hover/caption:visible group-hover/caption:opacity-100">
+          <p className="whitespace-pre-wrap break-words">{captionNodes}</p>
         </div>
-      )}
+      </div>
+
+      <div className="mb-3 aspect-[8/5] w-full overflow-hidden rounded-2xl">
+        {mediaItems.length > 0 ? (
+          <ThreadMedia items={mediaItems} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center rounded-2xl border border-white/10 bg-[#101014] text-[11px] text-white/25">
+            미디어 없음
+          </div>
+        )}
+      </div>
 
       <div className="mostem-metrics mb-4 space-y-1.5">
         <div className="mostem-metrics-row" data-cols="6">
@@ -160,7 +182,7 @@ export function ThreadCard({
 
       <div className="mt-auto flex items-center justify-between gap-2">
         <p className="truncate text-[11px] text-white/40">
-          팔로워 {formatCount(post.followers)} 수집 {shortDate}
+          팔로워 {formatCount(post.followers)} · 수집 {shortDate}
         </p>
         <div className="flex shrink-0 items-center justify-end gap-1.5">
           {post.url && (

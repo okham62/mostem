@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { attachScheduleTimes, readScheduleMap } from '@/lib/schedule-store'
 import { fetchThreadsPostMedia, mergeRemoteMedia } from '@/lib/threads-remote-media'
 import { notFound } from 'next/navigation'
 import { EditClient } from './edit-client'
@@ -16,7 +17,7 @@ export default async function ThreadEditPage({
   const { id } = params
   const supabase = createAdminClient()
 
-  const [postRes, accountsRes] = await Promise.all([
+  const [postRes, accountsRes, scheduleMap] = await Promise.all([
     supabase
       .from('collected_posts')
       .select('*')
@@ -29,11 +30,12 @@ export default async function ThreadEditPage({
       .eq('user_id', session!.user.id)
       .eq('platform', 'threads')
       .order('created_at', { ascending: true }),
+    readScheduleMap(session!.user.id),
   ])
 
   if (!postRes.data) notFound()
 
-  let post = postRes.data as CollectedPost
+  let post = attachScheduleTimes([postRes.data as CollectedPost], scheduleMap)[0]
   if (post.url) {
     const remote = await fetchThreadsPostMedia(post.url).catch(() => [])
     const merged = mergeRemoteMedia(post, remote)

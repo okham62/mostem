@@ -93,6 +93,10 @@ function NavGroup({
                 href={item.href}
                 onClick={() => {
                   previewHideMarketTicker(item.href === '/markets')
+                  if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
+                  if (item.href === '/shopping') warmShoppingCache()
+                  if (item.href === '/markets') warmMarketCharts()
+                  if (item.href === '/trends') warmTrendCache()
                 }}
                 onMouseEnter={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()

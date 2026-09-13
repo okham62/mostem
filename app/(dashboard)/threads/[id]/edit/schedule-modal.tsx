@@ -318,15 +318,15 @@ export function ScheduleModal({
         <div className="mb-3 rounded-xl border border-white/10 bg-black/30 p-3">
           <p className="flex items-center gap-2 text-sm font-semibold text-white">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Threads 공식 API로 예약
+            Threads가 시각에 발행
           </p>
           <p className="mt-1 text-xs text-white/40">
-            공식 API가 예약 시각에 발행해요. 브라우저나 노드를 켜둘 필요가 없어요.
+            예약 확정 시 Threads에 등록되고, 그 시각에 Threads가 발행해요. PC를 켜둘 필요가 없어요.
           </p>
         </div>
 
         <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          확장이 응답하지 않으면 크롬 확장 관리에서 하미를 새로고침한 뒤 다시 시도해 주세요.
+          예약 확정 순간만 하미 + Threads 로그인이 필요해요. 확장이 응답하지 않으면 하미를 새로고침한 뒤 다시 시도해 주세요.
         </div>
 
         <button
@@ -335,7 +335,7 @@ export function ScheduleModal({
           onClick={() => void onConfirm(clampFuture(when))}
           className="w-full rounded-xl bg-gold py-3 text-sm font-bold text-black transition-transform duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
         >
-          🗓️ (확장프로그램 방식) 이 시각에 예약하기
+          🗓️ 이 시각에 예약하기
         </button>
         {!account && (
           <p className="mt-2 text-xs text-gold">설정에서 업로드할 스레드 아이디를 먼저 연결하세요.</p>

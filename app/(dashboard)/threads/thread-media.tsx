@@ -301,17 +301,15 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
   return (
     <>
       {shown.length === 1 ? (
-        <div className="w-full overflow-hidden rounded-2xl">
-          <div className="aspect-[4/5]">
-            <MediaTile item={shown[0]} extraCount={hidden || undefined} onOpen={() => openTile(shown[0])} />
-          </div>
+        <div className="h-full w-full overflow-hidden rounded-2xl">
+          <MediaTile item={shown[0]} extraCount={hidden || undefined} onOpen={() => openTile(shown[0])} />
         </div>
       ) : (
-        <div className="grid w-full grid-cols-2 gap-1.5">
-          <div className="aspect-[4/5] overflow-hidden rounded-2xl">
+        <div className="grid h-full w-full grid-cols-2 gap-1.5">
+          <div className="h-full overflow-hidden rounded-2xl">
             <MediaTile item={shown[0]} onOpen={() => openTile(shown[0])} />
           </div>
-          <div className="aspect-[4/5] overflow-hidden rounded-2xl">
+          <div className="h-full overflow-hidden rounded-2xl">
             <MediaTile item={shown[1]} extraCount={hidden || undefined} onOpen={() => openTile(shown[1])} />
           </div>
         </div>
