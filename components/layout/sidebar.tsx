@@ -91,12 +91,21 @@ function NavGroup({
             <li key={item.href}>
               <Link
                 href={item.href}
-                onClick={() => {
+                onClick={(event) => {
                   previewHideMarketTicker(item.href === '/markets')
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
                   if (item.href === '/shopping') warmShoppingCache()
                   if (item.href === '/markets') warmMarketCharts()
                   if (item.href === '/trends') warmTrendCache()
+                  // Leaving a stuck /threads/[id] 404 (or soft-nav glitch) needs a full load.
+                  if (
+                    item.href === '/threads' &&
+                    pathname.startsWith('/threads/') &&
+                    pathname !== '/threads'
+                  ) {
+                    event.preventDefault()
+                    window.location.assign('/threads')
+                  }
                 }}
                 onMouseEnter={() => {
                   if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()

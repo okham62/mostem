@@ -2,7 +2,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { attachScheduleTimes, readScheduleMap } from '@/lib/schedule-store'
 import { fetchThreadsPostMedia, mergeRemoteMedia } from '@/lib/threads-remote-media'
-import { notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { EditClient } from './edit-client'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 
@@ -14,6 +14,8 @@ export default async function ThreadEditPage({
   searchParams: { tab?: string }
 }) {
   const session = await auth()
+  if (!session?.user?.id) redirect('/login')
+
   const { id } = params
   const supabase = createAdminClient()
 
@@ -22,18 +24,20 @@ export default async function ThreadEditPage({
       .from('collected_posts')
       .select('*')
       .eq('id', id)
-      .eq('user_id', session!.user.id)
-      .single(),
+      .eq('user_id', session.user.id)
+      .maybeSingle(),
     supabase
       .from('connected_accounts')
       .select('*')
-      .eq('user_id', session!.user.id)
+      .eq('user_id', session.user.id)
       .eq('platform', 'threads')
       .order('created_at', { ascending: true }),
-    readScheduleMap(session!.user.id),
+    readScheduleMap(session.user.id),
   ])
 
-  if (!postRes.data) notFound()
+  // Missing/deleted posts used to call notFound() and leave the dashboard on a 404
+  // that soft-nav from the sidebar sometimes failed to leave. Bounce to the list.
+  if (!postRes.data) redirect('/threads')
 
   let post = attachScheduleTimes([postRes.data as CollectedPost], scheduleMap)[0]
   if (post.url) {
@@ -44,7 +48,7 @@ export default async function ThreadEditPage({
         .from('collected_posts')
         .update({ media_url: merged.serialized })
         .eq('id', post.id)
-        .eq('user_id', session!.user.id)
+        .eq('user_id', session.user.id)
       post = { ...post, media_url: merged.serialized }
     }
   }
@@ -59,7 +63,7 @@ export default async function ThreadEditPage({
       post={post}
       accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
       initialTab={tab}
-      isAdmin={session?.user?.role === 'admin'}
+      isAdmin={session.user.role === 'admin'}
     />
   )
 }
