@@ -216,6 +216,7 @@ export function EditClient({
   const [webSearch, setWebSearch] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [scheduleToast, setScheduleToast] = useState('')
   const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
   const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
   const [scheduleOpen, setScheduleOpen] = useState(false)
@@ -424,7 +425,9 @@ export function EditClient({
     setResolvedSchedule(null)
     const ok = await persist('ready', null)
     if (ok) {
-      setMessage('예약을 취소했습니다. 발행대기 상태로 돌아갔습니다.')
+      setMessage(
+        '모스템 예약을 취소했습니다. Threads 임시 저장본에 남은 예약은 Threads에서 직접 취소해 주세요.',
+      )
     }
   }
 
@@ -575,19 +578,13 @@ export function EditClient({
       return false
     }
 
-    // Save Mostem schedule first so the board always shows the time.
-    const iso = when.toISOString()
-    writeStoredSchedule(post.id, iso)
-    setResolvedSchedule(when)
-    setScheduleAt(when)
-    const saved = await persist('scheduled', iso)
-    if (!saved) return false
-
+    // HypeDuck path: register on Threads first. Only then mark Mostem scheduled.
+    // Phone push ("예약된 스레드가 게시되었습니다") comes from Threads itself at fire time.
     setSaving(true)
     setMessage(
       mediaForPublish.length
         ? 'Threads에 예약을 등록하는 중입니다. 미디어를 올리는 중일 수 있어요.'
-        : 'Threads에 예약을 등록하는 중입니다.'
+        : 'Threads에 예약을 등록하는 중입니다.',
     )
     const scheduled = await requestHamiSchedule({
       text: caption,
@@ -595,16 +592,34 @@ export function EditClient({
       media: mediaForPublish,
       scheduleAt: when,
     })
-    setSaving(false)
     if (!scheduled.ok) {
+      setSaving(false)
       setMessage(
         scheduled.error
-          ? `모스템에는 예약됐어요. Threads 등록 실패: ${scheduled.error}`
-          : '모스템에는 예약됐어요. Threads 등록에 실패했습니다.',
+          ? `Threads 예약 등록 실패: ${scheduled.error}`
+          : 'Threads 예약 등록에 실패했습니다. 하미·Threads 로그인을 확인한 뒤 다시 시도해 주세요.',
       )
-      return true
+      return false
     }
+
+    const iso = when.toISOString()
+    writeStoredSchedule(post.id, iso)
+    setResolvedSchedule(when)
+    setScheduleAt(when)
+    const saved = await persist('scheduled', iso)
+    setSaving(false)
+    if (!saved) {
+      setMessage(
+        'Threads에는 예약됐지만 모스템 저장에 실패했습니다. Threads 임시 저장본에서 확인해 주세요.',
+      )
+      return false
+    }
+
     setMessage('')
+    setScheduleToast(
+      `성공! @${selected.username} threads에 예약됐어요 — 컴퓨터를 꺼둬도 그 시각에 올라가요`,
+    )
+    window.setTimeout(() => setScheduleToast(''), 6500)
     rememberDraft()
     router.refresh()
     return true
@@ -753,6 +768,33 @@ export function EditClient({
 
   return (
     <div className="-m-3 min-h-full bg-[#0b0b0d] md:-m-4">
+      {scheduleToast ? (
+        <div className="pointer-events-none fixed inset-x-0 top-4 z-[220] flex justify-center px-4">
+          <div className="pointer-events-auto flex max-w-lg items-center gap-3 rounded-2xl border border-emerald-400/30 bg-[#12251a] px-4 py-3 text-sm text-emerald-50 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
+            <span className="min-w-0 flex-1">{scheduleToast}</span>
+            <a
+              href={
+                selected?.username
+                  ? `https://www.threads.com/@${selected.username}?hl=ko`
+                  : 'https://www.threads.com/?hl=ko'
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/15"
+            >
+              Threads에서 확인
+            </a>
+            <button
+              type="button"
+              onClick={() => setScheduleToast('')}
+              className="shrink-0 text-white/45 hover:text-white"
+              aria-label="닫기"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">

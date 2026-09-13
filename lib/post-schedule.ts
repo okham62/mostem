@@ -48,9 +48,15 @@ export function resolveScheduledAt(post: {
 
 export function formatScheduleNotice(when: Date, username?: string | null) {
   const handle = username?.replace(/^@/, '')
+  const stamp = when.toLocaleString('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
   return handle
-    ? `${when.toLocaleString('ko-KR')}에 @${handle} 계정으로 예약했습니다.`
-    : `${when.toLocaleString('ko-KR')}에 예약했습니다.`
+    ? `${stamp}에 @${handle} Threads 공식 예약으로 등록됨 · PC 꺼둬도 그 시각에 올라가요`
+    : `${stamp}에 Threads 공식 예약으로 등록됨 · PC 꺼둬도 그 시각에 올라가요`
 }
 
 export function formatScheduleCardDate(iso: string) {
