@@ -5,11 +5,11 @@ import { createPortal } from 'react-dom'
 import type { ConnectedAccount } from '@/types'
 
 const QUICK = [
-  [10, '10분 뒤'],
-  [30, '30분 뒤'],
-  [60, '1시간 뒤'],
-  [120, '2시간 뒤'],
-  [180, '3시간 뒤'],
+  [10, '10분'],
+  [30, '30분'],
+  [60, '1시간'],
+  [120, '2시간'],
+  [180, '3시간'],
 ] as const
 
 const HOUR_PRESETS = [
@@ -84,30 +84,29 @@ function Stepper({
   onStep: (delta: number) => void
 }) {
   return (
-    <div className="flex min-w-[88px] flex-col items-center">
+    <div className="flex min-w-[64px] flex-col items-center">
       <button
         type="button"
         onClick={() => onStep(1)}
-        className="flex h-9 w-full items-center justify-center rounded-xl text-white/45 transition-all duration-150 hover:-translate-y-0.5 hover:bg-white/8 hover:text-white active:scale-95"
+        className="flex h-6 w-full items-center justify-center rounded-lg text-[10px] text-white/45 hover:bg-white/8 hover:text-white"
         aria-label={`${label} 올리기`}
       >
         ▲
       </button>
       <p
         key={`${label}-${value}`}
-        className="animate-schedule-tick py-0.5 text-[42px] font-bold leading-none tabular-nums tracking-tight text-white"
+        className="animate-schedule-tick text-[28px] font-bold leading-none tabular-nums text-white"
       >
         {pad(value)}
       </p>
       <button
         type="button"
         onClick={() => onStep(-1)}
-        className="flex h-9 w-full items-center justify-center rounded-xl text-white/45 transition-all duration-150 hover:translate-y-0.5 hover:bg-white/8 hover:text-white active:scale-95"
+        className="flex h-6 w-full items-center justify-center rounded-lg text-[10px] text-white/45 hover:bg-white/8 hover:text-white"
         aria-label={`${label} 내리기`}
       >
         ▼
       </button>
-      <p className="mt-1 text-[11px] text-white/35">{label}</p>
     </div>
   )
 }
@@ -180,48 +179,49 @@ export function ScheduleModal({
     const hours = Math.floor(mins / 60)
     const rest = mins % 60
     if (hours < 24) return rest ? `${hours}시간 ${rest}분 뒤` : `${hours}시간 뒤`
-    const dayCount = Math.floor(hours / 24)
-    return `${dayCount}일 뒤`
+    return `${Math.floor(hours / 24)}일 뒤`
   })()
 
   if (!mounted) return null
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[2px] animate-schedule-backdrop-in"
-      onClick={onClose}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-3 backdrop-blur-[2px] animate-schedule-backdrop-in"
+      onClick={() => {
+        if (!working) onClose()
+      }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="schedule-title"
-        className="max-h-[min(92vh,820px)] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#141418] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55)] animate-schedule-card-in scrollbar-thin"
+        className="flex max-h-[min(96vh,720px)] w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141418] p-3.5 shadow-[0_24px_80px_rgba(0,0,0,0.55)] animate-schedule-card-in"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="schedule-title" className="text-lg font-bold text-white">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 id="schedule-title" className="text-[15px] font-bold text-white">
             예약 발행
           </h2>
-          <button type="button" onClick={onClose} className="rounded-lg px-1 text-white/40 hover:text-white">
+          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-white/5 px-2 py-1">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold">
+              {(account?.username?.[0] ?? '나').toUpperCase()}
+            </div>
+            <p className="truncate text-[11px] text-white/70">@{account?.username ?? '미선택'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={working}
+            className="rounded-lg px-1 text-white/40 hover:text-white disabled:opacity-40"
+          >
             ✕
           </button>
         </div>
 
-        <div className="mb-4 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold">
-            {(account?.username?.[0] ?? '나').toUpperCase()}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">@{account?.username ?? '계정 미선택'}</p>
-            <p className="text-xs text-white/45">이 계정에 예약돼요</p>
-          </div>
-        </div>
-
-        <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/[0.03] px-4 py-3.5 ring-1 ring-white/10">
-          <p className="text-[11px] font-medium text-white/40">예약 시각</p>
+        <div className="mb-2 rounded-xl bg-gradient-to-br from-white/10 to-white/[0.03] px-3 py-2 ring-1 ring-white/10">
           <p
             key={when.toISOString()}
-            className="animate-schedule-tick mt-1 text-[22px] font-bold leading-snug tracking-tight text-white"
+            className="animate-schedule-tick text-[17px] font-bold leading-snug tracking-tight text-white"
           >
             {when.toLocaleDateString('ko-KR', {
               month: 'long',
@@ -229,21 +229,18 @@ export function ScheduleModal({
               weekday: 'short',
             })}{' '}
             {meridiem} {when.getHours() % 12 || 12}:{pad(when.getMinutes())}
+            <span className="ml-2 text-[12px] font-semibold text-gold">{relative}</span>
           </p>
-          <p className="mt-1 text-xs text-gold">{relative}</p>
         </div>
 
-        <p className="mb-2 text-[11px] font-medium text-white/40">빠르게</p>
-        <div className="mb-4 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex flex-wrap gap-1">
           {QUICK.map(([mins, label]) => (
             <button
               key={mins}
               type="button"
               onClick={() => pickQuick(mins)}
-              className={`rounded-full px-3 py-1.5 text-xs transition-all duration-150 active:scale-95 ${
-                quickMins === mins
-                  ? 'bg-white text-black shadow-[0_4px_16px_rgba(255,255,255,0.18)]'
-                  : 'bg-white/8 text-white/80 hover:bg-white/12'
+              className={`rounded-full px-2.5 py-1 text-[11px] ${
+                quickMins === mins ? 'bg-white text-black' : 'bg-white/8 text-white/80 hover:bg-white/12'
               }`}
             >
               {label}
@@ -251,8 +248,7 @@ export function ScheduleModal({
           ))}
         </div>
 
-        <p className="mb-2 text-[11px] font-medium text-white/40">날짜</p>
-        <div className="mb-3 grid grid-cols-7 gap-1.5">
+        <div className="mb-1.5 grid grid-cols-7 gap-1">
           {days.map((day, index) => {
             const selected = Boolean(selectedDay && sameDay(day, when))
             return (
@@ -260,22 +256,20 @@ export function ScheduleModal({
                 key={day.toISOString()}
                 type="button"
                 onClick={() => setCustom(withDate(when, day))}
-                className={`flex flex-col items-center rounded-xl px-1 py-2 transition-all duration-200 active:scale-95 ${
-                  selected
-                    ? 'scale-[1.03] bg-white text-black shadow-[0_6px_18px_rgba(255,255,255,0.16)]'
-                    : 'bg-white/6 text-white/75 hover:bg-white/10'
+                className={`flex flex-col items-center rounded-lg px-0.5 py-1 ${
+                  selected ? 'bg-white text-black' : 'bg-white/6 text-white/75 hover:bg-white/10'
                 }`}
               >
-                <span className={`text-[10px] ${selected ? 'text-black/50' : 'text-white/40'}`}>
+                <span className={`text-[9px] ${selected ? 'text-black/50' : 'text-white/40'}`}>
                   {dayChipLabel(day, index)}
                 </span>
-                <span className="mt-0.5 text-sm font-bold tabular-nums">{day.getDate()}</span>
+                <span className="text-[12px] font-bold tabular-nums">{day.getDate()}</span>
               </button>
             )
           })}
         </div>
         <label
-          className={`mb-4 flex items-center justify-between rounded-xl border px-3 py-2 text-xs transition-colors ${
+          className={`mb-2 flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-[11px] ${
             laterDate ? 'border-white/25 bg-white/8 text-white' : 'border-white/10 bg-black/20 text-white/55'
           }`}
         >
@@ -289,19 +283,18 @@ export function ScheduleModal({
               const [year, month, day] = event.target.value.split('-').map(Number)
               setCustom(withDate(when, new Date(year, month - 1, day)))
             }}
-            className="bg-transparent text-right text-xs text-white outline-none [color-scheme:dark]"
+            className="bg-transparent text-right text-[11px] text-white outline-none [color-scheme:dark]"
           />
         </label>
 
-        <p className="mb-2 text-[11px] font-medium text-white/40">시간</p>
-        <div className="mb-3 flex items-center justify-center gap-3 rounded-2xl bg-black/30 px-3 py-2">
-          <p className="w-10 text-center text-sm font-semibold text-white/50">{meridiem}</p>
+        <div className="mb-1.5 flex items-center justify-center gap-2 rounded-xl bg-black/30 px-2 py-1">
+          <p className="w-8 text-center text-[12px] font-semibold text-white/50">{meridiem}</p>
           <Stepper
             value={when.getHours()}
             label="시"
             onStep={(delta) => setCustom(withTime(when, (when.getHours() + delta + 24) % 24, when.getMinutes()))}
           />
-          <span className="pb-5 text-3xl font-bold text-white/25">:</span>
+          <span className="text-2xl font-bold text-white/25">:</span>
           <Stepper
             value={when.getMinutes()}
             label="분"
@@ -312,13 +305,13 @@ export function ScheduleModal({
             }}
           />
         </div>
-        <div className="mb-4 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex flex-wrap gap-1">
           {HOUR_PRESETS.map(([hour, label]) => (
             <button
               key={hour}
               type="button"
               onClick={() => setCustom(withTime(when, hour, 0))}
-              className={`rounded-full px-2.5 py-1 text-[11px] transition-all duration-150 active:scale-95 ${
+              className={`rounded-full px-2 py-0.5 text-[10px] ${
                 when.getHours() === hour && when.getMinutes() === 0 && quickMins == null
                   ? 'bg-brand text-white'
                   : 'bg-white/8 text-white/70 hover:bg-white/12'
@@ -329,29 +322,19 @@ export function ScheduleModal({
           ))}
         </div>
 
-        <div className="mb-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3">
-          <p className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Threads 공식 예약으로 등록
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-white/55">
-            하미가 Threads에 초안을 만들고 예약을 걸어요. Threads가 시각에 직접 발행하므로 PC를
-            켜둘 필요가 없고, 그 시각에 폰으로 &quot;예약된 스레드가 게시되었습니다&quot; 알림이 와요.
-          </p>
-          <p className="mt-1.5 text-[11px] text-white/40">
-            Threads가 직접 발행해요 — 컴퓨터를 꺼둬도 @{account?.username ?? '계정'}에 그 시각에
-            올라가요. 확인·취소는 Threads 임시 저장본에서.
-          </p>
+        <div className="mb-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-white/65">
+          <span className="font-semibold text-white">Threads 공식 예약</span>
+          {' · '}
+          PC 꺼둬도 시각에 발행 · 폰 알림은 Threads가 보내요 · 확인은 임시저장본
         </div>
 
-        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          예약 확정 순간만 하미 + Threads 로그인이 필요해요. Threads 등록이 실패하면 모스템에도
-          예약되지 않아요.
+        <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-200">
+          확정 때만 하미 + Threads 로그인 필요 · Threads 실패 시 모스템에도 예약 안 됨
         </div>
 
         {feedback ? (
           <div
-            className={`mb-3 rounded-xl px-3 py-2 text-xs leading-relaxed ${
+            className={`mb-2 rounded-lg px-2.5 py-1.5 text-[11px] leading-snug ${
               working
                 ? 'border border-sky-400/30 bg-sky-500/10 text-sky-100'
                 : 'border border-gold/40 bg-gold/10 text-gold'
@@ -365,12 +348,12 @@ export function ScheduleModal({
           type="button"
           disabled={working || !account}
           onClick={() => void confirm()}
-          className="w-full rounded-xl bg-gold py-3 text-sm font-bold text-black transition-transform duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+          className="mt-auto w-full rounded-xl bg-gold py-2.5 text-[13px] font-bold text-black hover:brightness-110 disabled:opacity-50"
         >
           {working ? 'Threads에 예약 등록 중…' : '📅 (확장프로그램 방식) 이 시각에 예약하기'}
         </button>
         {!account && (
-          <p className="mt-2 text-xs text-gold">설정에서 업로드할 스레드 아이디를 먼저 연결하세요.</p>
+          <p className="mt-1 text-[11px] text-gold">설정에서 업로드할 스레드 아이디를 먼저 연결하세요.</p>
         )}
       </div>
     </div>,
