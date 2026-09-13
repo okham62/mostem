@@ -1,5 +1,5 @@
-export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.30'
-export const HAMI_SCHEDULE_VERSION = '0.2.30'
+export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.31'
+export const HAMI_SCHEDULE_VERSION = '0.2.31'
 
 export type PublishMediaItem = {
   url: string

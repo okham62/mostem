@@ -449,7 +449,7 @@ export function EditClient({
       ...extraMedia,
     ]
     if (items.length && !hamiSupportsMediaPublish()) {
-      setMessage('하미 0.2.30이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 Threads 탭을 모두 닫고 다시 열어 주세요.')
+      setMessage('하미 0.2.31이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 Threads 탭을 모두 닫고 다시 열어 주세요.')
       return
     }
     const publishItems: Array<{
@@ -569,12 +569,12 @@ export function EditClient({
       return false
     }
     if (!hamiSupportsNativeSchedule()) {
-      setMessage('하미 0.2.30이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
+      setMessage('하미 0.2.31이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
       return false
     }
     const mediaForPublish = collectPublishMedia()
     if (mediaForPublish.length && !hamiSupportsMediaPublish()) {
-      setMessage('하미 0.2.30이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
+      setMessage('하미 0.2.31이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
       return false
     }
 
