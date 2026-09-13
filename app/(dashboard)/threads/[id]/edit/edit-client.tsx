@@ -617,9 +617,9 @@ export function EditClient({
 
     setMessage('')
     setScheduleToast(
-      `성공! @${selected.username} threads에 예약됐어요 — 컴퓨터를 꺼둬도 그 시각에 올라가요`,
+      `@${selected.username} threads에 예약됐어요 —\n컴퓨터를 꺼둬도 그 시각에 올라가요`,
     )
-    window.setTimeout(() => setScheduleToast(''), 6500)
+    window.setTimeout(() => setScheduleToast(''), 8000)
     rememberDraft()
     router.refresh()
     return true
@@ -770,28 +770,25 @@ export function EditClient({
     <div className="-m-3 min-h-full bg-[#0b0b0d] md:-m-4">
       {scheduleToast ? (
         <div className="pointer-events-none fixed inset-x-0 top-4 z-[220] flex justify-center px-4">
-          <div className="pointer-events-auto flex max-w-lg items-center gap-3 rounded-2xl border border-emerald-400/30 bg-[#12251a] px-4 py-3 text-sm text-emerald-50 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
-            <span className="min-w-0 flex-1">{scheduleToast}</span>
-            <a
-              href={
-                selected?.username
-                  ? `https://www.threads.com/@${selected.username}?hl=ko`
-                  : 'https://www.threads.com/?hl=ko'
-              }
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/15"
-            >
-              Threads에서 확인
-            </a>
-            <button
-              type="button"
+          <div className="pointer-events-auto flex max-w-md flex-col gap-2 rounded-2xl border border-emerald-400/25 bg-[#0f1f16] px-4 py-3 text-sm text-emerald-50 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
+            <div className="flex items-start gap-3">
+              <span className="min-w-0 flex-1 leading-snug whitespace-pre-line">{scheduleToast}</span>
+              <button
+                type="button"
+                onClick={() => setScheduleToast('')}
+                className="shrink-0 text-white/45 hover:text-white"
+                aria-label="닫기"
+              >
+                ✕
+              </button>
+            </div>
+            <Link
+              href="/threads?status=scheduled"
+              className="w-fit text-[12px] font-semibold text-emerald-200/90 hover:text-white"
               onClick={() => setScheduleToast('')}
-              className="shrink-0 text-white/45 hover:text-white"
-              aria-label="닫기"
             >
-              ✕
-            </button>
+              예약 목록에서 확인 →
+            </Link>
           </div>
         </div>
       ) : null}
