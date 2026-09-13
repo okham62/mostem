@@ -115,12 +115,14 @@ function Stepper({
 export function ScheduleModal({
   account,
   saving,
+  feedback,
   initialAt,
   onClose,
   onConfirm,
 }: {
   account?: ConnectedAccount
   saving: boolean
+  feedback?: string
   initialAt: Date
   onClose: () => void
   onConfirm: (when: Date) => void | Promise<void>
@@ -128,7 +130,9 @@ export function ScheduleModal({
   const [mounted, setMounted] = useState(false)
   const [when, setWhen] = useState(() => clampFuture(initialAt))
   const [quickMins, setQuickMins] = useState<number | null>(10)
+  const [busy, setBusy] = useState(false)
   const days = useMemo(() => upcomingDays(7), [])
+  const working = saving || busy
 
   useEffect(() => setMounted(true), [])
 
@@ -136,14 +140,24 @@ export function ScheduleModal({
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape' && !working) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [onClose])
+  }, [onClose, working])
+
+  async function confirm() {
+    if (working || !account) return
+    setBusy(true)
+    try {
+      await onConfirm(clampFuture(when))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   function setCustom(next: Date) {
     setWhen(clampFuture(next))
@@ -335,13 +349,25 @@ export function ScheduleModal({
           예약되지 않아요.
         </div>
 
+        {feedback ? (
+          <div
+            className={`mb-3 rounded-xl px-3 py-2 text-xs leading-relaxed ${
+              working
+                ? 'border border-sky-400/30 bg-sky-500/10 text-sky-100'
+                : 'border border-gold/40 bg-gold/10 text-gold'
+            }`}
+          >
+            {feedback}
+          </div>
+        ) : null}
+
         <button
           type="button"
-          disabled={saving || !account}
-          onClick={() => void onConfirm(clampFuture(when))}
+          disabled={working || !account}
+          onClick={() => void confirm()}
           className="w-full rounded-xl bg-gold py-3 text-sm font-bold text-black transition-transform duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
         >
-          {saving ? 'Threads에 예약 등록 중…' : '📅 (확장프로그램 방식) 이 시각에 예약하기'}
+          {working ? 'Threads에 예약 등록 중…' : '📅 (확장프로그램 방식) 이 시각에 예약하기'}
         </button>
         {!account && (
           <p className="mt-2 text-xs text-gold">설정에서 업로드할 스레드 아이디를 먼저 연결하세요.</p>

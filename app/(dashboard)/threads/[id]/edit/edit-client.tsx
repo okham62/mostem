@@ -220,6 +220,7 @@ export function EditClient({
   const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
   const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [scheduleFeedback, setScheduleFeedback] = useState('')
   const [scheduleAt, setScheduleAt] = useState(() => {
     const saved = parseScheduleDate(post.scheduled_at)
     return saved ?? new Date(Date.now() + 10 * 60 * 1000)
@@ -556,73 +557,79 @@ export function EditClient({
   }
 
   async function scheduleViaExtension(when: Date) {
-    if (!selected) {
-      setMessage('설정에서 올릴 스레드 아이디를 먼저 연결하세요.')
+    const fail = (text: string) => {
+      setScheduleFeedback(text)
+      setMessage(text)
       return false
+    }
+    if (!selected) {
+      return fail('설정에서 올릴 스레드 아이디를 먼저 연결하세요.')
     }
     if (!caption.trim()) {
-      setMessage('예약할 글이 없습니다.')
-      return false
+      return fail('예약할 글이 없습니다.')
     }
     if (!isHamiOnline()) {
-      setMessage('예약하려면 하미 확장이 필요해요. chrome://extensions에서 켠 뒤 이 창을 다시 열어 주세요.')
-      return false
+      return fail(
+        '예약하려면 하미 확장이 필요해요. chrome://extensions에서 하미를 새로고침(0.2.31)한 뒤 이 창을 Ctrl+F5 하세요.',
+      )
     }
     if (!hamiSupportsNativeSchedule()) {
-      setMessage('하미 0.2.31이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
-      return false
+      return fail(
+        '하미 0.2.31이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 Threads 탭을 모두 닫고 다시 열어 주세요.',
+      )
     }
     const mediaForPublish = collectPublishMedia()
     if (mediaForPublish.length && !hamiSupportsMediaPublish()) {
-      setMessage('하미 0.2.31이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.')
-      return false
+      return fail(
+        '하미 0.2.31이 필요합니다. chrome://extensions에서 하미를 새로고침한 뒤 다시 시도해 주세요.',
+      )
     }
 
     // HypeDuck path: register on Threads first. Only then mark Mostem scheduled.
-    // Phone push ("예약된 스레드가 게시되었습니다") comes from Threads itself at fire time.
     setSaving(true)
-    setMessage(
-      mediaForPublish.length
-        ? 'Threads에 예약을 등록하는 중입니다. 미디어를 올리는 중일 수 있어요.'
-        : 'Threads에 예약을 등록하는 중입니다.',
-    )
-    const scheduled = await requestHamiSchedule({
-      text: caption,
-      username: selected.username,
-      media: mediaForPublish,
-      scheduleAt: when,
-    })
-    if (!scheduled.ok) {
+    const progress = mediaForPublish.length
+      ? 'Threads 창을 열어 예약을 등록하는 중… (미디어 업로드 포함, 잠시 기다려 주세요)'
+      : 'Threads 창을 열어 예약을 등록하는 중…'
+    setScheduleFeedback(progress)
+    setMessage(progress)
+    try {
+      const scheduled = await requestHamiSchedule({
+        text: caption,
+        username: selected.username,
+        media: mediaForPublish,
+        scheduleAt: when,
+      })
+      if (!scheduled.ok) {
+        return fail(
+          scheduled.error
+            ? `Threads 예약 등록 실패: ${scheduled.error}`
+            : 'Threads 예약 등록에 실패했습니다. 하미·Threads 로그인을 확인한 뒤 다시 시도해 주세요.',
+        )
+      }
+
+      const iso = when.toISOString()
+      writeStoredSchedule(post.id, iso)
+      setResolvedSchedule(when)
+      setScheduleAt(when)
+      const saved = await persist('scheduled', iso)
+      if (!saved) {
+        return fail(
+          'Threads에는 예약됐지만 모스템 저장에 실패했습니다. Threads 임시 저장본에서 확인해 주세요.',
+        )
+      }
+
+      setScheduleFeedback('')
+      setMessage('')
+      setScheduleToast(
+        `@${selected.username} threads에 예약됐어요 —\n컴퓨터를 꺼둬도 그 시각에 올라가요`,
+      )
+      window.setTimeout(() => setScheduleToast(''), 8000)
+      rememberDraft()
+      router.refresh()
+      return true
+    } finally {
       setSaving(false)
-      setMessage(
-        scheduled.error
-          ? `Threads 예약 등록 실패: ${scheduled.error}`
-          : 'Threads 예약 등록에 실패했습니다. 하미·Threads 로그인을 확인한 뒤 다시 시도해 주세요.',
-      )
-      return false
     }
-
-    const iso = when.toISOString()
-    writeStoredSchedule(post.id, iso)
-    setResolvedSchedule(when)
-    setScheduleAt(when)
-    const saved = await persist('scheduled', iso)
-    setSaving(false)
-    if (!saved) {
-      setMessage(
-        'Threads에는 예약됐지만 모스템 저장에 실패했습니다. Threads 임시 저장본에서 확인해 주세요.',
-      )
-      return false
-    }
-
-    setMessage('')
-    setScheduleToast(
-      `@${selected.username} threads에 예약됐어요 —\n컴퓨터를 꺼둬도 그 시각에 올라가요`,
-    )
-    window.setTimeout(() => setScheduleToast(''), 8000)
-    rememberDraft()
-    router.refresh()
-    return true
   }
 
   async function generate() {
@@ -837,6 +844,8 @@ export function EditClient({
             type="button"
             onClick={() => {
               setLightbox(null)
+              setScheduleFeedback('')
+              setSaving(false)
               pickSchedule(10)
               setScheduleOpen(true)
             }}
@@ -1085,11 +1094,20 @@ export function EditClient({
         <ScheduleModal
           account={selected}
           saving={saving}
+          feedback={scheduleFeedback}
           initialAt={scheduleAt}
-          onClose={() => setScheduleOpen(false)}
+          onClose={() => {
+            if (!saving) {
+              setScheduleOpen(false)
+              setScheduleFeedback('')
+            }
+          }}
           onConfirm={async (when) => {
             const ok = await scheduleViaExtension(when)
-            if (ok) setScheduleOpen(false)
+            if (ok) {
+              setScheduleOpen(false)
+              setScheduleFeedback('')
+            }
           }}
         />
       )}
