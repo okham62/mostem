@@ -882,7 +882,7 @@ export function EditClient({
       )}
 
       {tab === 'rewrite' && (
-        <div className="grid w-full gap-3 p-4 lg:grid-cols-[76px_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid w-full gap-3 p-4 lg:grid-cols-[76px_minmax(0,7fr)_minmax(0,3fr)]">
           <EditToolbar
             accounts={accounts}
             accountId={accountId}
