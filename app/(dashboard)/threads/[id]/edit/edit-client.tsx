@@ -10,6 +10,7 @@ import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guid
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
 import { MAX_THREAD_REPLIES, readEditDraft, writeEditDraft, type GenerateRun } from '@/lib/edit-drafts'
+import { publicThreadsAvatar, requestHamiThreadsProfiles } from '@/lib/threads-profile'
 import {
   clearStoredSchedule,
   formatScheduleNotice,
@@ -235,6 +236,8 @@ export function EditClient({
   const [commentDropActive, setCommentDropActive] = useState(false)
   const [replies, setReplies] = useState<ThreadReply[]>([])
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
+  const [liveAccounts, setLiveAccounts] = useState(accounts)
+  const profileRefreshRef = useRef(false)
   const [guides, setGuides] = useState<AiGuide[]>(DEFAULT_AI_GUIDES)
   const [guideId, setGuideId] = useState(pickDefaultGuide(DEFAULT_AI_GUIDES).id)
   const [extraMedia, setExtraMedia] = useState<MediaPreview[]>([])
@@ -267,10 +270,66 @@ export function EditClient({
   }
 
   const thumb = mediaSrc(post.thumbnail_url)
-  const selected = accounts.find((a) => a.id === accountId)
+  const selected = liveAccounts.find((a) => a.id === accountId) ?? liveAccounts[0]
   const grade = post.grade ? GRADE_LABEL[post.grade] : null
   const date = post.collected_at ? new Date(post.collected_at).toISOString().slice(0, 10) : ''
   const originalCaption = sourceCaption || '본문 없음'
+
+  useEffect(() => {
+    setLiveAccounts(accounts)
+    profileRefreshRef.current = false
+  }, [accounts])
+
+  useEffect(() => {
+    if (accounts.length && !accounts.some((item) => item.id === accountId)) {
+      setAccountId(accounts[0]?.id ?? '')
+    }
+  }, [accounts, accountId])
+
+  useEffect(() => {
+    if (!liveAccounts.length || profileRefreshRef.current) return
+    profileRefreshRef.current = true
+    let cancelled = false
+    void (async () => {
+      const result = await requestHamiThreadsProfiles(liveAccounts.map((a) => a.username))
+      if (cancelled || !result.profiles.length) return
+
+      setLiveAccounts((prev) =>
+        prev.map((account) => {
+          const live = result.profiles.find(
+            (row) => row.username.toLowerCase() === account.username.toLowerCase()
+          )
+          if (!live) {
+            return {
+              ...account,
+              avatar_url: account.avatar_url || publicThreadsAvatar(account.username),
+            }
+          }
+          return {
+            ...account,
+            avatar_url: live.avatarUrl || account.avatar_url || publicThreadsAvatar(account.username),
+            display_name: live.displayName || account.display_name,
+          }
+        })
+      )
+
+      void fetch('/api/accounts/threads/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profiles: result.profiles.map((row) => ({
+            username: row.username,
+            displayName: row.displayName,
+            avatarUrl: row.avatarUrl,
+          })),
+        }),
+      }).catch(() => null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [liveAccounts])
+
   const statusLockRef = useRef(post.status === 'uploaded' || post.status === 'scheduled')
   const captionRef = useRef(caption)
   const draftsRef = useRef(drafts)
@@ -1069,7 +1128,7 @@ export function EditClient({
       {tab === 'rewrite' && (
         <div className="grid w-full gap-3 p-4 lg:grid-cols-[76px_minmax(0,1fr)_auto]">
           <EditToolbar
-            accounts={accounts}
+            accounts={liveAccounts}
             accountId={accountId}
             onAccount={setAccountId}
             guides={guides}

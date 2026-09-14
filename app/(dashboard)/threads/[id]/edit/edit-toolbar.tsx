@@ -2,10 +2,49 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BookOpen, RotateCcw, StickyNote, UserRound } from 'lucide-react'
+import { BookOpen, RotateCcw, StickyNote } from 'lucide-react'
 import type { AiGuide } from '@/lib/ai-guides'
+import { mediaSrc } from '@/lib/collect-labels'
+import { publicThreadsAvatar } from '@/lib/threads-profile'
 import type { ConnectedAccount } from '@/types'
 import { cn } from '@/lib/utils'
+
+function AccountAvatar({
+  account,
+  size = 'md',
+}: {
+  account?: ConnectedAccount | null
+  size?: 'sm' | 'md'
+}) {
+  const px = size === 'sm' ? 'h-8 w-8' : 'h-10 w-10'
+  const avatar =
+    mediaSrc(account?.avatar_url) ||
+    mediaSrc(publicThreadsAvatar(account?.username || '')) ||
+    ''
+  const letter = (account?.username?.[0] ?? '나').toUpperCase()
+
+  return (
+    <div className="mostem-account-avatar-wrap relative shrink-0">
+      {avatar ? (
+        <img
+          src={avatar}
+          alt=""
+          className={cn('mostem-account-avatar rounded-full object-cover bg-black/40', px)}
+        />
+      ) : (
+        <div
+          className={cn(
+            'mostem-account-avatar flex items-center justify-center rounded-full bg-brand text-xs font-bold text-white',
+            px
+          )}
+        >
+          {letter}
+        </div>
+      )}
+      <span className="mostem-account-live absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#141418] bg-emerald-400" />
+    </div>
+  )
+}
 
 export function EditToolbar({
   accounts,
@@ -30,7 +69,7 @@ export function EditToolbar({
 }) {
   const [open, setOpen] = useState<'account' | 'guide' | null>(null)
   const root = useRef<HTMLDivElement>(null)
-  const selected = accounts.find((item) => item.id === accountId)
+  const selected = accounts.find((item) => item.id === accountId) ?? accounts[0]
   const guide = guides.find((item) => item.id === guideId) ?? guides[0]
 
   useEffect(() => {
@@ -49,12 +88,9 @@ export function EditToolbar({
       <ToolButton
         active={open === 'account'}
         label="내 계정"
+        plainIcon
         onClick={() => setOpen((value) => (value === 'account' ? null : 'account'))}
-        icon={
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
-            {(selected?.username?.[0] ?? '나').toUpperCase()}
-          </span>
-        }
+        icon={<AccountAvatar account={selected} />}
       />
       {open === 'account' ? (
         <Popover>
@@ -64,23 +100,31 @@ export function EditToolbar({
               설정에서 스레드 아이디 연결
             </Link>
           ) : (
-            accounts.map((account) => (
-              <button
-                key={account.id}
-                type="button"
-                onClick={() => {
-                  onAccount(account.id)
-                  setOpen(null)
-                }}
-                className={cn(
-                  'mb-1 flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm',
-                  accountId === account.id ? 'bg-brand/20 text-white' : 'text-white/60 hover:bg-white/5'
-                )}
-              >
-                <UserRound className="h-4 w-4" />
-                @{account.username}
-              </button>
-            ))
+            accounts.map((account) => {
+              const label = account.display_name?.trim() || account.username
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  onClick={() => {
+                    onAccount(account.id)
+                    setOpen(null)
+                  }}
+                  className={cn(
+                    'mb-1 flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left',
+                    accountId === account.id ? 'bg-brand/20 text-white' : 'text-white/70 hover:bg-white/5'
+                  )}
+                >
+                  <AccountAvatar account={account} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-emerald-300/90">
+                      @{account.username}
+                    </span>
+                    <span className="block truncate text-[11px] text-rose-200/80">{label}</span>
+                  </span>
+                </button>
+              )
+            })
           )}
         </Popover>
       ) : null}
@@ -135,11 +179,13 @@ function ToolButton({
   icon,
   onClick,
   active,
+  plainIcon,
 }: {
   label: string
   icon: ReactNode
   onClick: () => void
   active?: boolean
+  plainIcon?: boolean
 }) {
   return (
     <button
@@ -150,7 +196,14 @@ function ToolButton({
         active && 'bg-white/8 text-white'
       )}
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/8 text-white/80">{icon}</span>
+      <span
+        className={cn(
+          'flex h-10 w-10 items-center justify-center',
+          !plainIcon && 'rounded-full bg-white/8 text-white/80'
+        )}
+      >
+        {icon}
+      </span>
       <span className="line-clamp-2 w-full text-center">{label}</span>
     </button>
   )
