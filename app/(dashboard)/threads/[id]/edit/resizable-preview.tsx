@@ -44,13 +44,13 @@ function edgeClass(edge: Edge) {
     case 'w':
       return `${shared} top-2 bottom-2 left-0 w-2 -translate-x-1/2`
     case 'ne':
-      return `${shared} right-0 top-0 h-3.5 w-3.5 translate-x-1/3 -translate-y-1/3 rounded-sm bg-white/20 hover:bg-brand`
+      return `${shared} right-0 top-0 h-4 w-4 translate-x-1/3 -translate-y-1/3 bg-transparent`
     case 'nw':
-      return `${shared} left-0 top-0 h-3.5 w-3.5 -translate-x-1/3 -translate-y-1/3 rounded-sm bg-white/20 hover:bg-brand`
+      return `${shared} left-0 top-0 h-4 w-4 -translate-x-1/3 -translate-y-1/3 bg-transparent`
     case 'se':
-      return `${shared} bottom-0 right-0 h-3.5 w-3.5 translate-x-1/3 translate-y-1/3 rounded-sm bg-white/25 hover:bg-brand`
+      return `${shared} bottom-0 right-0 h-4 w-4 translate-x-1/3 translate-y-1/3 bg-transparent`
     case 'sw':
-      return `${shared} bottom-0 left-0 h-3.5 w-3.5 -translate-x-1/3 translate-y-1/3 rounded-sm bg-white/20 hover:bg-brand`
+      return `${shared} bottom-0 left-0 h-4 w-4 -translate-x-1/3 translate-y-1/3 bg-transparent`
   }
 }
 
@@ -159,14 +159,6 @@ export function ResizablePreview({
           onPointerDown={(event) => startDrag(edge, event)}
         />
       ))}
-      <div
-        className="pointer-events-none absolute bottom-2 right-2 h-3 w-3 opacity-60"
-        aria-hidden
-        style={{
-          background:
-            'linear-gradient(135deg, transparent 45%, rgba(255,255,255,.4) 46%, rgba(255,255,255,.4) 54%, transparent 55%), linear-gradient(135deg, transparent 62%, rgba(255,255,255,.4) 63%, rgba(255,255,255,.4) 71%, transparent 72%)',
-        }}
-      />
     </div>
   )
 }
