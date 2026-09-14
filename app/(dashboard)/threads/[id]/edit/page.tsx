@@ -53,16 +53,14 @@ export default async function ThreadEditPage({
     }
   }
 
-  const tab =
-    searchParams.tab === 'rewrite' || searchParams.tab === 'publish' || searchParams.tab === 'original'
-      ? searchParams.tab
-      : 'original'
+  const tab = searchParams.tab === 'rewrite' ? 'rewrite' : 'original'
 
   return (
     <EditClient
       post={post}
       accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
       initialTab={tab}
+      openPublish={searchParams.tab === 'publish'}
       isAdmin={session.user.role === 'admin'}
     />
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { Paperclip, X } from 'lucide-react'
+import { Paperclip, Trash2, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -9,7 +9,7 @@ import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/l
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
 import type { CollectedPost, ConnectedAccount } from '@/types'
 import { DEFAULT_AI_MODEL } from '@/lib/ai-models'
-import { readEditDraft, writeEditDraft, type GenerateRun } from '@/lib/edit-drafts'
+import { MAX_THREAD_REPLIES, readEditDraft, writeEditDraft, type GenerateRun } from '@/lib/edit-drafts'
 import {
   clearStoredSchedule,
   formatScheduleNotice,
@@ -32,11 +32,17 @@ import { PublishModal } from './publish-modal'
 import { ScheduleModal } from './schedule-modal'
 import { TemplateModal } from './template-modal'
 
-type Tab = 'original' | 'rewrite' | 'publish'
+type Tab = 'original' | 'rewrite'
 type MediaPreview = { url: string; type: 'image' | 'video'; poster?: string }
 type CommentAttachment = { name: string; base64: string }
+type ThreadReply = { id: string; text: string }
 
 const MAX_COMMENT_FILE_BYTES = 5 * 1024 * 1024
+const THREAD_CHAR_LIMIT = 500
+
+function newReplyId() {
+  return `r-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
 
 function fileToBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -205,16 +211,18 @@ export function EditClient({
   post,
   accounts,
   initialTab,
+  openPublish = false,
   isAdmin = false,
 }: {
   post: CollectedPost
   accounts: ConnectedAccount[]
   initialTab?: Tab
+  openPublish?: boolean
   isAdmin?: boolean
 }) {
   const router = useRouter()
   const sourceMedia = useMemo(() => originalMedia(post), [post])
-  const [tab, setTab] = useState<Tab>(initialTab ?? 'original')
+  const [tab, setTab] = useState<Tab>(initialTab === 'rewrite' ? 'rewrite' : 'original')
   const [caption, setCaption] = useState(post.caption ?? '')
   const [drafts, setDrafts] = useState<string[]>([post.caption ?? '', '', ''])
   const [draftIndex, setDraftIndex] = useState(0)
@@ -223,6 +231,7 @@ export function EditClient({
   )
   const [instruction, setInstruction] = useState('')
   const [commentFile, setCommentFile] = useState<CommentAttachment | null>(null)
+  const [replies, setReplies] = useState<ThreadReply[]>([])
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [guides, setGuides] = useState<AiGuide[]>(DEFAULT_AI_GUIDES)
   const [guideId, setGuideId] = useState(pickDefaultGuide(DEFAULT_AI_GUIDES).id)
@@ -236,8 +245,8 @@ export function EditClient({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [scheduleToast, setScheduleToast] = useState('')
-  const [showOriginalModal, setShowOriginalModal] = useState(initialTab === 'original-modal' as Tab)
-  const [publishOpen, setPublishOpen] = useState(initialTab === 'publish')
+  const [showOriginalModal, setShowOriginalModal] = useState(false)
+  const [publishOpen, setPublishOpen] = useState(openPublish)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scheduleFeedback, setScheduleFeedback] = useState('')
   const [scheduleAt, setScheduleAt] = useState(() => {
@@ -268,6 +277,7 @@ export function EditClient({
   const sourceCaptionRef = useRef(sourceCaption)
   const historyRef = useRef(history)
   const accountRef = useRef(selected?.username)
+  const repliesRef = useRef(replies)
   captionRef.current = caption
   draftsRef.current = drafts
   draftIndexRef.current = draftIndex
@@ -275,6 +285,7 @@ export function EditClient({
   sourceCaptionRef.current = sourceCaption
   historyRef.current = history
   accountRef.current = selected?.username
+  repliesRef.current = replies
 
   function rememberDraft() {
     writeEditDraft(post.id, {
@@ -287,6 +298,7 @@ export function EditClient({
       draftIndex: draftIndexRef.current,
       hiddenSource: hiddenSourceRef.current,
       history: historyRef.current,
+      replies: repliesRef.current.map((item) => item.text),
     })
   }
 
@@ -326,6 +338,12 @@ export function EditClient({
     setCaption(stored.drafts[stored.draftIndex] || stored.drafts[0] || post.caption || '')
     setHiddenSource(stored.hiddenSource)
     setHistory(stored.history)
+    setReplies(
+      stored.replies.map((text) => ({
+        id: newReplyId(),
+        text,
+      }))
+    )
   }, [post.id])
 
   useEffect(() => {
@@ -381,12 +399,10 @@ export function EditClient({
   const tabs: { id: Tab; label: string }[] = [
     { id: 'original', label: '원문 뜯어보기' },
     { id: 'rewrite', label: '내 글로 바꾸기' },
-    { id: 'publish', label: '올리기' },
   ]
 
   function openTab(next: Tab) {
     setTab(next)
-    setPublishOpen(next === 'publish')
     router.replace(`/threads/${post.id}/edit?tab=${next}`, { scroll: false })
   }
 
