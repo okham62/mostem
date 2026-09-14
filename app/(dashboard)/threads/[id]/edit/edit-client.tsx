@@ -1413,25 +1413,30 @@ export function EditClient({
                     {caption || '작성된 글이 여기에 보여요'}
                   </p>
 
-                  {/* 미디어: 고정 정사각, 여러 장이면 가로로만 이어 스크롤 */}
-                  {previewMedia.length > 0 ? (
-                    <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {previewMedia.map((item, index) => (
-                        <div
-                          key={`${item.url}-${index}`}
-                          className="relative h-[96px] w-[96px] shrink-0 overflow-hidden rounded-xl bg-white/5"
-                        >
-                          <MediaThumb item={item} />
-                        </div>
-                      ))}
+                  {/* 미디어: 빨간 박스 크기(정사각 2열 폭), 여러 장이면 가로로만 */}
+                  {(previewMedia.length > 0 || previewThumb) && (
+                    <div className="mt-3 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {previewMedia.length > 0
+                        ? previewMedia.map((item, index) => (
+                            <div
+                              key={`${item.url}-${index}`}
+                              className="relative aspect-square w-[calc((100%-0.375rem)/2)] min-w-[calc((100%-0.375rem)/2)] shrink-0 overflow-hidden rounded-xl bg-white/5"
+                            >
+                              <MediaThumb item={item} />
+                            </div>
+                          ))
+                        : (
+                            <div className="relative aspect-square w-[calc((100%-0.375rem)/2)] min-w-[calc((100%-0.375rem)/2)] shrink-0 overflow-hidden rounded-xl bg-white/5">
+                              <img src={previewThumb!} alt="" className="h-full w-full object-cover" />
+                            </div>
+                          )}
                     </div>
-                  ) : previewThumb ? (
-                    <div className="relative mt-2 h-[96px] w-[96px] overflow-hidden rounded-xl bg-white/5">
-                      <img src={previewThumb} alt="" className="h-full w-full object-cover" />
-                    </div>
-                  ) : null}
+                  )}
 
-                  <p className="mt-2 text-right text-[10px] text-white/30">{caption.length}/500</p>
+                  {/* 글자 수는 미디어 아래 — 겹치지 않게 */}
+                  <p className="mt-3 text-right text-[10px] leading-none text-white/35">
+                    {caption.length}/500
+                  </p>
                 </div>
               </div>
 
