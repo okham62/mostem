@@ -1,4 +1,4 @@
-export type ThreadTemplateCategory = 'ftc' | 'thread'
+export type ThreadTemplateCategory = 'ftc'
 
 export type ThreadTemplate = {
   id: string
@@ -8,6 +8,7 @@ export type ThreadTemplate = {
   builtin?: boolean
 }
 
+/** Same default phrases as HypeDuck (입덕) — 공정위 only. */
 export const BUILTIN_THREAD_TEMPLATES: ThreadTemplate[] = [
   {
     id: 'coupang-ftc',
@@ -26,6 +27,7 @@ export const BUILTIN_THREAD_TEMPLATES: ThreadTemplate[] = [
 ]
 
 const STORAGE_KEY = 'mostem:thread-templates-v1'
+const HIDDEN_KEY = 'mostem:thread-templates-hidden-v1'
 
 export function loadCustomTemplates(): ThreadTemplate[] {
   if (typeof window === 'undefined') return []
@@ -33,7 +35,11 @@ export function loadCustomTemplates(): ThreadTemplate[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const rows = JSON.parse(raw) as ThreadTemplate[]
-    return Array.isArray(rows) ? rows.filter((item) => item?.id && item.body) : []
+    return Array.isArray(rows)
+      ? rows
+          .filter((item) => item?.id && item.body)
+          .map((item) => ({ ...item, category: 'ftc' as const, builtin: false }))
+      : []
   } catch {
     return []
   }
@@ -42,12 +48,40 @@ export function loadCustomTemplates(): ThreadTemplate[] {
 export function saveCustomTemplates(rows: ThreadTemplate[]) {
   if (typeof window === 'undefined') return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rows.filter((item) => !item.builtin)))
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(rows.filter((item) => !item.builtin).map((item) => ({ ...item, category: 'ftc' })))
+    )
   } catch {
     /* ignore */
   }
 }
 
-export function allThreadTemplates(custom: ThreadTemplate[]) {
-  return [...BUILTIN_THREAD_TEMPLATES, ...custom.filter((item) => !item.builtin)]
+export function loadHiddenBuiltinIds(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY)
+    if (!raw) return []
+    const rows = JSON.parse(raw) as string[]
+    return Array.isArray(rows) ? rows.filter((id) => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function saveHiddenBuiltinIds(ids: string[]) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...new Set(ids)]))
+  } catch {
+    /* ignore */
+  }
+}
+
+export function allThreadTemplates(custom: ThreadTemplate[], hiddenBuiltinIds: string[] = []) {
+  const hidden = new Set(hiddenBuiltinIds)
+  return [
+    ...BUILTIN_THREAD_TEMPLATES.filter((item) => !hidden.has(item.id)),
+    ...custom.filter((item) => !item.builtin),
+  ]
 }
