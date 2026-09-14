@@ -303,35 +303,46 @@ export function ThreadsBoard({
           </Link>
         </div>
         {accounts.length > 0 ? (
-          <div className="grid gap-2">
-            {accounts.map((account) => (
+          <div className="flex flex-wrap items-start gap-2.5">
+            {accounts.map((account, index) => (
               <div
                 key={account.id}
-                className="mostem-account-banner flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 sm:px-4"
+                data-tone={String((index % 4) + 1)}
+                className="mostem-account-tile group flex w-[104px] flex-col items-center gap-2 rounded-2xl px-2.5 pb-2.5 pt-3 sm:w-[112px]"
+                title={`@${account.username} · 확장 연동됨`}
               >
                 <div className="relative shrink-0">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-sm font-bold text-white ring-1 ring-white/20 backdrop-blur-sm">
+                  <div className="mostem-account-avatar flex h-14 w-14 items-center justify-center rounded-full bg-black/40 text-lg font-bold text-white backdrop-blur-sm">
                     {account.username[0]?.toUpperCase() ?? 'U'}
                   </div>
                   <span
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0b1220] bg-emerald-400"
+                    className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0b1220] bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]"
                     aria-hidden
                   />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold tracking-tight text-white drop-shadow-sm">
-                    @{account.username}
-                  </p>
-                  <p className="truncate text-[11px] text-white/70">
-                    {account.display_name || '스레드 계정'} · 확장 연동됨 · 발행가능
-                  </p>
-                </div>
+                <p className="w-full truncate text-center text-[11px] font-semibold tracking-tight text-emerald-300">
+                  @{account.username}
+                </p>
               </div>
             ))}
+            <Link
+              href="/settings?tab=threads"
+              className="flex h-[118px] w-[104px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-white/40 transition hover:border-white/25 hover:bg-white/[0.06] hover:text-white/70 sm:w-[112px]"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="text-[10px] font-medium">계정 추가</span>
+            </Link>
           </div>
         ) : (
-          <div className="w-full rounded-2xl border border-dashed border-white/10 px-4 py-3 text-xs text-white/40">
-            연결된 스레드 계정이 없습니다. 계정 재연결에서 아이디를 추가하세요.
+          <div className="flex flex-wrap items-start gap-2.5">
+            <Link
+              href="/settings?tab=threads"
+              className="flex h-[118px] w-[104px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-white/40 transition hover:border-white/25 hover:bg-white/[0.06] hover:text-white/70 sm:w-[112px]"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="text-[10px] font-medium">계정 연동</span>
+            </Link>
+            <p className="self-center text-xs text-white/40">연결된 스레드 계정이 없습니다.</p>
           </div>
         )}
       </section>
