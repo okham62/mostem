@@ -820,7 +820,7 @@ html[data-theme='light'] .bg-brand .text-white {
     0 10px 28px rgba(0, 0, 0, 0.28),
     0 0 0 1px rgba(52, 211, 153, 0.06),
     0 0 24px rgba(52, 211, 153, 0.08);
-  animation: mostem-account-breathe 4.8s ease-in-out infinite;
+  animation: mostem-account-breathe 3.6s ease-in-out infinite;
   transition:
     transform 180ms ease,
     border-color 180ms ease;
@@ -856,7 +856,7 @@ html[data-theme='light'] .bg-brand .text-white {
   z-index: 0;
   background: radial-gradient(circle at 50% 38%, rgba(52, 211, 153, 0.22), transparent 48%),
     radial-gradient(circle at 70% 70%, rgba(125, 211, 252, 0.1), transparent 42%);
-  animation: mostem-account-aura 4.8s ease-in-out infinite;
+  animation: mostem-account-aura 3.6s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -894,38 +894,41 @@ html[data-theme='light'] .bg-brand .text-white {
   100% {
     box-shadow:
       0 10px 28px rgba(0, 0, 0, 0.28),
-      0 0 0 1px rgba(52, 211, 153, 0.05),
-      0 0 18px rgba(52, 211, 153, 0.06);
-    filter: brightness(0.98);
+      0 0 0 1px rgba(52, 211, 153, 0.08),
+      0 0 16px rgba(52, 211, 153, 0.1);
+    filter: brightness(0.96);
+    border-color: rgba(52, 211, 153, 0.16);
   }
   50% {
     box-shadow:
-      0 12px 32px rgba(0, 0, 0, 0.3),
-      0 0 0 1px rgba(52, 211, 153, 0.16),
-      0 0 36px rgba(52, 211, 153, 0.2);
-    filter: brightness(1.04);
+      0 14px 36px rgba(0, 0, 0, 0.34),
+      0 0 0 1px rgba(52, 211, 153, 0.34),
+      0 0 48px rgba(52, 211, 153, 0.38),
+      0 0 72px rgba(110, 231, 183, 0.16);
+    filter: brightness(1.1);
+    border-color: rgba(52, 211, 153, 0.42);
   }
 }
 
 @keyframes mostem-account-aura {
   0%,
   100% {
-    opacity: 0.45;
-    transform: scale(0.96);
+    opacity: 0.35;
+    transform: scale(0.94);
   }
   50% {
-    opacity: 0.9;
-    transform: scale(1.04);
+    opacity: 1;
+    transform: scale(1.08);
   }
 }
 
 @keyframes mostem-account-veil {
   0%,
   100% {
-    opacity: 0.35;
+    opacity: 0.28;
   }
   50% {
-    opacity: 0.7;
+    opacity: 0.85;
   }
 }
 
@@ -933,25 +936,28 @@ html[data-theme='light'] .bg-brand .text-white {
   0%,
   100% {
     box-shadow:
-      0 0 0 2px rgba(52, 211, 153, 0.72),
-      0 0 10px rgba(52, 211, 153, 0.18);
+      0 0 0 2px rgba(52, 211, 153, 0.55),
+      0 0 8px rgba(52, 211, 153, 0.16);
   }
   50% {
     box-shadow:
-      0 0 0 2px rgba(52, 211, 153, 1),
-      0 0 18px rgba(52, 211, 153, 0.42);
+      0 0 0 2.5px rgba(167, 243, 208, 1),
+      0 0 22px rgba(52, 211, 153, 0.7),
+      0 0 36px rgba(110, 231, 183, 0.35);
   }
 }
 
 @keyframes mostem-account-live-dot {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.35);
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
     transform: scale(1);
+    filter: brightness(1);
   }
   50% {
-    box-shadow: 0 0 0 5px rgba(52, 211, 153, 0);
-    transform: scale(1.06);
+    box-shadow: 0 0 0 7px rgba(52, 211, 153, 0);
+    transform: scale(1.14);
+    filter: brightness(1.25);
   }
 }
 
