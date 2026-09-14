@@ -31,7 +31,6 @@ import { ModelPicker } from './model-picker'
 import { PublishModal } from './publish-modal'
 import { ScheduleModal } from './schedule-modal'
 import { TemplateModal } from './template-modal'
-import { ResizablePreview } from './resizable-preview'
 
 type Tab = 'original' | 'rewrite'
 type MediaPreview = { url: string; type: 'image' | 'video'; poster?: string }
@@ -1322,7 +1321,7 @@ export function EditClient({
             ) : null}
           </section>
 
-          <ResizablePreview storageKey={`mostem-edit-preview:${post.id}`}>
+          <aside className="w-[320px] shrink-0 overflow-auto rounded-2xl border border-white/10 bg-[#141418] p-4">
             <p className="mb-3 text-xs text-white/40">발행하면 내 프로필에 이렇게 올라가요</p>
             <div className="rounded-[28px] border border-white/10 bg-black p-4">
               <p className="text-xs font-semibold text-white">{previewName}</p>
@@ -1353,7 +1352,7 @@ export function EditClient({
               ) : null}
               <p className="mt-4 text-right text-[10px] text-white/30">{caption.length}/500</p>
             </div>
-          </ResizablePreview>
+          </aside>
         </div>
       )}
       </div>
