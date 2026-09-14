@@ -368,7 +368,7 @@ export function ThreadsBoard({
                   className="mostem-account-tile group flex w-[104px] flex-col items-center gap-2 rounded-2xl px-2.5 pb-2.5 pt-3 sm:w-[112px]"
                   title={`@${account.username}${label !== account.username ? ` · ${label}` : ''} · 실시간 프로필`}
                 >
-                  <div className="relative shrink-0">
+                  <div className="mostem-account-avatar-wrap relative shrink-0">
                     {avatar ? (
                       <img
                         src={avatar}
