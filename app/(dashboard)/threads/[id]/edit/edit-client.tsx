@@ -31,6 +31,7 @@ import { ModelPicker } from './model-picker'
 import { PublishModal } from './publish-modal'
 import { ScheduleModal } from './schedule-modal'
 import { TemplateModal } from './template-modal'
+import { ResizablePreview } from './resizable-preview'
 
 type Tab = 'original' | 'rewrite'
 type MediaPreview = { url: string; type: 'image' | 'video'; poster?: string }
@@ -814,10 +815,39 @@ export function EditClient({
   }, [])
 
   function insertTemplate(body: string) {
-    const next = caption.trim() ? `${caption.trim()}\n\n${body}` : body
-    setCaption(next)
-    setDrafts((prev) => prev.map((item, index) => (index === draftIndex ? next : item)))
-    setMessage('템플릿을 타래에 넣었습니다.')
+    setReplies((prev) => {
+      if (prev.length >= MAX_THREAD_REPLIES) {
+        setMessage('타래는 최대 10개까지예요.')
+        return prev
+      }
+      const emptyIdx = prev.findIndex((item) => !item.text.trim())
+      if (emptyIdx >= 0) {
+        const next = prev.map((item, index) => (index === emptyIdx ? { ...item, text: body } : item))
+        setMessage(`${emptyIdx + 2}번 타래에 넣었어요`)
+        return next
+      }
+      const next = [...prev, { id: newReplyId(), text: body }]
+      setMessage(`${next.length + 1}번 타래에 넣었어요`)
+      return next
+    })
+  }
+
+  function addReply() {
+    setReplies((prev) => {
+      if (prev.length >= MAX_THREAD_REPLIES) {
+        setMessage('타래는 최대 10개까지예요.')
+        return prev
+      }
+      return [...prev, { id: newReplyId(), text: '' }]
+    })
+  }
+
+  function updateReply(id: string, text: string) {
+    setReplies((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)))
+  }
+
+  function removeReply(id: string) {
+    setReplies((prev) => prev.filter((item) => item.id !== id))
   }
 
   function attachFiles(files: File[]) {
@@ -863,11 +893,13 @@ export function EditClient({
     })
     setHiddenSource([])
     setLightbox(null)
+    setReplies([])
     writeEditDraft(post.id, {
       original,
       drafts: [original, '', ''],
       draftIndex: 0,
       hiddenSource: [],
+      replies: [],
     })
     setMessage('처음 상태로 되돌렸습니다.')
   }
@@ -1034,7 +1066,7 @@ export function EditClient({
       )}
 
       {tab === 'rewrite' && (
-        <div className="grid w-full gap-3 p-4 lg:grid-cols-[76px_minmax(0,7fr)_minmax(0,3fr)]">
+        <div className="grid w-full gap-3 p-4 lg:grid-cols-[76px_minmax(0,1fr)_auto]">
           <EditToolbar
             accounts={accounts}
             accountId={accountId}
@@ -1116,8 +1148,58 @@ export function EditClient({
                 setDrafts((prev) => prev.map((d, i) => (i === draftIndex ? e.target.value : d)))
               }}
               rows={14}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm text-white outline-none focus:border-brand"
+              className="w-full resize rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm text-white outline-none focus:border-brand"
             />
+
+            <div className="mt-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/[0.04] px-3 py-2.5">
+                <p className="text-[11px] leading-snug text-white/45">
+                  타래 댓글은 본문이 올라간 직후 순서대로 자동으로 달려요 — 따로 발행하지 않아도 돼요
+                </p>
+                <button
+                  type="button"
+                  onClick={addReply}
+                  disabled={replies.length >= MAX_THREAD_REPLIES}
+                  className="shrink-0 rounded-lg bg-black/50 px-3 py-1.5 text-[11px] font-semibold text-white/85 ring-1 ring-white/10 hover:bg-black/70 disabled:opacity-40"
+                >
+                  + 타래 추가 ({replies.length}/{MAX_THREAD_REPLIES})
+                </button>
+              </div>
+
+              {replies.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-white/10 bg-black/25 px-3 py-3"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-white/70">{index + 2}번 타래</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-white/35">
+                        {item.text.length}/{THREAD_CHAR_LIMIT}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeReply(item.id)}
+                        className="rounded p-1 text-white/35 hover:bg-white/10 hover:text-white"
+                        aria-label={`${index + 2}번 타래 삭제`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={item.text}
+                    onChange={(event) =>
+                      updateReply(item.id, event.target.value.slice(0, THREAD_CHAR_LIMIT))
+                    }
+                    rows={4}
+                    placeholder="이어질 내용 — 추가 후기·안내·링크 등을 적어주세요"
+                    className="w-full resize-y rounded-lg border border-white/8 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/30"
+                  />
+                </div>
+              ))}
+            </div>
+
             <div className="mt-3 space-y-2">
               <input
                 value={instruction}
@@ -1205,7 +1287,7 @@ export function EditClient({
             ) : null}
           </section>
 
-          <aside className="rounded-2xl border border-white/10 bg-[#141418] p-4">
+          <ResizablePreview storageKey={`mostem-edit-preview:${post.id}`}>
             <p className="mb-3 text-xs text-white/40">발행하면 내 프로필에 이렇게 올라가요</p>
             <div className="rounded-[28px] border border-white/10 bg-black p-4">
               <p className="text-xs font-semibold text-white">{previewName}</p>
@@ -1222,9 +1304,21 @@ export function EditClient({
               ) : previewThumb ? (
                 <img src={previewThumb} alt="" className="mt-3 w-full rounded-lg object-cover" />
               ) : null}
+              {replies.some((item) => item.text.trim()) ? (
+                <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
+                  {replies
+                    .filter((item) => item.text.trim())
+                    .map((item, index) => (
+                      <div key={item.id}>
+                        <p className="text-[10px] text-white/35">{index + 2}번 타래</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-white/80">{item.text}</p>
+                      </div>
+                    ))}
+                </div>
+              ) : null}
               <p className="mt-4 text-right text-[10px] text-white/30">{caption.length}/500</p>
             </div>
-          </aside>
+          </ResizablePreview>
         </div>
       )}
       </div>
