@@ -1362,34 +1362,80 @@ export function EditClient({
 
           <aside className="w-[320px] shrink-0 overflow-auto rounded-2xl border border-white/10 bg-[#141418] p-4">
             <p className="mb-3 text-xs text-white/40">발행하면 내 프로필에 이렇게 올라가요</p>
-            <div className="rounded-[28px] border border-white/10 bg-black p-4">
-              <p className="text-xs font-semibold text-white">{previewName}</p>
-              <p className="mt-1 text-[10px] text-white/30">지금</p>
-              <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{caption || '작성된 글이 여기에 보여요'}</p>
-              {previewMedia.length ? (
-                <div className="mt-3 grid grid-cols-2 gap-1.5">
-                  {previewMedia.map((item, index) => (
-                    <div key={`${item.url}-${index}`} className="relative aspect-square overflow-hidden rounded-lg bg-white/5">
-                      <MediaThumb item={item} />
+            <div className="rounded-[28px] border border-white/10 bg-black p-3">
+              {/* 1번 본문 */}
+              <div className="relative flex gap-2.5">
+                <div className="flex w-9 shrink-0 flex-col items-center">
+                  <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand text-[11px] font-bold text-white">
+                    {(selected?.username?.[0] || '나').toUpperCase()}
+                  </div>
+                  {replies.length > 0 ? (
+                    <div className="mt-1 w-0.5 flex-1 min-h-[12px] rounded-full bg-white/15" aria-hidden />
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1 pb-3">
+                  <div className="flex items-baseline gap-1.5">
+                    <p className="truncate text-xs font-semibold text-white">{previewName}</p>
+                    <p className="shrink-0 text-[10px] text-white/30">지금</p>
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
+                    {caption || '작성된 글이 여기에 보여요'}
+                  </p>
+                  {previewMedia.length ? (
+                    <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                      {previewMedia.map((item, index) => (
+                        <div
+                          key={`${item.url}-${index}`}
+                          className="relative aspect-square overflow-hidden rounded-lg bg-white/5"
+                        >
+                          <MediaThumb item={item} />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : previewThumb ? (
+                    <img src={previewThumb} alt="" className="mt-2.5 w-full rounded-lg object-cover" />
+                  ) : null}
+                  <p className="mt-2 text-right text-[10px] text-white/30">{caption.length}/500</p>
                 </div>
-              ) : previewThumb ? (
-                <img src={previewThumb} alt="" className="mt-3 w-full rounded-lg object-cover" />
-              ) : null}
-              {replies.some((item) => item.text.trim()) ? (
-                <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
-                  {replies
-                    .filter((item) => item.text.trim())
-                    .map((item, index) => (
-                      <div key={item.id}>
-                        <p className="text-[10px] text-white/35">{index + 2}번 타래</p>
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-white/80">{item.text}</p>
+              </div>
+
+              {/* 2번~ 타래 — 폰에서처럼 같은 계정 연속 글 */}
+              {replies.map((item, index) => {
+                const body = item.text.trim()
+                const isLast = index === replies.length - 1
+                return (
+                  <div key={item.id} className="relative flex gap-2.5">
+                    <div className="flex w-9 shrink-0 flex-col items-center">
+                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand text-[11px] font-bold text-white">
+                        {(selected?.username?.[0] || '나').toUpperCase()}
                       </div>
-                    ))}
-                </div>
-              ) : null}
-              <p className="mt-4 text-right text-[10px] text-white/30">{caption.length}/500</p>
+                      {!isLast ? (
+                        <div className="mt-1 w-0.5 flex-1 min-h-[12px] rounded-full bg-white/15" aria-hidden />
+                      ) : null}
+                    </div>
+                    <div className={cn('min-w-0 flex-1', isLast ? 'pb-1' : 'pb-3')}>
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="truncate text-xs font-semibold text-white">{previewName}</p>
+                        <p className="shrink-0 text-[10px] text-white/30">지금</p>
+                        <p className="ml-auto shrink-0 text-[10px] text-white/25">{index + 2}번 타래</p>
+                      </div>
+                      <p
+                        className={cn(
+                          'mt-1.5 whitespace-pre-wrap break-words text-sm leading-snug',
+                          body ? 'text-white/85' : 'text-white/30'
+                        )}
+                      >
+                        {body || '타래 내용을 입력하면 여기에 보여요'}
+                      </p>
+                      {body ? (
+                        <p className="mt-2 text-right text-[10px] text-white/30">
+                          {item.text.length}/{THREAD_CHAR_LIMIT}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </aside>
         </div>
