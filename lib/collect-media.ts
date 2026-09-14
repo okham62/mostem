@@ -27,13 +27,23 @@ export function sortMediaVideoLeft(items: CollectMediaItem[]) {
   return [...items].sort((a, b) => Number(isVideoItem(b)) - Number(isVideoItem(a)))
 }
 
+/** Board preview: video|image when mixed; two tiles when images-only (not single +N). */
 export function previewMedia(items: CollectMediaItem[]) {
   const videos = items.filter(isVideoItem)
   const photos = items.filter((item) => !isVideoItem(item))
   const shown: CollectMediaItem[] = []
-  if (videos[0]) shown.push(videos[0])
-  if (photos[0]) shown.push(photos[0])
-  else if (videos[1] && shown.length === 1) shown.push(videos[1])
+
+  if (videos[0]) {
+    // 왼쪽 동영상 · 오른쪽 이미지(없으면 다른 영상)
+    shown.push(videos[0])
+    if (photos[0]) shown.push(photos[0])
+    else if (videos[1]) shown.push(videos[1])
+  } else {
+    // 이미지만 있어도 2장이면 나란히 (단일 +N 금지)
+    if (photos[0]) shown.push(photos[0])
+    if (photos[1]) shown.push(photos[1])
+  }
+
   const hidden = Math.max(0, items.length - shown.length)
   return { shown, hidden }
 }
