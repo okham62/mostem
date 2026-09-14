@@ -624,12 +624,12 @@ function ListView({
                         예약 취소
                       </button>
                     ) : null}
-                    <Link
+                    <a
                       href={`/threads/${post.id}/edit?tab=rewrite`}
                       className="rounded-lg bg-brand px-2.5 py-1 text-[11px] font-semibold text-white"
                     >
                       편집
-                    </Link>
+                    </a>
                     <button
                       type="button"
                       onClick={() => onRemoved(post.id)}
@@ -702,12 +702,12 @@ function KanbanView({
                               예약 취소
                             </button>
                           ) : null}
-                          <Link
+                          <a
                             href={`/threads/${post.id}/edit?tab=rewrite`}
                             className="rounded-lg bg-brand px-2 py-1 text-[10px] font-semibold text-white"
                           >
                             편집
-                          </Link>
+                          </a>
                           <button
                             type="button"
                             onClick={() => onRemoved(post.id)}

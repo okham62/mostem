@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
@@ -86,12 +85,12 @@ export function ThreadCard({
           </div>
           <div className="min-w-0 overflow-visible">
             <div className="flex items-center gap-1.5 overflow-visible">
-              <Link
+              <a
                 href={`/threads/${post.id}/edit?tab=original`}
                 className="truncate text-sm font-semibold text-white hover:underline"
               >
                 @{post.author || 'unknown'}
-              </Link>
+              </a>
               <StatusForceBadge post={post} onUpdated={onUpdated} />
             </div>
             <p className="text-[11px] text-white/35">{date}</p>
@@ -188,12 +187,12 @@ export function ThreadCard({
               원본
             </a>
           )}
-          <Link
+          <a
             href={`/threads/${post.id}/edit?tab=rewrite`}
             className="rounded-lg bg-brand px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand/90"
           >
             편집
-          </Link>
+          </a>
         </div>
       </div>
     </article>
