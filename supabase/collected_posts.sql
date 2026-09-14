@@ -42,6 +42,7 @@ create table if not exists public.connected_accounts (
   display_name text,
   intro text,
   topics text[] default '{}',
+  avatar_url text,
   created_at timestamptz not null default now(),
   unique (user_id, platform, username)
 );

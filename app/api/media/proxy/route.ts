@@ -7,6 +7,7 @@ const ALLOWED = [
   'threads.net',
   'threads.com',
   'instagram.com',
+  'unavatar.io',
 ]
 
 const VIDEO_RE = /\.(mp4|m3u8|webm|mov)(\?|$)/i

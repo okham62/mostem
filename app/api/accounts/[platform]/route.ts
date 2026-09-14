@@ -98,6 +98,7 @@ export async function PATCH(
       display_name: body.display_name,
       intro: body.intro,
       topics: Array.isArray(body.topics) ? body.topics : undefined,
+      ...(typeof body.avatar_url === 'string' ? { avatar_url: body.avatar_url } : {}),
     })
     .eq('id', body.id)
     .eq('user_id', session.user.id)

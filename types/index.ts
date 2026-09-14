@@ -58,6 +58,7 @@ export interface ConnectedAccount {
   display_name: string | null
   intro: string | null
   topics: string[]
+  avatar_url?: string | null
   created_at: string
 }
 export type VideoType = 'long' | 'short'

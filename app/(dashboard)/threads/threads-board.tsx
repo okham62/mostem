@@ -27,6 +27,7 @@ import {
 } from '@/lib/collect-labels'
 import { imagePosterUrl, parseMediaItems } from '@/lib/collect-media'
 import { hydrateScheduledPosts, resolveScheduledAt } from '@/lib/post-schedule'
+import { publicThreadsAvatar, requestHamiThreadsProfiles } from '@/lib/threads-profile'
 import { MediaDownloadButtons } from './media-download-buttons'
 import { StatusForceBadge } from './status-force-badge'
 import { ThreadCard } from './thread-card'
@@ -100,19 +101,70 @@ function GradePill({ post }: { post: CollectedPost }) {
 
 export function ThreadsBoard({
   posts: initialPosts,
-  accounts,
+  accounts: initialAccounts,
 }: {
   posts: CollectedPost[]
   accounts: ConnectedAccount[]
 }) {
   const [posts, setPosts] = useState(initialPosts)
+  const [accounts, setAccounts] = useState(initialAccounts)
   const [hiddenIds, setHiddenIds] = useState<string[]>([])
   const [view, setView] = useState<ViewMode>('grid')
   const backfilledRef = useRef<Set<string>>(new Set())
+  const profileRefreshRef = useRef(false)
 
   useEffect(() => {
     setPosts(hydrateScheduledPosts(initialPosts))
   }, [initialPosts])
+
+  useEffect(() => {
+    setAccounts(initialAccounts)
+  }, [initialAccounts])
+
+  // Live Threads profile (avatar / display name) via extension session, with public fallback.
+  useEffect(() => {
+    if (!accounts.length || profileRefreshRef.current) return
+    profileRefreshRef.current = true
+    let cancelled = false
+    void (async () => {
+      const result = await requestHamiThreadsProfiles(accounts.map((a) => a.username))
+      if (cancelled || !result.profiles.length) return
+
+      setAccounts((prev) =>
+        prev.map((account) => {
+          const live = result.profiles.find(
+            (row) => row.username.toLowerCase() === account.username.toLowerCase(),
+          )
+          if (!live) {
+            return {
+              ...account,
+              avatar_url: account.avatar_url || publicThreadsAvatar(account.username),
+            }
+          }
+          return {
+            ...account,
+            avatar_url: live.avatarUrl || account.avatar_url || publicThreadsAvatar(account.username),
+            display_name: live.displayName || account.display_name,
+          }
+        }),
+      )
+
+      void fetch('/api/accounts/threads/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profiles: result.profiles.map((row) => ({
+            username: row.username,
+            displayName: row.displayName,
+            avatarUrl: row.avatarUrl,
+          })),
+        }),
+      }).catch(() => null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [accounts])
 
   // Restore scheduled_at into DB when we only have localStorage (older collect wiped it).
   useEffect(() => {
@@ -304,27 +356,48 @@ export function ThreadsBoard({
         </div>
         {accounts.length > 0 ? (
           <div className="flex flex-wrap items-start gap-2.5">
-            {accounts.map((account, index) => (
-              <div
-                key={account.id}
-                data-tone={String((index % 4) + 1)}
-                className="mostem-account-tile group flex w-[104px] flex-col items-center gap-2 rounded-2xl px-2.5 pb-2.5 pt-3 sm:w-[112px]"
-                title={`@${account.username} · 확장 연동됨`}
-              >
-                <div className="relative shrink-0">
-                  <div className="mostem-account-avatar flex h-14 w-14 items-center justify-center rounded-full bg-black/40 text-lg font-bold text-white backdrop-blur-sm">
-                    {account.username[0]?.toUpperCase() ?? 'U'}
+            {accounts.map((account, index) => {
+              const avatar =
+                mediaSrc(account.avatar_url) ||
+                mediaSrc(publicThreadsAvatar(account.username))
+              const label = account.display_name?.trim() || account.username
+              return (
+                <div
+                  key={account.id}
+                  data-tone={String((index % 4) + 1)}
+                  className="mostem-account-tile group flex w-[104px] flex-col items-center gap-2 rounded-2xl px-2.5 pb-2.5 pt-3 sm:w-[112px]"
+                  title={`@${account.username}${label !== account.username ? ` · ${label}` : ''} · 실시간 프로필`}
+                >
+                  <div className="relative shrink-0">
+                    {avatar ? (
+                      <img
+                        src={avatar}
+                        alt={`@${account.username}`}
+                        className="mostem-account-avatar h-14 w-14 rounded-full object-cover bg-black/40"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="mostem-account-avatar flex h-14 w-14 items-center justify-center rounded-full bg-black/40 text-lg font-bold text-white backdrop-blur-sm">
+                        {account.username[0]?.toUpperCase() ?? 'U'}
+                      </div>
+                    )}
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0b1220] bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]"
+                      aria-hidden
+                    />
                   </div>
-                  <span
-                    className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0b1220] bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]"
-                    aria-hidden
-                  />
+                  <div className="w-full min-w-0 text-center">
+                    <p className="truncate text-[11px] font-semibold tracking-tight text-emerald-300">
+                      @{account.username}
+                    </p>
+                    {label && label !== account.username ? (
+                      <p className="truncate text-[9px] text-white/55">{label}</p>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="w-full truncate text-center text-[11px] font-semibold tracking-tight text-emerald-300">
-                  @{account.username}
-                </p>
-              </div>
-            ))}
+              )
+            })}
             <Link
               href="/settings?tab=threads"
               className="flex h-[118px] w-[104px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-white/40 transition hover:border-white/25 hover:bg-white/[0.06] hover:text-white/70 sm:w-[112px]"
