@@ -9,6 +9,7 @@ import {
   formatScheduleCardDate,
   resolveScheduledAt,
 } from '@/lib/post-schedule'
+import { threadsPermalink } from '@/lib/threads-permalink'
 import { MediaDownloadButtons } from './media-download-buttons'
 import { StatusForceBadge } from './status-force-badge'
 import { ThreadMedia } from './thread-media'
@@ -37,6 +38,11 @@ export function ThreadCard({
   const stats = derivePostStats(post)
   const grade = stats.grade ? GRADE_LABEL[stats.grade] : null
   const mediaItems = parseMediaItems(post)
+  const originalUrl = threadsPermalink({
+    url: post.url,
+    author: post.author,
+    postId: post.post_id,
+  })
   const caption =
     post.caption && post.caption !== post.author && post.caption !== `@${post.author}`
       ? post.caption
@@ -178,11 +184,11 @@ export function ThreadCard({
           팔로워 {formatCount(post.followers)} · 수집 {shortDate}
         </p>
         <div className="flex shrink-0 items-center justify-end gap-1.5">
-          {post.url && (
+          {originalUrl && (
             <a
-              href={post.url}
+              href={originalUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
             >
               <ExternalLink className="h-3 w-3" />
