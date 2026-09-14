@@ -249,7 +249,6 @@ export function EditClient({
   const [webSearch, setWebSearch] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const [scheduleToast, setScheduleToast] = useState('')
   const [showOriginalModal, setShowOriginalModal] = useState(false)
   const [publishOpen, setPublishOpen] = useState(openPublish)
   const [scheduleOpen, setScheduleOpen] = useState(false)
@@ -471,6 +470,7 @@ export function EditClient({
   async function persist(
     status: 'editing' | 'ready' | 'scheduled' | 'uploaded',
     scheduledAt?: string | null,
+    opts?: { refresh?: boolean },
   ) {
     setSaving(true)
     setMessage('')
@@ -514,7 +514,8 @@ export function EditClient({
     setPostStatus(status)
     if (status === 'uploaded' || status === 'scheduled') statusLockRef.current = true
     if (status === 'ready' || status === 'editing') statusLockRef.current = false
-    router.refresh()
+    // Skip soft refresh when the caller is about to hard-navigate away (avoids flicker).
+    if (opts?.refresh !== false) router.refresh()
     return true
   }
 
@@ -708,7 +709,8 @@ export function EditClient({
       writeStoredSchedule(post.id, iso)
       setResolvedSchedule(when)
       setScheduleAt(when)
-      const saved = await persist('scheduled', iso)
+      // No soft refresh — hard leave to threads home so the edit shell cannot flash.
+      const saved = await persist('scheduled', iso, { refresh: false })
       if (!saved) {
         return fail(
           'Threads에는 예약됐지만 모스템 저장에 실패했습니다. Threads 임시 저장본에서 확인해 주세요.',
@@ -717,12 +719,10 @@ export function EditClient({
 
       setScheduleFeedback('')
       setMessage('')
-      setScheduleToast(
-        `@${selected.username} threads에 예약됐어요 —\n컴퓨터를 꺼둬도 그 시각에 올라가요`,
-      )
-      window.setTimeout(() => setScheduleToast(''), 8000)
+      setScheduleOpen(false)
       rememberDraft()
-      router.refresh()
+      // Instant exit: scheduled row is saved; land on Threads start (수집).
+      window.location.replace('/threads?status=collected')
       return true
     } finally {
       setSaving(false)
@@ -966,30 +966,6 @@ export function EditClient({
 
   return (
     <div className="-m-3 min-h-full bg-[#0b0b0d] md:-m-4">
-      {scheduleToast ? (
-        <div className="pointer-events-none fixed inset-x-0 top-4 z-[220] flex justify-center px-4">
-          <div className="pointer-events-auto flex max-w-md flex-col gap-2 rounded-2xl border border-emerald-400/25 bg-[#0f1f16] px-4 py-3 text-sm text-emerald-50 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
-            <div className="flex items-start gap-3">
-              <span className="min-w-0 flex-1 leading-snug whitespace-pre-line">{scheduleToast}</span>
-              <button
-                type="button"
-                onClick={() => setScheduleToast('')}
-                className="shrink-0 text-white/45 hover:text-white"
-                aria-label="닫기"
-              >
-                ✕
-              </button>
-            </div>
-            <Link
-              href="/threads?status=scheduled"
-              className="w-fit text-[12px] font-semibold text-emerald-200/90 hover:text-white"
-              onClick={() => setScheduleToast('')}
-            >
-              예약 목록에서 확인 →
-            </Link>
-          </div>
-        </div>
-      ) : null}
       <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -1407,11 +1383,7 @@ export function EditClient({
             }
           }}
           onConfirm={async (when) => {
-            const ok = await scheduleViaExtension(when)
-            if (ok) {
-              setScheduleOpen(false)
-              setScheduleFeedback('')
-            }
+            await scheduleViaExtension(when)
           }}
         />
       )}
