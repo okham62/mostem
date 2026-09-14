@@ -72,7 +72,7 @@ export function ModelPicker({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="모델 검색 — 예: claude, gemini..."
+              placeholder="모델 검색 — 예: gemini..."
               className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/30"
             />
           </label>

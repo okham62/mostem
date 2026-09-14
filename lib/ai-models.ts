@@ -11,26 +11,12 @@ export type AiModelOption = {
 
 export const AI_MODELS: AiModelOption[] = [
   {
-    id: 'claude-haiku-4-5-20251001',
-    label: 'Claude Haiku 4.5',
-    provider: 'claude',
-    credits: 3,
-    recommended: true,
-    isDefault: true,
-  },
-  {
-    id: 'gemini-3.6-flash',
-    label: 'Gemini 3.6 Flash',
-    provider: 'gemini',
-    credits: 2,
-    recommended: true,
-  },
-  {
     id: 'gemini-3.8-flash',
     label: 'Gemini 3.8 Flash',
     provider: 'gemini',
     credits: 3,
     recommended: true,
+    isDefault: true,
   },
 ]
 
