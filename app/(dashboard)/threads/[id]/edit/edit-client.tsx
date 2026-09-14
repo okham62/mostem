@@ -1360,7 +1360,11 @@ export function EditClient({
       <HoverPreview item={lightbox} anchor={mediaStripRef.current} />
 
       {templateOpen ? (
-        <TemplateModal onClose={() => setTemplateOpen(false)} onInsert={insertTemplate} />
+        <TemplateModal
+          onClose={() => setTemplateOpen(false)}
+          onInsert={insertTemplate}
+          isAdmin={isAdmin}
+        />
       ) : null}
 
       {historyOpen ? (

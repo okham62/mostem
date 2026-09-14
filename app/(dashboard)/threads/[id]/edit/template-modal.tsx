@@ -14,18 +14,21 @@ import {
 export function TemplateModal({
   onClose,
   onInsert,
+  isAdmin = false,
 }: {
   onClose: () => void
   onInsert: (body: string) => void
+  isAdmin?: boolean
 }) {
   const [custom, setCustom] = useState<ThreadTemplate[]>(() => loadCustomTemplates())
   const [hiddenBuiltinIds, setHiddenBuiltinIds] = useState<string[]>(() => loadHiddenBuiltinIds())
   const [draft, setDraft] = useState('')
   const [copiedId, setCopiedId] = useState('')
 
+  // Non-admins always see default FTC phrases; only admins can hide/delete them.
   const rows = useMemo(
-    () => allThreadTemplates(custom, hiddenBuiltinIds),
-    [custom, hiddenBuiltinIds]
+    () => allThreadTemplates(custom, isAdmin ? hiddenBuiltinIds : []),
+    [custom, hiddenBuiltinIds, isAdmin]
   )
 
   async function copy(item: ThreadTemplate) {
@@ -55,6 +58,7 @@ export function TemplateModal({
 
   function removeTemplate(item: ThreadTemplate) {
     if (item.builtin) {
+      if (!isAdmin) return
       const next = [...hiddenBuiltinIds, item.id]
       setHiddenBuiltinIds(next)
       saveHiddenBuiltinIds(next)
@@ -63,6 +67,10 @@ export function TemplateModal({
     const next = custom.filter((row) => row.id !== item.id)
     setCustom(next)
     saveCustomTemplates(next)
+  }
+
+  function canDelete(item: ThreadTemplate) {
+    return item.builtin ? isAdmin : true
   }
 
   return (
@@ -120,15 +128,17 @@ export function TemplateModal({
                   >
                     타래에 넣기
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => removeTemplate(item)}
-                    className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-white/45 hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-300"
-                    aria-label={`${item.title} 삭제`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    삭제
-                  </button>
+                  {canDelete(item) ? (
+                    <button
+                      type="button"
+                      onClick={() => removeTemplate(item)}
+                      className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-white/45 hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-300"
+                      aria-label={`${item.title} 삭제`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      삭제
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))
