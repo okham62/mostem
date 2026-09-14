@@ -40,9 +40,14 @@ type ThreadReply = { id: string; text: string }
 
 const MAX_COMMENT_FILE_BYTES = 5 * 1024 * 1024
 const THREAD_CHAR_LIMIT = 500
-/** Default caption box height (~14 lines), then grows downward with content only. */
-const CAPTION_MIN_PX = 296
+/** Default caption box height — matches edit UI frame, then grows downward only. */
+const CAPTION_MIN_PX = 380
 const REPLY_MIN_PX = 96
+
+function syncTextareaHeight(el: HTMLTextAreaElement, minHeight: number) {
+  el.style.height = '0px'
+  el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`
+}
 
 function AutoGrowTextarea({
   value,
@@ -62,8 +67,7 @@ function AutoGrowTextarea({
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`
+    syncTextareaHeight(el, minHeight)
   }, [value, minHeight])
 
   return (
@@ -72,12 +76,16 @@ function AutoGrowTextarea({
       value={value}
       placeholder={placeholder}
       rows={1}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={(event) => {
+        onChange(event.target.value)
+        syncTextareaHeight(event.target, minHeight)
+      }}
+      onInput={(event) => syncTextareaHeight(event.currentTarget, minHeight)}
       className={cn(
-        'block w-full max-w-full min-w-0 resize-none overflow-x-hidden overflow-y-hidden break-words rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm text-white outline-none focus:border-brand',
+        'box-border block w-full max-w-full min-w-0 resize-none overflow-x-hidden overflow-y-hidden break-words rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm leading-6 text-white outline-none focus:border-brand',
         className
       )}
-      style={{ minHeight }}
+      style={{ minHeight, height: minHeight }}
     />
   )
 }
