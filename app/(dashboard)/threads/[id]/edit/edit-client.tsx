@@ -1413,26 +1413,20 @@ export function EditClient({
                     {caption || '작성된 글이 여기에 보여요'}
                   </p>
 
-                  {/* 미디어: 여러 장이면 가로로만 이어 스크롤 */}
+                  {/* 미디어: 고정 정사각, 여러 장이면 가로로만 이어 스크롤 */}
                   {previewMedia.length > 0 ? (
-                    previewMedia.length === 1 ? (
-                      <div className="relative mt-2 aspect-[4/5] w-full overflow-hidden rounded-xl bg-white/5">
-                        <MediaThumb item={previewMedia[0]} />
-                      </div>
-                    ) : (
-                      <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {previewMedia.map((item, index) => (
-                          <div
-                            key={`${item.url}-${index}`}
-                            className="relative h-[118px] w-[118px] shrink-0 overflow-hidden rounded-xl bg-white/5"
-                          >
-                            <MediaThumb item={item} />
-                          </div>
-                        ))}
-                      </div>
-                    )
+                    <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {previewMedia.map((item, index) => (
+                        <div
+                          key={`${item.url}-${index}`}
+                          className="relative h-[96px] w-[96px] shrink-0 overflow-hidden rounded-xl bg-white/5"
+                        >
+                          <MediaThumb item={item} />
+                        </div>
+                      ))}
+                    </div>
                   ) : previewThumb ? (
-                    <div className="relative mt-2 aspect-[4/5] w-full overflow-hidden rounded-xl bg-white/5">
+                    <div className="relative mt-2 h-[96px] w-[96px] overflow-hidden rounded-xl bg-white/5">
                       <img src={previewThumb} alt="" className="h-full w-full object-cover" />
                     </div>
                   ) : null}
