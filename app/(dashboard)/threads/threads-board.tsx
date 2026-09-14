@@ -383,7 +383,7 @@ export function ThreadsBoard({
                       </div>
                     )}
                     <span
-                      className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0b1220] bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]"
+                      className="mostem-account-live absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0b1220] bg-emerald-400"
                       aria-hidden
                     />
                   </div>
