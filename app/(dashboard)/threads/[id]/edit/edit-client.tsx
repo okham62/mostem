@@ -31,6 +31,7 @@ import { ModelPicker } from './model-picker'
 import { PublishModal } from './publish-modal'
 import { ScheduleModal } from './schedule-modal'
 import { TemplateModal } from './template-modal'
+import { cn } from '@/lib/utils'
 
 type Tab = 'original' | 'rewrite'
 type MediaPreview = { url: string; type: 'image' | 'video'; poster?: string }
@@ -39,6 +40,47 @@ type ThreadReply = { id: string; text: string }
 
 const MAX_COMMENT_FILE_BYTES = 5 * 1024 * 1024
 const THREAD_CHAR_LIMIT = 500
+/** Default caption box height (~14 lines), then grows downward with content only. */
+const CAPTION_MIN_PX = 296
+const REPLY_MIN_PX = 96
+
+function AutoGrowTextarea({
+  value,
+  onChange,
+  minHeight = CAPTION_MIN_PX,
+  className,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  minHeight?: number
+  className?: string
+  placeholder?: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`
+  }, [value, minHeight])
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      placeholder={placeholder}
+      rows={1}
+      onChange={(event) => onChange(event.target.value)}
+      className={cn(
+        'block w-full max-w-full min-w-0 resize-none overflow-x-hidden overflow-y-hidden break-words rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm text-white outline-none focus:border-brand',
+        className
+      )}
+      style={{ minHeight }}
+    />
+  )
+}
 
 function newReplyId() {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -1100,7 +1142,7 @@ export function EditClient({
       )}
 
       {tab === 'rewrite' && (
-        <div className="grid w-full gap-3 p-4 lg:grid-cols-[76px_minmax(0,1fr)_auto]">
+        <div className="grid w-full min-w-0 gap-3 p-4 lg:grid-cols-[76px_minmax(0,1fr)_auto]">
           <EditToolbar
             accounts={liveAccounts}
             accountId={accountId}
@@ -1113,7 +1155,7 @@ export function EditClient({
             onReset={resetEditor}
           />
 
-          <section className="rounded-2xl border border-white/10 bg-[#141418] p-4">
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#141418] p-4">
             <div className="mb-3 flex gap-2">
               {[0, 1, 2].map((index) => (
                 <button
@@ -1175,14 +1217,13 @@ export function EditClient({
                 />
               </label>
             </div>
-            <textarea
+            <AutoGrowTextarea
               value={caption}
-              onChange={(e) => {
-                setCaption(e.target.value)
-                setDrafts((prev) => prev.map((d, i) => (i === draftIndex ? e.target.value : d)))
+              minHeight={CAPTION_MIN_PX}
+              onChange={(next) => {
+                setCaption(next)
+                setDrafts((prev) => prev.map((d, i) => (i === draftIndex ? next : d)))
               }}
-              rows={14}
-              className="w-full resize rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm text-white outline-none focus:border-brand"
             />
 
             <div className="mt-3 space-y-3">
@@ -1221,14 +1262,12 @@ export function EditClient({
                       </button>
                     </div>
                   </div>
-                  <textarea
+                  <AutoGrowTextarea
                     value={item.text}
-                    onChange={(event) =>
-                      updateReply(item.id, event.target.value.slice(0, THREAD_CHAR_LIMIT))
-                    }
-                    rows={4}
+                    minHeight={REPLY_MIN_PX}
                     placeholder="이어질 내용 — 추가 후기·안내·링크 등을 적어주세요"
-                    className="w-full resize-y rounded-lg border border-white/8 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/30"
+                    onChange={(next) => updateReply(item.id, next.slice(0, THREAD_CHAR_LIMIT))}
+                    className="rounded-lg border-white/8 bg-transparent px-2 py-2 placeholder:text-white/30"
                   />
                 </div>
               ))}
