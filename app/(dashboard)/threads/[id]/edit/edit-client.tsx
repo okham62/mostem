@@ -635,6 +635,17 @@ export function EditClient({
   async function generate() {
     setSaving(true)
     setMessage('')
+    const media = [
+      ...sourceMedia.filter((item) => !hiddenSource.includes(item.url)),
+      ...extraMedia,
+    ]
+      .filter((item) => /^https?:\/\//i.test(item.url) || (item.poster ? /^https?:\/\//i.test(item.poster) : false))
+      .map((item) => ({
+        url: item.url,
+        type: item.type,
+        poster: item.poster,
+        videoUrl: item.type === 'video' ? item.url : undefined,
+      }))
     const res = await fetch('/api/threads/rewrite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -646,6 +657,7 @@ export function EditClient({
         persona: selected?.intro || selected?.username,
         model: modelId,
         webSearch,
+        media,
       }),
     })
     const data = await res.json().catch(() => ({}))
@@ -675,7 +687,12 @@ export function EditClient({
       hiddenSource,
       history: nextHistory,
     })
-    setMessage('초안이 생성되었습니다.')
+    const mediaCount = typeof data.mediaCount === 'number' ? data.mediaCount : 0
+    setMessage(
+      mediaCount > 0
+        ? `초안이 생성되었습니다. (미디어 ${mediaCount}개 반영)`
+        : '초안이 생성되었습니다.'
+    )
   }
 
   function downloadZip() {

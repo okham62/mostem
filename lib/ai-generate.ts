@@ -2,8 +2,10 @@ import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
 import { claudeKey, geminiKey, scrubSecrets } from './ai-keys'
 import { AI_MODELS, findAiModel, parseDrafts, type AiModelOption, type AiProvider } from './ai-models'
+import type { GeminiMediaPart } from './ai-media'
 
 const TIMEOUT_MS = 60_000
+const TIMEOUT_MEDIA_MS = 90_000
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions'
 
 /** Errors safe to show to a signed-in operator: never built from raw provider payloads. */
@@ -25,13 +27,18 @@ export async function generateDrafts({
   prompt,
   fallback,
   modelId,
+  media,
 }: {
   prompt: string
   fallback: string
   modelId?: string | null
+  media?: GeminiMediaPart[]
 }) {
   const model = findAiModel(modelId)
-  const drafts = model.provider === 'gemini' ? await viaGemini(model, prompt, fallback) : await viaClaude(model, prompt, fallback)
+  const drafts =
+    model.provider === 'gemini'
+      ? await viaGemini(model, prompt, fallback, media)
+      : await viaClaude(model, prompt, fallback)
   return { drafts, model: model.id }
 }
 
@@ -50,9 +57,19 @@ async function viaClaude(model: AiModelOption, prompt: string, fallback: string)
   return parseDrafts(content.text, fallback)
 }
 
-async function viaGemini(model: AiModelOption, prompt: string, fallback: string) {
+async function viaGemini(
+  model: AiModelOption,
+  prompt: string,
+  fallback: string,
+  media: GeminiMediaPart[] = []
+) {
   const apiKey = geminiKey()
   if (!apiKey) throw new AiError('Gemini 키가 없습니다. 서버 환경변수 GEMINI_API_KEY를 설정해 주세요.')
+
+  const input =
+    media.length > 0
+      ? ([{ type: 'text', text: prompt }, ...media] as Array<Record<string, string>>)
+      : prompt
 
   const res = await fetch(GEMINI_ENDPOINT, {
     method: 'POST',
@@ -60,7 +77,7 @@ async function viaGemini(model: AiModelOption, prompt: string, fallback: string)
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       model: model.id,
-      input: prompt,
+      input,
       response_format: {
         type: 'text',
         mime_type: 'application/json',
@@ -71,7 +88,7 @@ async function viaGemini(model: AiModelOption, prompt: string, fallback: string)
         },
       },
     }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(media.length ? TIMEOUT_MEDIA_MS : TIMEOUT_MS),
     cache: 'no-store',
   })
 
