@@ -169,10 +169,8 @@ function PreviewMediaCarousel({ items }: { items: MediaPreview[] }) {
               key={`${item.url}-${index}`}
               data-media-tile
               className={cn(
-                'relative shrink-0 overflow-hidden rounded-xl bg-white/5',
-                multi
-                  ? 'aspect-square w-[85%] min-w-[85%] snap-start'
-                  : 'aspect-square w-full min-w-full'
+                'relative aspect-square w-[calc((100%-0.375rem)/2)] min-w-[calc((100%-0.375rem)/2)] shrink-0 overflow-hidden rounded-xl bg-white/5',
+                multi && 'snap-start'
               )}
             >
               <MediaThumb item={item} />
@@ -1496,26 +1494,29 @@ export function EditClient({
 
           <aside className="w-[300px] shrink-0 overflow-auto rounded-2xl border border-white/10 bg-[#141418] p-3">
             <p className="mb-2 px-1 text-[11px] text-white/40">발행하면 내 프로필에 이렇게 올라가요</p>
-            {/* 기본 높이 고정, 글·타래가 늘면 아래로만 확장 */}
-            <div className="flex min-h-[540px] flex-col rounded-[26px] border border-white/10 bg-black px-2.5 py-3">
+            {/* 기본 540px 고정 — 내용이 적어도 줄지 않고, 늘면 아래로만 커짐 */}
+            <div
+              className="box-border rounded-[26px] border border-white/10 bg-black px-2.5 py-3"
+              style={{ minHeight: 540 }}
+            >
               {/* 1번 본문 카드 */}
-              <div className="relative flex min-h-0 flex-1 gap-2">
+              <div className="relative flex gap-2">
                 <div className="flex w-9 shrink-0 flex-col items-center">
                   <PreviewAccountAvatar account={selected} />
                   {replies.length > 0 ? (
                     <div className="mt-1 w-0.5 flex-1 min-h-[16px] rounded-full bg-white/15" aria-hidden />
                   ) : null}
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3">
+                <div className="min-w-0 flex-1 pb-3">
                   <div className="flex items-baseline gap-1.5">
                     <p className="truncate text-xs font-semibold text-white">{previewName}</p>
                     <p className="shrink-0 text-[10px] text-white/30">지금</p>
                   </div>
-                  <p className="mt-1.5 min-h-[72px] flex-1 whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
+                  <p className="mt-1.5 min-h-[120px] whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
                     {caption || '작성된 글이 여기에 보여요'}
                   </p>
 
-                  {/* 미디어: 2장+면 입덕처럼 가로 스크롤 + 하단 스크롤바 */}
+                  {/* 미디어: 작은 정사각(절반 폭), 2장+면 가로 스크롤바 */}
                   {previewMedia.length > 0 ? (
                     <PreviewMediaCarousel items={previewMedia} />
                   ) : previewThumb ? (
@@ -1524,8 +1525,7 @@ export function EditClient({
                     />
                   ) : null}
 
-                  {/* 글자 수는 미디어 아래 — 겹치지 않게 */}
-                  <p className="mt-3 text-right text-[10px] leading-none text-white/35">
+                  <p className="mt-4 text-right text-[10px] leading-none text-white/35">
                     {caption.length}/500
                   </p>
                 </div>
