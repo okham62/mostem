@@ -155,7 +155,7 @@ function PreviewMediaCarousel({ items }: { items: MediaPreview[] }) {
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-0">
       <div className="relative">
         <div
           ref={scrollerRef}
@@ -1497,20 +1497,20 @@ export function EditClient({
 
           <aside className="w-[300px] shrink-0 overflow-auto rounded-2xl border border-white/10 bg-[#141418] p-3">
             <p className="mb-2 px-1 text-[11px] text-white/40">발행하면 내 프로필에 이렇게 올라가요</p>
-            {/* 기본 540px 고정 — 내용이 적어도 줄지 않고, 늘면 아래로만 커짐 */}
+            {/* 기본 540px 고정 — 미디어는 항상 카드 맨 아래 */}
             <div
-              className="box-border rounded-[26px] border border-white/10 bg-black px-2.5 py-3"
+              className="box-border flex flex-col rounded-[26px] border border-white/10 bg-black px-2.5 py-3"
               style={{ minHeight: 540 }}
             >
-              {/* 1번 본문 카드 */}
-              <div className="relative flex min-h-[calc(540px-1.5rem)] gap-2">
-                <div className="flex w-9 shrink-0 flex-col items-center">
+              {/* 1번 본문: 남는 높이를 채우고 미디어를 바닥에 고정 */}
+              <div className="relative flex min-h-[calc(540px-1.5rem)] flex-1 gap-2">
+                <div className="flex w-9 shrink-0 flex-col items-center self-stretch">
                   <PreviewAccountAvatar account={selected} />
                   {replies.length > 0 ? (
                     <div className="mt-1 w-0.5 flex-1 min-h-[16px] rounded-full bg-white/15" aria-hidden />
                   ) : null}
                 </div>
-                <div className="flex min-w-0 flex-1 flex-col pb-1">
+                <div className="flex min-h-full min-w-0 flex-1 flex-col">
                   <div className="flex items-baseline gap-1.5">
                     <p className="truncate text-xs font-semibold text-white">{previewName}</p>
                     <p className="shrink-0 text-[10px] text-white/30">지금</p>
@@ -1519,8 +1519,8 @@ export function EditClient({
                     {caption || '작성된 글이 여기에 보여요'}
                   </p>
 
-                  {/* 미디어는 본문 아래 여백을 두고 카드 하단으로 */}
-                  <div className="mt-auto pt-4">
+                  {/* 글이 짧아도/길어도 미디어는 항상 이 카드의 맨 아래 */}
+                  <div className="mt-auto flex flex-col pt-6">
                     {previewMedia.length > 0 ? (
                       <PreviewMediaCarousel items={previewMedia} />
                     ) : previewThumb ? (
@@ -1528,7 +1528,6 @@ export function EditClient({
                         items={[{ url: previewThumb, type: 'image', poster: previewThumb }]}
                       />
                     ) : null}
-
                     <p className="mt-3 text-right text-[10px] leading-none text-white/35">
                       {caption.length}/500
                     </p>
