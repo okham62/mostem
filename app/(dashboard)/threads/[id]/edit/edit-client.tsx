@@ -1,6 +1,6 @@
 'use client'
 
-import { Paperclip, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Paperclip, Trash2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
@@ -111,6 +111,107 @@ function PreviewAccountAvatar({ account }: { account?: ConnectedAccount | null }
   return (
     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand text-[11px] font-bold text-white">
       {letter}
+    </div>
+  )
+}
+
+/** Mobile preview media — 입덕-like horizontal strip + bottom scrollbar when 2+. */
+function PreviewMediaCarousel({ items }: { items: MediaPreview[] }) {
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [page, setPage] = useState(0)
+  const [thumb, setThumb] = useState({ widthPct: 100, leftPct: 0 })
+  const multi = items.length > 1
+
+  function syncScroll() {
+    const el = scrollerRef.current
+    if (!el) return
+    const max = Math.max(0, el.scrollWidth - el.clientWidth)
+    const widthPct = el.scrollWidth > 0 ? Math.min(100, (el.clientWidth / el.scrollWidth) * 100) : 100
+    const leftPct = max > 0 ? (el.scrollLeft / max) * (100 - widthPct) : 0
+    setThumb({ widthPct: Math.max(18, widthPct), leftPct })
+    const tile = el.querySelector<HTMLElement>('[data-media-tile]')
+    const step = (tile?.offsetWidth ?? el.clientWidth) + 6
+    setPage(Math.min(items.length - 1, Math.max(0, Math.round(el.scrollLeft / step))))
+  }
+
+  useEffect(() => {
+    const el = scrollerRef.current
+    if (!el) return
+    syncScroll()
+    el.addEventListener('scroll', syncScroll, { passive: true })
+    window.addEventListener('resize', syncScroll)
+    return () => {
+      el.removeEventListener('scroll', syncScroll)
+      window.removeEventListener('resize', syncScroll)
+    }
+  }, [items.length])
+
+  function scrollByDir(dir: -1 | 1) {
+    const el = scrollerRef.current
+    if (!el) return
+    const tile = el.querySelector<HTMLElement>('[data-media-tile]')
+    const step = (tile?.offsetWidth ?? el.clientWidth) + 6
+    el.scrollBy({ left: dir * step, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="mt-3">
+      <div className="relative">
+        <div
+          ref={scrollerRef}
+          className={cn(
+            'flex gap-1.5 overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+            multi && 'snap-x snap-mandatory'
+          )}
+        >
+          {items.map((item, index) => (
+            <div
+              key={`${item.url}-${index}`}
+              data-media-tile
+              className={cn(
+                'relative shrink-0 overflow-hidden rounded-xl bg-white/5',
+                multi
+                  ? 'aspect-square w-[85%] min-w-[85%] snap-start'
+                  : 'aspect-square w-full min-w-full'
+              )}
+            >
+              <MediaThumb item={item} />
+            </div>
+          ))}
+        </div>
+        {multi ? (
+          <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-medium text-white/90">
+            {page + 1}/{items.length}
+          </span>
+        ) : null}
+      </div>
+
+      {multi ? (
+        <div className="mt-2 flex items-center gap-1">
+          <button
+            type="button"
+            aria-label="이전 미디어"
+            onClick={() => scrollByDir(-1)}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-white/40 hover:text-white/80"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="absolute top-0 h-full rounded-full bg-white/55 transition-[left,width] duration-150"
+              style={{ width: `${thumb.widthPct}%`, left: `${thumb.leftPct}%` }}
+            />
+          </div>
+          <button
+            type="button"
+            aria-label="다음 미디어"
+            onClick={() => scrollByDir(1)}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-white/40 hover:text-white/80"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -1413,25 +1514,14 @@ export function EditClient({
                     {caption || '작성된 글이 여기에 보여요'}
                   </p>
 
-                  {/* 미디어: 빨간 박스 크기(정사각 2열 폭), 여러 장이면 가로로만 */}
-                  {(previewMedia.length > 0 || previewThumb) && (
-                    <div className="mt-3 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {previewMedia.length > 0
-                        ? previewMedia.map((item, index) => (
-                            <div
-                              key={`${item.url}-${index}`}
-                              className="relative aspect-square w-[calc((100%-0.375rem)/2)] min-w-[calc((100%-0.375rem)/2)] shrink-0 overflow-hidden rounded-xl bg-white/5"
-                            >
-                              <MediaThumb item={item} />
-                            </div>
-                          ))
-                        : (
-                            <div className="relative aspect-square w-[calc((100%-0.375rem)/2)] min-w-[calc((100%-0.375rem)/2)] shrink-0 overflow-hidden rounded-xl bg-white/5">
-                              <img src={previewThumb!} alt="" className="h-full w-full object-cover" />
-                            </div>
-                          )}
-                    </div>
-                  )}
+                  {/* 미디어: 2장+면 입덕처럼 가로 스크롤 + 하단 스크롤바 */}
+                  {previewMedia.length > 0 ? (
+                    <PreviewMediaCarousel items={previewMedia} />
+                  ) : previewThumb ? (
+                    <PreviewMediaCarousel
+                      items={[{ url: previewThumb, type: 'image', poster: previewThumb }]}
+                    />
+                  ) : null}
 
                   {/* 글자 수는 미디어 아래 — 겹치지 않게 */}
                   <p className="mt-3 text-right text-[10px] leading-none text-white/35">
