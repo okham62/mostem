@@ -20,15 +20,15 @@ import {
 import {
   GRADE_LABEL,
   GRADE_PILL,
-  STATUS_CLASS,
   STATUS_LABEL,
   derivePostStats,
   formatCount,
   mediaSrc,
 } from '@/lib/collect-labels'
 import { imagePosterUrl, parseMediaItems } from '@/lib/collect-media'
-import { formatScheduleBadgeTime, hydrateScheduledPosts, resolveScheduledAt } from '@/lib/post-schedule'
+import { hydrateScheduledPosts, resolveScheduledAt } from '@/lib/post-schedule'
 import { MediaDownloadButtons } from './media-download-buttons'
+import { StatusForceBadge } from './status-force-badge'
 import { ThreadCard } from './thread-card'
 import type { CollectedPost, CollectStatus, ConnectedAccount, PerformanceGrade } from '@/types'
 
@@ -506,21 +506,7 @@ function ListView({
                 <td className="px-3 py-3 text-sm text-white">{formatCount(stats.likes)}</td>
                 <td className="px-3 py-3 text-sm text-white">{formatCount(stats.comments)}</td>
                 <td className="px-3 py-3">
-                  {(() => {
-                    const scheduleIso =
-                      post.status === 'scheduled' ? resolveScheduledAt(post) : null
-                    const scheduleTime = scheduleIso ? formatScheduleBadgeTime(scheduleIso) : ''
-                    return (
-                      <span
-                        className={`inline-flex items-baseline gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[post.status]}`}
-                      >
-                        {STATUS_LABEL[post.status]}
-                        {scheduleTime ? (
-                          <span className="text-[9px] font-medium opacity-75">{scheduleTime}</span>
-                        ) : null}
-                      </span>
-                    )
-                  })()}
+                  <StatusForceBadge post={post} onUpdated={onUpdated} />
                 </td>
                 <td className="px-3 py-3">
                   <GradePill post={post} />
@@ -608,6 +594,7 @@ function KanbanView({
                       <article key={post.id} className="rounded-xl border border-white/10 bg-[#141418] p-3">
                         <div className="mb-2 flex items-start justify-between gap-2">
                           <p className="truncate text-xs font-semibold text-white">@{post.author || 'unknown'}</p>
+                          <StatusForceBadge post={post} onUpdated={onUpdated} />
                         </div>
                         <p className="line-clamp-3 text-sm text-white/80">{captionOf(post)}</p>
                         <p className="mt-3 text-[11px] text-white/40">

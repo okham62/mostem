@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
-import { GRADE_LABEL, STATUS_CLASS, STATUS_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
+import { GRADE_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
 import {
   clearStoredSchedule,
-  formatScheduleBadgeTime,
   formatScheduleCardDate,
   resolveScheduledAt,
 } from '@/lib/post-schedule'
 import { MediaDownloadButtons } from './media-download-buttons'
+import { StatusForceBadge } from './status-force-badge'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
 
@@ -25,7 +25,6 @@ export function ThreadCard({
 }) {
   const scheduled = post.status === 'scheduled'
   const scheduleIso = resolveScheduledAt(post)
-  const scheduleTime = scheduled && scheduleIso ? formatScheduleBadgeTime(scheduleIso) : ''
   const scheduleAt = scheduleIso ? new Date(scheduleIso) : null
   const collected = post.collected_at ? new Date(post.collected_at) : null
   const date =
@@ -80,27 +79,20 @@ export function ThreadCard({
 
   return (
     <article className="flex h-full flex-col rounded-2xl border border-[var(--card-border)] bg-[#141418] p-4">
-      <div className="mb-3 flex h-9 items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
+      <div className="relative z-10 mb-3 flex min-h-9 items-start justify-between gap-2 overflow-visible">
+        <div className="flex min-w-0 items-center gap-2.5 overflow-visible">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
             {initial}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
+          <div className="min-w-0 overflow-visible">
+            <div className="flex items-center gap-1.5 overflow-visible">
               <Link
                 href={`/threads/${post.id}/edit?tab=original`}
                 className="truncate text-sm font-semibold text-white hover:underline"
               >
                 @{post.author || 'unknown'}
               </Link>
-              <span
-                className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[post.status]}`}
-              >
-                {STATUS_LABEL[post.status]}
-                {scheduleTime ? (
-                  <span className="text-[10px] font-semibold text-amber-50">{scheduleTime}</span>
-                ) : null}
-              </span>
+              <StatusForceBadge post={post} onUpdated={onUpdated} />
             </div>
             <p className="text-[11px] text-white/35">{date}</p>
           </div>
