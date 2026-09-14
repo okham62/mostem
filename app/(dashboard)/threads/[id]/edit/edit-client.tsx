@@ -1496,21 +1496,22 @@ export function EditClient({
 
           <aside className="w-[300px] shrink-0 overflow-auto rounded-2xl border border-white/10 bg-[#141418] p-3">
             <p className="mb-2 px-1 text-[11px] text-white/40">발행하면 내 프로필에 이렇게 올라가요</p>
-            <div className="rounded-[26px] border border-white/10 bg-black px-2.5 py-3">
+            {/* 기본 높이 고정, 글·타래가 늘면 아래로만 확장 */}
+            <div className="flex min-h-[540px] flex-col rounded-[26px] border border-white/10 bg-black px-2.5 py-3">
               {/* 1번 본문 카드 */}
-              <div className="relative flex gap-2">
+              <div className="relative flex min-h-0 flex-1 gap-2">
                 <div className="flex w-9 shrink-0 flex-col items-center">
                   <PreviewAccountAvatar account={selected} />
                   {replies.length > 0 ? (
                     <div className="mt-1 w-0.5 flex-1 min-h-[16px] rounded-full bg-white/15" aria-hidden />
                   ) : null}
                 </div>
-                <div className="min-w-0 flex-1 pb-3">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3">
                   <div className="flex items-baseline gap-1.5">
                     <p className="truncate text-xs font-semibold text-white">{previewName}</p>
                     <p className="shrink-0 text-[10px] text-white/30">지금</p>
                   </div>
-                  <p className="mt-1.5 min-h-[72px] whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
+                  <p className="mt-1.5 min-h-[72px] flex-1 whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
                     {caption || '작성된 글이 여기에 보여요'}
                   </p>
 
