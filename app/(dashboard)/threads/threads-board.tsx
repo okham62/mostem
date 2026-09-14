@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   BarChart3,
   CalendarClock,
@@ -106,6 +107,8 @@ export function ThreadsBoard({
   posts: CollectedPost[]
   accounts: ConnectedAccount[]
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [posts, setPosts] = useState(initialPosts)
   const [accounts, setAccounts] = useState(initialAccounts)
   const [hiddenIds, setHiddenIds] = useState<string[]>([])
@@ -237,7 +240,7 @@ export function ThreadsBoard({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('collected')
 
   useEffect(() => {
-    const status = new URLSearchParams(window.location.search).get('status')
+    const status = searchParams.get('status')
     if (!status) {
       setStatusFilter('collected')
       return
@@ -245,8 +248,13 @@ export function ThreadsBoard({
     if (status === 'all' || STATUS_ORDER.includes(status as CollectStatus)) {
       setStatusFilter(status as StatusFilter)
     }
-  }, [])
-  const [sort, setSort] = useState<SortMode>('newest')
+  }, [searchParams])
+
+  function selectStatus(next: StatusFilter) {
+    setStatusFilter(next)
+    const href = next === 'all' ? '/threads' : `/threads?status=${next}`
+    router.push(href, { scroll: false })
+  }  const [sort, setSort] = useState<SortMode>('newest')
   const [refreshing, setRefreshing] = useState(false)
 
   const counts = useMemo(
@@ -437,7 +445,7 @@ export function ThreadsBoard({
             <button
               key={item.id}
               type="button"
-              onClick={() => setStatusFilter(item.id)}
+              onClick={() => selectStatus(item.id)}
               className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium ${
                 active ? 'bg-white/12 text-white' : 'bg-white/5 text-white/50 hover:bg-white/8 hover:text-white/80'
               }`}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
   BookOpen,
@@ -74,6 +74,7 @@ function NavGroup({
   items: { href: string; label: string; icon: React.ElementType }[]
   pathname: string
 }) {
+  const router = useRouter()
   return (
     <div className="mb-5">
       <div className="mb-2 flex items-center gap-2 px-3">
@@ -100,10 +101,10 @@ function NavGroup({
                   if (itemPath === '/shopping') warmShoppingCache()
                   if (itemPath === '/markets') warmMarketCharts()
                   if (itemPath === '/trends') warmTrendCache()
-                  // Always open Threads on 「수집」.
+                  // Open Threads on 「수집」, but keep SPA history (no hard assign).
                   if (isThreads) {
                     event.preventDefault()
-                    window.location.assign('/threads?status=collected')
+                    router.push('/threads?status=collected')
                   }
                 }}
                 onMouseEnter={() => {

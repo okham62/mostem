@@ -403,7 +403,8 @@ export function EditClient({
 
   function openTab(next: Tab) {
     setTab(next)
-    router.replace(`/threads/${post.id}/edit?tab=${next}`, { scroll: false })
+    // push so browser/back and ← 스레드 walk tab changes one step at a time
+    router.push(`/threads/${post.id}/edit?tab=${next}`, { scroll: false })
   }
 
   async function persist(
@@ -876,19 +877,24 @@ export function EditClient({
       <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/threads?status=editing"
+          <button
+            type="button"
             className="text-sm text-white/60 hover:text-white"
-            onClick={(event) => {
-              event.preventDefault()
+            onClick={() => {
               void (async () => {
                 await flushEditSave()
-                router.push('/threads?status=editing')
+                const before = window.location.href
+                router.back()
+                window.setTimeout(() => {
+                  if (window.location.href === before) {
+                    router.push(`/threads?status=${post.status || 'collected'}`)
+                  }
+                }, 280)
               })()
             }}
           >
             ← 스레드
-          </Link>
+          </button>
           {tabs.map((item) => (
             <button
               key={item.id}

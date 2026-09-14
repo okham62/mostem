@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { attachScheduleTimes, readScheduleMap } from '@/lib/schedule-store'
 import { ThreadsBoard } from './threads-board'
@@ -33,9 +34,11 @@ export default async function ThreadsPage() {
   )
 
   return (
-    <ThreadsBoard
-      posts={posts}
-      accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
-    />
+    <Suspense fallback={<div className="p-6 text-sm text-white/40">불러오는 중…</div>}>
+      <ThreadsBoard
+        posts={posts}
+        accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
+      />
+    </Suspense>
   )
 }
