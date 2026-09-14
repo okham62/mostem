@@ -82,6 +82,31 @@ function AutoGrowTextarea({
   )
 }
 
+function PreviewAccountAvatar({ account }: { account?: ConnectedAccount | null }) {
+  const avatar =
+    mediaSrc(account?.avatar_url) ||
+    mediaSrc(publicThreadsAvatar(account?.username || '') || '') ||
+    ''
+  const letter = (account?.username?.[0] ?? '나').toUpperCase()
+
+  if (avatar) {
+    return (
+      <img
+        src={avatar}
+        alt=""
+        className="h-9 w-9 rounded-full object-cover bg-black/40"
+        referrerPolicy="no-referrer"
+      />
+    )
+  }
+
+  return (
+    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand text-[11px] font-bold text-white">
+      {letter}
+    </div>
+  )
+}
+
 function newReplyId() {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
@@ -1366,9 +1391,7 @@ export function EditClient({
               {/* 1번 본문 */}
               <div className="relative flex gap-2.5">
                 <div className="flex w-9 shrink-0 flex-col items-center">
-                  <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand text-[11px] font-bold text-white">
-                    {(selected?.username?.[0] || '나').toUpperCase()}
-                  </div>
+                  <PreviewAccountAvatar account={selected} />
                   {replies.length > 0 ? (
                     <div className="mt-1 w-0.5 flex-1 min-h-[12px] rounded-full bg-white/15" aria-hidden />
                   ) : null}
@@ -1406,9 +1429,7 @@ export function EditClient({
                 return (
                   <div key={item.id} className="relative flex gap-2.5">
                     <div className="flex w-9 shrink-0 flex-col items-center">
-                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand text-[11px] font-bold text-white">
-                        {(selected?.username?.[0] || '나').toUpperCase()}
-                      </div>
+                      <PreviewAccountAvatar account={selected} />
                       {!isLast ? (
                         <div className="mt-1 w-0.5 flex-1 min-h-[12px] rounded-full bg-white/15" aria-hidden />
                       ) : null}
