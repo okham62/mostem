@@ -5,7 +5,7 @@ export function isStaleChunkError(error: unknown) {
       : typeof error === 'string'
         ? error
         : ''
-  return /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading CSS chunk/i.test(
+  return /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading CSS chunk|NotFoundError|Failed to execute 'removeChild'|Failed to execute 'insertBefore'|The node to be removed is not a child/i.test(
     text
   )
 }
