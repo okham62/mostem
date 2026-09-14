@@ -182,10 +182,14 @@ export function ThreadsBoard({
   }, [hiddenIds])
   const [query, setQuery] = useState('')
   const [grade, setGrade] = useState<'all' | PerformanceGrade>('all')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('collected')
 
   useEffect(() => {
     const status = new URLSearchParams(window.location.search).get('status')
+    if (!status) {
+      setStatusFilter('collected')
+      return
+    }
     if (status === 'all' || STATUS_ORDER.includes(status as CollectStatus)) {
       setStatusFilter(status as StatusFilter)
     }

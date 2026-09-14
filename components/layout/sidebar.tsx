@@ -48,7 +48,7 @@ function BlogIcon() {
 }
 
 export const publish = [
-  { href: '/threads', label: '스레드', icon: ThreadsIcon },
+  { href: '/threads?status=collected', label: '스레드', icon: ThreadsIcon },
   { href: '/instagram', label: '인스타', icon: InstagramIcon },
   { href: '/tiktok', label: '틱톡', icon: TiktokIcon },
   { href: '/blog', label: '네이버 블로그', icon: BlogIcon },
@@ -83,41 +83,39 @@ function NavGroup({
       <ul className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon
+          const itemPath = item.href.split('?')[0]
+          const isThreads = itemPath === '/threads'
           const isActive =
-            item.href === '/admin'
+            itemPath === '/admin'
               ? pathname === '/admin' || pathname.startsWith('/admin/users')
-              : pathname === item.href || pathname.startsWith(item.href + '/')
+              : pathname === itemPath || pathname.startsWith(`${itemPath}/`)
           return (
             <li key={item.href}>
               <Link
                 href={item.href}
                 onClick={(event) => {
-                  previewHideMarketTicker(item.href === '/markets')
-                  if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
-                  if (item.href === '/shopping') warmShoppingCache()
-                  if (item.href === '/markets') warmMarketCharts()
-                  if (item.href === '/trends') warmTrendCache()
-                  // Leaving a stuck /threads/[id] 404 (or soft-nav glitch) needs a full load.
-                  if (
-                    item.href === '/threads' &&
-                    pathname.startsWith('/threads/') &&
-                    pathname !== '/threads'
-                  ) {
+                  previewHideMarketTicker(itemPath === '/markets')
+                  if (itemPath === '/keywords' || itemPath === '/news') warmRealtimeCache()
+                  if (itemPath === '/shopping') warmShoppingCache()
+                  if (itemPath === '/markets') warmMarketCharts()
+                  if (itemPath === '/trends') warmTrendCache()
+                  // Always open Threads on 「수집」.
+                  if (isThreads) {
                     event.preventDefault()
-                    window.location.assign('/threads')
+                    window.location.assign('/threads?status=collected')
                   }
                 }}
                 onMouseEnter={() => {
-                  if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
-                  if (item.href === '/shopping') warmShoppingCache()
-                  if (item.href === '/markets') warmMarketCharts()
-                  if (item.href === '/trends') warmTrendCache()
+                  if (itemPath === '/keywords' || itemPath === '/news') warmRealtimeCache()
+                  if (itemPath === '/shopping') warmShoppingCache()
+                  if (itemPath === '/markets') warmMarketCharts()
+                  if (itemPath === '/trends') warmTrendCache()
                 }}
                 onFocus={() => {
-                  if (item.href === '/keywords' || item.href === '/news') warmRealtimeCache()
-                  if (item.href === '/shopping') warmShoppingCache()
-                  if (item.href === '/markets') warmMarketCharts()
-                  if (item.href === '/trends') warmTrendCache()
+                  if (itemPath === '/keywords' || itemPath === '/news') warmRealtimeCache()
+                  if (itemPath === '/shopping') warmShoppingCache()
+                  if (itemPath === '/markets') warmMarketCharts()
+                  if (itemPath === '/trends') warmTrendCache()
                 }}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
