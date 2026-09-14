@@ -5,8 +5,11 @@ import { findAiModel, rewritePrompt } from '@/lib/ai-models'
 import { generateDrafts } from '@/lib/ai-generate'
 import { scrubSecrets } from '@/lib/ai-keys'
 import { loadGeminiMediaParts, type RewriteMediaInput } from '@/lib/ai-media'
+import { parseCommentAttachmentBase64 } from '@/lib/comment-file'
 
 export const maxDuration = 60
+
+const MAX_COMMENT_FILE_CHARS = 8_000_000
 
 function normalizeMedia(raw: unknown): RewriteMediaInput[] {
   if (!Array.isArray(raw)) return []
@@ -38,10 +41,37 @@ export async function POST(req: Request) {
     model,
     webSearch,
     media: rawMedia,
+    commentsFile,
+    commentsFilename,
   } = body as Record<string, unknown>
 
   if (!caption || typeof caption !== 'string') {
     return NextResponse.json({ error: '원문이 없습니다.' }, { status: 400 })
+  }
+
+  let commentsDigest = ''
+  let commentsCount = 0
+  if (typeof commentsFile === 'string' && commentsFile.trim()) {
+    if (commentsFile.length > MAX_COMMENT_FILE_CHARS) {
+      return NextResponse.json({ error: '댓글 파일이 너무 큽니다. (최대 약 5MB)' }, { status: 400 })
+    }
+    try {
+      const parsed = parseCommentAttachmentBase64(
+        commentsFile,
+        typeof commentsFilename === 'string' && commentsFilename ? commentsFilename : 'comments.xlsx'
+      )
+      commentsDigest = parsed.text
+      commentsCount = parsed.count
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: scrubSecrets(
+            error instanceof Error ? error.message : '댓글 파일을 읽지 못했습니다.'
+          ),
+        },
+        { status: 400 }
+      )
+    }
   }
 
   const chosen = findAiModel(typeof model === 'string' ? model : '')
@@ -53,6 +83,8 @@ export async function POST(req: Request) {
     guide: typeof guide === 'string' ? guide : '',
     guideName: typeof guideName === 'string' ? guideName : '',
     hasMedia: mediaParts.length > 0,
+    commentsDigest,
+    commentsCount,
   })
 
   try {
@@ -74,11 +106,17 @@ export async function POST(req: Request) {
         model: chosen.id,
         webSearch: Boolean(webSearch),
         mediaCount: mediaParts.length,
+        commentsCount,
         drafts,
       },
       req
     )
-    return NextResponse.json({ drafts, model: chosen.id, mediaCount: mediaParts.length })
+    return NextResponse.json({
+      drafts,
+      model: chosen.id,
+      mediaCount: mediaParts.length,
+      commentsCount,
+    })
   } catch (error) {
     return NextResponse.json(
       { error: scrubSecrets(error instanceof Error ? error.message : '생성에 실패했습니다.') },
