@@ -1409,24 +1409,29 @@ export function EditClient({
                     <p className="truncate text-xs font-semibold text-white">{previewName}</p>
                     <p className="shrink-0 text-[10px] text-white/30">지금</p>
                   </div>
-                  <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
-                    {caption || '작성된 글이 여기에 보여요'}
-                  </p>
-                  {previewMedia.length ? (
-                    <div className="mt-2.5 grid grid-cols-2 gap-1.5">
-                      {previewMedia.map((item, index) => (
-                        <div
-                          key={`${item.url}-${index}`}
-                          className="relative aspect-square overflow-hidden rounded-lg bg-white/5"
-                        >
-                          <MediaThumb item={item} />
+                  {/* 글 공간은 기본 여백을 두고, 미디어는 맨 아래 */}
+                  <div className="mt-1.5 flex min-h-[200px] flex-col">
+                    <p className="whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
+                      {caption || '작성된 글이 여기에 보여요'}
+                    </p>
+                    <div className="mt-auto pt-3">
+                      {previewMedia.length ? (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {previewMedia.map((item, index) => (
+                            <div
+                              key={`${item.url}-${index}`}
+                              className="relative aspect-square overflow-hidden rounded-lg bg-white/5"
+                            >
+                              <MediaThumb item={item} />
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : previewThumb ? (
+                        <img src={previewThumb} alt="" className="w-full rounded-lg object-cover" />
+                      ) : null}
+                      <p className="mt-2 text-right text-[10px] text-white/30">{caption.length}/500</p>
                     </div>
-                  ) : previewThumb ? (
-                    <img src={previewThumb} alt="" className="mt-2.5 w-full rounded-lg object-cover" />
-                  ) : null}
-                  <p className="mt-2 text-right text-[10px] text-white/30">{caption.length}/500</p>
+                  </div>
                 </div>
               </div>
 
