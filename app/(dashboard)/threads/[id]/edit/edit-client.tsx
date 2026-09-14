@@ -169,11 +169,14 @@ function PreviewMediaCarousel({ items }: { items: MediaPreview[] }) {
               key={`${item.url}-${index}`}
               data-media-tile
               className={cn(
-                'relative aspect-square w-[calc((100%-0.375rem)/2)] min-w-[calc((100%-0.375rem)/2)] shrink-0 overflow-hidden rounded-xl bg-white/5',
+                'relative h-[100px] w-[100px] shrink-0 overflow-hidden rounded-xl bg-white/5',
                 multi && 'snap-start'
               )}
+              style={{ width: 100, height: 100, minWidth: 100, minHeight: 100 }}
             >
-              <MediaThumb item={item} />
+              <div className="absolute inset-0">
+                <MediaThumb item={item} />
+              </div>
             </div>
           ))}
         </div>
@@ -1500,34 +1503,36 @@ export function EditClient({
               style={{ minHeight: 540 }}
             >
               {/* 1번 본문 카드 */}
-              <div className="relative flex gap-2">
+              <div className="relative flex min-h-[calc(540px-1.5rem)] gap-2">
                 <div className="flex w-9 shrink-0 flex-col items-center">
                   <PreviewAccountAvatar account={selected} />
                   {replies.length > 0 ? (
                     <div className="mt-1 w-0.5 flex-1 min-h-[16px] rounded-full bg-white/15" aria-hidden />
                   ) : null}
                 </div>
-                <div className="min-w-0 flex-1 pb-3">
+                <div className="flex min-w-0 flex-1 flex-col pb-1">
                   <div className="flex items-baseline gap-1.5">
                     <p className="truncate text-xs font-semibold text-white">{previewName}</p>
                     <p className="shrink-0 text-[10px] text-white/30">지금</p>
                   </div>
-                  <p className="mt-1.5 min-h-[120px] whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
+                  <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-snug text-white/85">
                     {caption || '작성된 글이 여기에 보여요'}
                   </p>
 
-                  {/* 미디어: 작은 정사각(절반 폭), 2장+면 가로 스크롤바 */}
-                  {previewMedia.length > 0 ? (
-                    <PreviewMediaCarousel items={previewMedia} />
-                  ) : previewThumb ? (
-                    <PreviewMediaCarousel
-                      items={[{ url: previewThumb, type: 'image', poster: previewThumb }]}
-                    />
-                  ) : null}
+                  {/* 미디어는 본문 아래 여백을 두고 카드 하단으로 */}
+                  <div className="mt-auto pt-4">
+                    {previewMedia.length > 0 ? (
+                      <PreviewMediaCarousel items={previewMedia} />
+                    ) : previewThumb ? (
+                      <PreviewMediaCarousel
+                        items={[{ url: previewThumb, type: 'image', poster: previewThumb }]}
+                      />
+                    ) : null}
 
-                  <p className="mt-4 text-right text-[10px] leading-none text-white/35">
-                    {caption.length}/500
-                  </p>
+                    <p className="mt-3 text-right text-[10px] leading-none text-white/35">
+                      {caption.length}/500
+                    </p>
+                  </div>
                 </div>
               </div>
 
