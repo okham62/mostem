@@ -28,6 +28,7 @@ import {
 } from '@/lib/collect-labels'
 import { imagePosterUrl, parseMediaItems } from '@/lib/collect-media'
 import { hydrateScheduledPosts, resolveScheduledAt } from '@/lib/post-schedule'
+import { openThreadEdit } from '@/lib/open-thread-edit'
 import { publicThreadsAvatar, requestHamiThreadsProfiles } from '@/lib/threads-profile'
 import { MediaDownloadButtons } from './media-download-buttons'
 import { StatusForceBadge } from './status-force-badge'
@@ -632,12 +633,13 @@ function ListView({
                         예약 취소
                       </button>
                     ) : null}
-                    <a
-                      href={`/threads/${post.id}/edit?tab=rewrite`}
+                    <button
+                      type="button"
+                      onClick={() => openThreadEdit(post.id, 'rewrite')}
                       className="rounded-lg bg-brand px-2.5 py-1 text-[11px] font-semibold text-white"
                     >
                       편집
-                    </a>
+                    </button>
                     <button
                       type="button"
                       onClick={() => onRemoved(post.id)}
@@ -710,12 +712,13 @@ function KanbanView({
                               예약 취소
                             </button>
                           ) : null}
-                          <a
-                            href={`/threads/${post.id}/edit?tab=rewrite`}
+                          <button
+                            type="button"
+                            onClick={() => openThreadEdit(post.id, 'rewrite')}
                             className="rounded-lg bg-brand px-2 py-1 text-[10px] font-semibold text-white"
                           >
                             편집
-                          </a>
+                          </button>
                           <button
                             type="button"
                             onClick={() => onRemoved(post.id)}

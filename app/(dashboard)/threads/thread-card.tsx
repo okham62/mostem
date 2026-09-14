@@ -3,6 +3,7 @@
 import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
 import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
+import { openThreadEdit } from '@/lib/open-thread-edit'
 import {
   clearStoredSchedule,
   formatScheduleCardDate,
@@ -85,12 +86,13 @@ export function ThreadCard({
           </div>
           <div className="min-w-0 overflow-visible">
             <div className="flex items-center gap-1.5 overflow-visible">
-              <a
-                href={`/threads/${post.id}/edit?tab=original`}
+              <button
+                type="button"
+                onClick={() => openThreadEdit(post.id, 'original')}
                 className="truncate text-sm font-semibold text-white hover:underline"
               >
                 @{post.author || 'unknown'}
-              </a>
+              </button>
               <StatusForceBadge post={post} onUpdated={onUpdated} />
             </div>
             <p className="text-[11px] text-white/35">{date}</p>
@@ -187,12 +189,13 @@ export function ThreadCard({
               원본
             </a>
           )}
-          <a
-            href={`/threads/${post.id}/edit?tab=rewrite`}
+          <button
+            type="button"
+            onClick={() => openThreadEdit(post.id, 'rewrite')}
             className="rounded-lg bg-brand px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand/90"
           >
             편집
-          </a>
+          </button>
         </div>
       </div>
     </article>

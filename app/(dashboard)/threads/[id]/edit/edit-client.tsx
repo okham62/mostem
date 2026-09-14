@@ -285,7 +285,7 @@ export function EditClient({
   const [lightbox, setLightbox] = useState<MediaPreview | null>(null)
   const mediaStripRef = useRef<HTMLDivElement>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
-  const [modelId, setModelId] = useState(DEFAULT_AI_MODEL.id)
+  const [modelId, setModelId] = useState(DEFAULT_AI_MODEL?.id ?? 'gemini-3.8-flash')
   const [webSearch, setWebSearch] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -439,7 +439,7 @@ export function EditClient({
     setHiddenSource(stored.hiddenSource)
     setHistory(stored.history)
     setReplies(
-      stored.replies.map((text) => ({
+      (stored.replies ?? []).map((text) => ({
         id: newReplyId(),
         text,
       }))

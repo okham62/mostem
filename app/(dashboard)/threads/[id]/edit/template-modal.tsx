@@ -117,14 +117,14 @@ export function TemplateModal({
                   </p>
                   <p className="mt-1 text-xs leading-5 text-white/45">{item.body}</p>
                 </button>
-                <div className="flex shrink-0 flex-col gap-1.5">
+                <div className="flex w-[132px] shrink-0 flex-col gap-1.5">
                   <button
                     type="button"
                     onClick={() => {
                       onInsert(item.body)
                       onClose()
                     }}
-                    className="rounded-lg bg-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/15"
+                    className="w-full rounded-lg bg-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/15"
                   >
                     타래에 넣기
                   </button>
@@ -132,7 +132,7 @@ export function TemplateModal({
                     <button
                       type="button"
                       onClick={() => removeTemplate(item)}
-                      className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-white/45 hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-300"
+                      className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-white/45 hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-300"
                       aria-label={`${item.title} 삭제`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />

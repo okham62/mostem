@@ -11,6 +11,7 @@ export default function EditError({
   reset: () => void
 }) {
   useEffect(() => {
+    console.error('[mostem] edit error', error?.message, error?.digest, error)
     if (reloadOnceForStaleChunk(error)) return
     if (isStaleChunkError(error)) {
       try {
@@ -24,6 +25,9 @@ export default function EditError({
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
       <p className="text-sm text-white/60">편집 화면을 불러오지 못했습니다. 다시 열어 주세요.</p>
+      {error?.message ? (
+        <p className="max-w-md break-words text-[11px] text-white/35">{error.message}</p>
+      ) : null}
       <button
         type="button"
         onClick={() => {
