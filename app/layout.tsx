@@ -10,6 +10,14 @@ export const metadata: Metadata = {
   title: 'MOSTEM',
   description: '콘텐츠 수집, 분석, 발행을 한곳에서',
   applicationName: 'MOSTEM',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '128x128' },
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '128x128', type: 'image/png' }],
+    shortcut: ['/favicon.ico'],
+  },
   appleWebApp: {
     capable: true,
     title: '모스템',
