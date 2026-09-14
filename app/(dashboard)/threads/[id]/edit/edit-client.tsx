@@ -40,8 +40,8 @@ type ThreadReply = { id: string; text: string }
 
 const MAX_COMMENT_FILE_BYTES = 5 * 1024 * 1024
 const THREAD_CHAR_LIMIT = 500
-/** Default caption box height — matches edit UI frame, then grows downward only. */
-const CAPTION_MIN_PX = 380
+/** Default caption box height — matches the edit UI frame the user marked. */
+const CAPTION_MIN_PX = 260
 const REPLY_MIN_PX = 96
 
 function syncTextareaHeight(el: HTMLTextAreaElement, minHeight: number) {
