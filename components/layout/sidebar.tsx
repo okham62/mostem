@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { BrandMark } from '@/components/brand-logos'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { cn } from '@/lib/utils'
 import { warmMarketCharts } from '@/lib/market-cache'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
@@ -152,7 +153,8 @@ export function Sidebar({ session, onHide }: SidebarProps) {
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
-      <div className="flex items-center justify-end px-2 pt-2">
+      <div className="flex items-center justify-between gap-2 px-2 pt-2">
+        <ThemeToggle size="sm" />
         <button
           type="button"
           aria-label="사이드바 숨기기"

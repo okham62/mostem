@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Zap } from 'lucide-react'
 import type { Session } from 'next-auth'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 
 const PAGE_TITLES: Record<string, string> = {
   '/keywords': '실시간 키워드',
@@ -50,19 +51,22 @@ export function MobileHeader({ session }: { session: Session | null }) {
         </div>
         <span className="text-sm font-bold text-white">{title}</span>
       </div>
-      {user ? (
-        <Link href="/settings" className="flex items-center gap-2">
-          {user.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.image} alt="" className="h-7 w-7 rounded-full object-cover" />
-          ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-[11px] font-medium text-white">
-              {user.name?.[0]?.toUpperCase() ?? 'U'}
-            </div>
-          )}
-          <span className="max-w-[4.5rem] truncate text-[11px] text-white/70">{loginId}</span>
-        </Link>
-      ) : null}
+      <div className="flex items-center gap-2">
+        <ThemeToggle size="sm" />
+        {user ? (
+          <Link href="/settings" className="flex items-center gap-2">
+            {user.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.image} alt="" className="h-7 w-7 rounded-full object-cover" />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-[11px] font-medium text-white">
+                {user.name?.[0]?.toUpperCase() ?? 'U'}
+              </div>
+            )}
+            <span className="max-w-[4.5rem] truncate text-[11px] text-white/70">{loginId}</span>
+          </Link>
+        ) : null}
+      </div>
     </header>
   )
 }

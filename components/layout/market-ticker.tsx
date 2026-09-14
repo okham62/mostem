@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { MarketIcon } from '@/components/market-icons'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { subscribeLiveMarkets } from '@/lib/live-markets'
 import { emptyMarketItems, formatChange, formatKrw, formatUsd, type MarketItem } from '@/lib/markets'
 import { cn } from '@/lib/utils'
@@ -105,43 +106,46 @@ export function MarketTicker() {
       onMouseLeave={onLeave}
       className="sticky top-0 z-30 overflow-x-clip overflow-y-visible border-b border-[var(--card-border)] bg-[var(--ticker-bg)]"
     >
-      <div
-        ref={rowRef}
-        className="flex flex-nowrap items-center justify-start gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [-ms-overflow-style:none] md:justify-center md:gap-2.5 md:px-4 md:py-3.5 [&::-webkit-scrollbar]:hidden"
-      >
-        {items.map((item) => {
-          const up = (item.change ?? 0) > 0
-          const down = (item.change ?? 0) < 0
-          return (
-            <div key={item.id} className="relative flex shrink-0">
-              <Link
-                href="/markets"
-                data-ticker-pill
-                onClick={() => previewHideMarketTicker(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.06] px-2.5 py-1 will-change-transform [transition:transform_160ms_cubic-bezier(0.22,1,0.36,1)] hover:border-white/40 hover:bg-white/10 md:gap-2 md:px-3 md:py-1.5"
-              >
-                <MarketIcon id={item.id} className="h-5 w-5 md:h-6 md:w-6" />
-                <span className="text-[12px] font-bold tracking-tight text-white md:text-[13px]">{item.label}</span>
-                <span className="text-[12px] font-bold text-gold md:text-[13px]">{formatKrw(item.krw)}</span>
-                {item.kind === 'coin' ? (
-                  <span className="hidden text-[13px] font-semibold text-white/80 md:inline">{formatUsd(item.usd)}</span>
-                ) : null}
-                {item.change != null ? (
-                  <span
-                    className={cn(
-                      'text-xs font-extrabold',
-                      up && 'text-[var(--change-up)]',
-                      down && 'text-[var(--change-down)]',
-                      !up && !down && 'text-white/50',
-                    )}
-                  >
-                    {formatChange(item.change)}
-                  </span>
-                ) : null}
-              </Link>
-            </div>
-          )
-        })}
+      <div className="relative flex items-center gap-2 px-2 md:px-3">
+        <div
+          ref={rowRef}
+          className="flex min-w-0 flex-1 flex-nowrap items-center justify-start gap-1.5 overflow-x-auto py-2 [scrollbar-width:none] [-ms-overflow-style:none] md:justify-center md:gap-2.5 md:py-3.5 [&::-webkit-scrollbar]:hidden"
+        >
+          {items.map((item) => {
+            const up = (item.change ?? 0) > 0
+            const down = (item.change ?? 0) < 0
+            return (
+              <div key={item.id} className="relative flex shrink-0">
+                <Link
+                  href="/markets"
+                  data-ticker-pill
+                  onClick={() => previewHideMarketTicker(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.06] px-2.5 py-1 will-change-transform [transition:transform_160ms_cubic-bezier(0.22,1,0.36,1)] hover:border-white/40 hover:bg-white/10 md:gap-2 md:px-3 md:py-1.5"
+                >
+                  <MarketIcon id={item.id} className="h-5 w-5 md:h-6 md:w-6" />
+                  <span className="text-[12px] font-bold tracking-tight text-white md:text-[13px]">{item.label}</span>
+                  <span className="text-[12px] font-bold text-gold md:text-[13px]">{formatKrw(item.krw)}</span>
+                  {item.kind === 'coin' ? (
+                    <span className="hidden text-[13px] font-semibold text-white/80 md:inline">{formatUsd(item.usd)}</span>
+                  ) : null}
+                  {item.change != null ? (
+                    <span
+                      className={cn(
+                        'text-xs font-extrabold',
+                        up && 'text-[var(--change-up)]',
+                        down && 'text-[var(--change-down)]',
+                        !up && !down && 'text-white/50',
+                      )}
+                    >
+                      {formatChange(item.change)}
+                    </span>
+                  ) : null}
+                </Link>
+              </div>
+            )
+          })}
+        </div>
+        <ThemeToggle className="hidden md:inline-flex" />
       </div>
     </div>
   )
