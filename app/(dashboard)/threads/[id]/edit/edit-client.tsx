@@ -3,7 +3,7 @@
 import { Paperclip, Trash2, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { GRADE_LABEL, formatCount, mediaSrc } from '@/lib/collect-labels'
 import { cleanMediaUrl, imagePosterUrl, isVideoFile, parseMediaItems } from '@/lib/collect-media'
 import { DEFAULT_AI_GUIDES, pickDefaultGuide, type AiGuide } from '@/lib/ai-guides'
@@ -231,6 +231,7 @@ export function EditClient({
   )
   const [instruction, setInstruction] = useState('')
   const [commentFile, setCommentFile] = useState<CommentAttachment | null>(null)
+  const [commentDropActive, setCommentDropActive] = useState(false)
   const [replies, setReplies] = useState<ThreadReply[]>([])
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [guides, setGuides] = useState<AiGuide[]>(DEFAULT_AI_GUIDES)
@@ -688,6 +689,29 @@ export function EditClient({
     }
   }
 
+  function onCommentDragOver(event: DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+    if (!commentDropActive) setCommentDropActive(true)
+  }
+
+  function onCommentDragLeave(event: DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    const next = event.relatedTarget as Node | null
+    if (next && event.currentTarget.contains(next)) return
+    setCommentDropActive(false)
+  }
+
+  function onCommentDrop(event: DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    setCommentDropActive(false)
+    const file = event.dataTransfer.files?.[0] ?? null
+    void attachCommentFile(file)
+  }
+
   async function generate() {
     setSaving(true)
     setMessage('')
@@ -1101,35 +1125,51 @@ export function EditClient({
                 placeholder="(선택) 어떻게 바꿀까요? — 첫 문장 더 세게, 원문 줄바꿈 그대로... 안 써도 생성돼요"
                 className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none"
               />
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-white/20 bg-white/5 px-2.5 text-[11px] text-white/70 hover:border-white/35 hover:text-white">
-                  <Paperclip className="h-3.5 w-3.5" />
-                  댓글 파일
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-                    className="sr-only"
-                    onChange={(event) => {
-                      void attachCommentFile(event.target.files?.[0] ?? null)
-                      event.target.value = ''
-                    }}
-                  />
-                </label>
-                {commentFile ? (
-                  <span className="inline-flex max-w-[220px] items-center gap-1 rounded-lg bg-brand/15 px-2 py-1.5 text-[11px] text-brand">
-                    <span className="truncate">{commentFile.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => setCommentFile(null)}
-                      className="rounded p-0.5 hover:bg-white/10"
-                      aria-label="댓글 파일 제거"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-white/35">확장 프로그램 댓글 엑셀 첨부 시 호응 반영</span>
-                )}
+              <div
+                onDragEnter={onCommentDragOver}
+                onDragOver={onCommentDragOver}
+                onDragLeave={onCommentDragLeave}
+                onDrop={onCommentDrop}
+                className={`rounded-xl border border-dashed px-3 py-2.5 transition-colors ${
+                  commentDropActive
+                    ? 'border-brand bg-brand/15'
+                    : 'border-white/15 bg-white/[0.03]'
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/8 px-2.5 text-[11px] text-white/80 hover:bg-white/12">
+                    <Paperclip className="h-3.5 w-3.5" />
+                    댓글 파일
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                      className="sr-only"
+                      onChange={(event) => {
+                        void attachCommentFile(event.target.files?.[0] ?? null)
+                        event.target.value = ''
+                      }}
+                    />
+                  </label>
+                  {commentFile ? (
+                    <span className="inline-flex max-w-[min(280px,100%)] items-center gap-1 rounded-lg bg-brand/15 px-2 py-1.5 text-[11px] text-brand">
+                      <span className="truncate">{commentFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCommentFile(null)}
+                        className="rounded p-0.5 hover:bg-white/10"
+                        aria-label="댓글 파일 제거"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-white/40">
+                      {commentDropActive
+                        ? '여기에 놓으면 첨부됩니다'
+                        : '다운로드 파일 끌어다 놓기 · 또는 클릭'}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <ModelPicker value={modelId} onChange={setModelId} />
