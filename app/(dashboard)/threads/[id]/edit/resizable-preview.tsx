@@ -18,15 +18,19 @@ const EDGE_CURSOR: Record<Edge, string> = {
 
 type Size = { width: number; height: number }
 
-function readStored(key: string, fallback: Size): Size {
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function readStored(key: string, fallback: Size, aspect: number): Size {
   if (typeof window === 'undefined') return fallback
   try {
     const raw = window.localStorage.getItem(key)
     if (!raw) return fallback
     const parsed = JSON.parse(raw) as Partial<Size>
     const width = typeof parsed.width === 'number' ? parsed.width : fallback.width
-    const height = typeof parsed.height === 'number' ? parsed.height : fallback.height
-    return { width, height }
+    // Always derive height from aspect so outer/inner stay proportional.
+    return { width, height: width * aspect }
   } catch {
     return fallback
   }
@@ -59,9 +63,7 @@ export function ResizablePreview({
   defaultWidth = 320,
   defaultHeight = 560,
   minWidth = 240,
-  minHeight = 320,
   maxWidth = 720,
-  maxHeight = 960,
   className,
   children,
 }: {
@@ -75,18 +77,20 @@ export function ResizablePreview({
   className?: string
   children: ReactNode
 }) {
+  const aspect = defaultHeight / defaultWidth
   const [size, setSize] = useState<Size>({ width: defaultWidth, height: defaultHeight })
   const dragRef = useRef<{
     edge: Edge
     startX: number
     startY: number
     startW: number
-    startH: number
   } | null>(null)
 
   useEffect(() => {
-    setSize(readStored(storageKey, { width: defaultWidth, height: defaultHeight }))
-  }, [storageKey, defaultWidth, defaultHeight])
+    const stored = readStored(storageKey, { width: defaultWidth, height: defaultHeight }, aspect)
+    const width = clamp(stored.width, minWidth, maxWidth)
+    setSize({ width, height: width * aspect })
+  }, [storageKey, defaultWidth, defaultHeight, aspect, minWidth, maxWidth])
 
   useEffect(() => {
     function onMove(event: PointerEvent) {
@@ -94,15 +98,28 @@ export function ResizablePreview({
       if (!drag) return
       const dx = event.clientX - drag.startX
       const dy = event.clientY - drag.startY
-      let width = drag.startW
-      let height = drag.startH
-      if (drag.edge.includes('e')) width = drag.startW + dx
-      if (drag.edge.includes('w')) width = drag.startW - dx
-      if (drag.edge.includes('s')) height = drag.startH + dy
-      if (drag.edge.includes('n')) height = drag.startH - dy
-      width = Math.min(maxWidth, Math.max(minWidth, width))
-      height = Math.min(maxHeight, Math.max(minHeight, height))
-      setSize({ width, height })
+
+      // Pick the dominant axis so corner/edge drags keep a locked aspect ratio.
+      let nextWidth = drag.startW
+      if (drag.edge === 'e' || drag.edge === 'w') {
+        nextWidth = drag.edge === 'e' ? drag.startW + dx : drag.startW - dx
+      } else if (drag.edge === 'n' || drag.edge === 's') {
+        const nextHeight = drag.edge === 's' ? drag.startW * aspect + dy : drag.startW * aspect - dy
+        nextWidth = nextHeight / aspect
+      } else {
+        const fromX =
+          drag.edge.includes('e') ? drag.startW + dx : drag.edge.includes('w') ? drag.startW - dx : drag.startW
+        const fromY = (() => {
+          const startH = drag.startW * aspect
+          const nextH = drag.edge.includes('s') ? startH + dy : drag.edge.includes('n') ? startH - dy : startH
+          return nextH / aspect
+        })()
+        // Use the larger absolute change so the gesture feels natural.
+        nextWidth = Math.abs(fromX - drag.startW) >= Math.abs(fromY - drag.startW) ? fromX : fromY
+      }
+
+      const width = clamp(nextWidth, minWidth, maxWidth)
+      setSize({ width, height: width * aspect })
     }
 
     function onUp() {
@@ -124,7 +141,7 @@ export function ResizablePreview({
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
     }
-  }, [storageKey, minWidth, minHeight, maxWidth, maxHeight])
+  }, [storageKey, minWidth, maxWidth, aspect])
 
   function startDrag(edge: Edge, event: ReactPointerEvent) {
     event.preventDefault()
@@ -135,19 +152,28 @@ export function ResizablePreview({
       startX: event.clientX,
       startY: event.clientY,
       startW: size.width,
-      startH: size.height,
     }
   }
 
   const edges: Edge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+  const scale = size.width / defaultWidth
 
   return (
     <div
       className={cn('relative shrink-0', className)}
       style={{ width: size.width, height: size.height, maxWidth: '100%' }}
     >
-      <div className="h-full overflow-auto rounded-2xl border border-white/10 bg-[#141418] p-4">
-        {children}
+      <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-[#141418]">
+        <div
+          className="origin-top-left p-4"
+          style={{
+            width: defaultWidth,
+            height: defaultHeight,
+            transform: `scale(${scale})`,
+          }}
+        >
+          {children}
+        </div>
       </div>
       {edges.map((edge) => (
         <button
