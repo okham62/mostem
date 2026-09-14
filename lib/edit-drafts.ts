@@ -83,7 +83,10 @@ export function readEditDraft(postId: string): EditDraftStore | null {
 
 export function writeEditDraft(
   postId: string,
-  value: Omit<EditDraftStore, 'savedAt' | 'history'> & { history?: GenerateRun[]; replies?: string[] }
+  value: Omit<EditDraftStore, 'savedAt' | 'history' | 'replies'> & {
+    history?: GenerateRun[]
+    replies?: string[]
+  }
 ) {
   if (typeof window === 'undefined') return
   const prev = value.history ? null : readEditDraft(postId)

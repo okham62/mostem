@@ -769,6 +769,7 @@ export function EditClient({
       draftIndex: 0,
       hiddenSource,
       history: nextHistory,
+      replies: replies.map((item) => item.text),
     })
     const parts: string[] = []
     if (typeof data.mediaCount === 'number' && data.mediaCount > 0) parts.push(`미디어 ${data.mediaCount}`)
