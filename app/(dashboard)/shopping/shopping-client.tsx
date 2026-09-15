@@ -142,66 +142,117 @@ function ProductCard({
   platform: string
   list: string
 }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  async function createBlogDraft(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setBusy(true)
+    setMsg('')
+    try {
+      const res = await fetch('/api/blog/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'product',
+          keyword: item.title,
+          product: {
+            title: item.title,
+            image: item.image,
+            priceText: item.priceText,
+            mall: item.mall,
+            url: item.url,
+            platform,
+            list,
+            rank: item.rank,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '생성 실패')
+      setMsg('초안 생성됨')
+      window.location.href = '/blog'
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : '실패')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noreferrer"
-      onClick={() =>
-        logWork('shopping_open', {
-          title: item.title,
-          rank: item.rank,
-          platform,
-          list,
-          url: item.url,
-        })
-      }
-      className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20"
-    >
-      <div className="relative aspect-[16/9] bg-black/40">
-        {item.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.image}
-            alt=""
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[11px] text-white/30">이미지 없음</div>
-        )}
-        <span
-          className={cn(
-            'absolute left-2 top-2 inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1.5 text-[11px] font-bold',
-            item.rank <= 3 ? 'bg-gold text-black' : 'bg-black/70 text-white'
+    <div className="group overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition hover:border-white/20">
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() =>
+          logWork('shopping_open', {
+            title: item.title,
+            rank: item.rank,
+            platform,
+            list,
+            url: item.url,
+          })
+        }
+        className="block"
+      >
+        <div className="relative aspect-[16/9] bg-black/40">
+          {item.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.image}
+              alt=""
+              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-[11px] text-white/30">이미지 없음</div>
           )}
-        >
-          {item.rank}
-        </span>
-        {item.discountRate ? (
-          <span className="absolute right-2 top-2 rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-            {item.discountRate}%
+          <span
+            className={cn(
+              'absolute left-2 top-2 inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1.5 text-[11px] font-bold',
+              item.rank <= 3 ? 'bg-gold text-black' : 'bg-black/70 text-white'
+            )}
+          >
+            {item.rank}
           </span>
-        ) : null}
-      </div>
-      <div className="space-y-2 p-3.5">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">{item.title}</p>
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-sm font-bold text-gold">{item.priceText || '가격 문의'}</span>
-          {item.listPrice ? (
-            <span className="text-[10px] text-white/30 line-through">
-              {item.listPrice.toLocaleString('ko-KR')}원
+          {item.discountRate ? (
+            <span className="absolute right-2 top-2 rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              {item.discountRate}%
             </span>
           ) : null}
         </div>
-        <div className="flex items-center justify-between gap-2 text-[10px] text-white/40">
-          <span className="truncate">{item.mall}</span>
-          <span className="inline-flex shrink-0 items-center gap-1">
-            {item.reviewScore ? <span>★ {item.reviewScore}</span> : null}
-            {item.reviewCount ? <span>({item.reviewCount})</span> : null}
-            <ExternalLink className="h-3 w-3 text-white/25" />
-          </span>
+        <div className="space-y-2 p-3.5 pb-2">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">{item.title}</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-sm font-bold text-gold">{item.priceText || '가격 문의'}</span>
+            {item.listPrice ? (
+              <span className="text-[10px] text-white/30 line-through">
+                {item.listPrice.toLocaleString('ko-KR')}원
+              </span>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-between gap-2 text-[10px] text-white/40">
+            <span className="truncate">{item.mall}</span>
+            <span className="inline-flex shrink-0 items-center gap-1">
+              {item.reviewScore ? <span>★ {item.reviewScore}</span> : null}
+              {item.reviewCount ? <span>({item.reviewCount})</span> : null}
+              <ExternalLink className="h-3 w-3 text-white/25" />
+            </span>
+          </div>
         </div>
+      </a>
+      <div className="px-3.5 pb-3.5">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={(e) => void createBlogDraft(e)}
+          className="w-full rounded-lg bg-gold/15 px-2 py-1.5 text-[11px] font-semibold text-gold hover:bg-gold/25 disabled:opacity-50"
+        >
+          {busy ? '생성 중…' : '블로그 초안 만들기'}
+        </button>
+        {msg ? <p className="mt-1 truncate text-[10px] text-white/40">{msg}</p> : null}
       </div>
-    </a>
+    </div>
   )
 }

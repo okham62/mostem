@@ -52,7 +52,7 @@ export const publish = [
   { href: '/threads?status=collected', label: '스레드', icon: ThreadsIcon },
   { href: '/instagram', label: '인스타', icon: InstagramIcon },
   { href: '/tiktok', label: '틱톡', icon: TiktokIcon },
-  { href: '/blog', label: '네이버 블로그', icon: BlogIcon },
+  { href: '/blog', label: 'Blog Hub', icon: BlogIcon },
 ]
 
 export const tools = [

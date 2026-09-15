@@ -15,7 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/threads': '스레드',
   '/instagram': '인스타',
   '/tiktok': '틱톡',
-  '/blog': '네이버 블로그',
+  '/blog': 'Blog Hub',
   '/compose': '새 글 만들기',
   '/ai': 'AI 도구',
   '/links': '링크 변환',
