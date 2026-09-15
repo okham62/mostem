@@ -18,7 +18,6 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { BrandMark } from '@/components/brand-logos'
-import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { cn } from '@/lib/utils'
 import { warmMarketCharts } from '@/lib/market-cache'
 import { warmRealtimeCache } from '@/lib/realtime-cache'
@@ -49,9 +48,9 @@ function BlogIcon() {
 }
 
 export const publish = [
-  { href: '/threads?status=collected', label: '스레드', icon: ThreadsIcon },
-  { href: '/instagram', label: '인스타', icon: InstagramIcon },
-  { href: '/tiktok', label: '틱톡', icon: TiktokIcon },
+  { href: '/threads?status=collected', label: 'Threads', icon: ThreadsIcon },
+  { href: '/instagram', label: 'Instagram', icon: InstagramIcon },
+  { href: '/tiktok', label: 'TikTok', icon: TiktokIcon },
   { href: '/blog', label: 'Blog Hub', icon: BlogIcon },
 ]
 
@@ -126,7 +125,7 @@ function NavGroup({
                     : 'text-white/50 hover:bg-white/5 hover:text-white'
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-5 w-5 shrink-0" />
                 {item.label}
               </Link>
             </li>
@@ -154,8 +153,7 @@ export function Sidebar({ session, onHide }: SidebarProps) {
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
-      <div className="flex items-center justify-between gap-2 px-2 pt-2">
-        <ThemeToggle size="sm" />
+      <div className="flex items-center justify-end gap-2 px-2 pt-2">
         <button
           type="button"
           aria-label="사이드바 숨기기"
