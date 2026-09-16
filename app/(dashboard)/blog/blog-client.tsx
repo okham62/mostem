@@ -128,6 +128,8 @@ export function BlogClient() {
 
   const [folderPath, setFolderPath] = useState('')
   const [folderLabel, setFolderLabel] = useState('')
+  const [pickingFolder, setPickingFolder] = useState(false)
+  const [agentOnline, setAgentOnline] = useState<boolean | null>(null)
 
   const ping = (msg: string) => {
     setToast(msg)
@@ -159,13 +161,27 @@ export function BlogClient() {
     const res = await fetch('/api/blog/posts', { cache: 'no-store' })
     const data = await res.json()
     setPosts(data.posts ?? [])
-    if (data.error) setError(String(data.error))
+    if (data.error) {
+      const msg = String(data.error)
+      if (/blog_posts|schema cache/i.test(msg)) {
+        setError(
+          'Blog Hub DB 테이블이 아직 없습니다. Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 순서로 실행해 주세요.'
+        )
+      } else {
+        setError(msg)
+      }
+    }
   }, [])
 
   const loadAccounts = useCallback(async () => {
     const res = await fetch('/api/blog/accounts', { cache: 'no-store' })
     const data = await res.json()
     setAccounts(data.accounts ?? [])
+    if (data.error && /blog_accounts|schema cache/i.test(String(data.error))) {
+      setError(
+        'Blog Hub DB 테이블이 아직 없습니다. Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 순서로 실행해 주세요.'
+      )
+    }
   }, [])
 
   const loadSchedules = useCallback(async () => {
@@ -189,6 +205,55 @@ export function BlogClient() {
     void loadSchedules()
     void loadFolders()
   }, [loadTrends, loadPosts, loadAccounts, loadSchedules, loadFolders])
+
+  useEffect(() => {
+    let alive = true
+    async function pingAgent() {
+      try {
+        const res = await fetch('http://127.0.0.1:39217/health', { cache: 'no-store' })
+        if (!alive) return
+        setAgentOnline(res.ok)
+      } catch {
+        if (alive) setAgentOnline(false)
+      }
+    }
+    void pingAgent()
+    const timer = window.setInterval(() => void pingAgent(), 8000)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  const AGENT_PICKER = 'http://127.0.0.1:39217/pick-folder'
+
+  async function pickLocalFolder() {
+    setPickingFolder(true)
+    setError('')
+    try {
+      const res = await fetch(AGENT_PICKER, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || '폴더 선택 실패')
+      if (!data.path) {
+        ping('폴더 선택이 취소되었습니다')
+        return
+      }
+      setFolderPath(String(data.path))
+      if (!folderLabel) {
+        const parts = String(data.path).replace(/[\\/]+$/, '').split(/[\\/]/)
+        setFolderLabel(parts[parts.length - 1] || '')
+      }
+      setAgentOnline(true)
+      ping('폴더가 선택되었습니다')
+    } catch {
+      setAgentOnline(false)
+      setError(
+        '로컬 에이전트가 꺼져 있습니다. PC에서 workers/blog-agent 를 실행한 뒤 「폴더 찾아보기」를 다시 눌러 주세요.'
+      )
+    } finally {
+      setPickingFolder(false)
+    }
+  }
 
   const modePosts = useMemo(() => {
     if (!mode) return posts
@@ -429,50 +494,125 @@ export function BlogClient() {
   }
 
   const dowOptions = WEEKDAY_LABELS.map((label, value) => ({ label, value: value as Weekday }))
+  const naverAccounts = accounts.filter((a) => a.provider === 'naver')
 
   if (!mode) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-bold text-white">Blog Hub</h1>
-          <p className="mt-1 text-sm text-white/45">네이버 블로그 글쓰기 방식을 선택하세요.</p>
+          <p className="mt-1 text-sm text-white/45">
+            네이버 블로그 계정을 연결한 뒤, 글쓰기 방식을 선택하세요.
+          </p>
         </div>
         {error ? (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             {error}
           </div>
         ) : null}
-        <div className="grid gap-4 md:grid-cols-3">
-          {MODES.map((item) => {
-            const Icon = item.icon
-            const count = posts.filter((p) =>
-              item.id === 'seo' ? p.mode === 'seo' || p.mode === 'folder' : p.mode === item.id
-            ).length
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => selectMode(item.id)}
-                className={cn(
-                  'flex min-h-[220px] flex-col rounded-3xl border bg-gradient-to-br p-5 text-left transition hover:scale-[1.01]',
-                  item.accent
-                )}
-              >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                  <Icon className="h-6 w-6 text-white" />
-                </div>
-                <h2 className="text-lg font-bold text-white">{item.title}</h2>
-                <p className="mt-1 text-xs font-semibold text-white/55">{item.subtitle}</p>
-                <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">{item.hint}</p>
-                <p className="mt-4 text-[11px] text-white/40">초안 {count}개 · 시작하기 →</p>
-              </button>
-            )
-          })}
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs text-white/40">
-          카테고리 공개/비공개 스케줄·로컬 폴더 감시·계정 설정은 각 글쓰기 화면의{' '}
-          <span className="text-white/70">운영</span> 탭에서 관리합니다. 예약 시각에는 PC 에이전트가 켜져 있어야
-          합니다.
+        {toast ? (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            {toast}
+          </div>
+        ) : null}
+
+        <section className="rounded-3xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-white">네이버 블로그 계정</h2>
+              <p className="mt-1 text-xs text-white/45">개수 제한 없음 · blogId마다 추가</p>
+            </div>
+            <div
+              className={cn(
+                'rounded-full px-3 py-1 text-[11px] font-semibold',
+                naverAccounts.length > 0 ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/8 text-white/45'
+              )}
+            >
+              {naverAccounts.length > 0 ? `연결됨 ${naverAccounts.length}개` : '연결 안 됨'}
+            </div>
+          </div>
+          <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            <input
+              value={naverBlogId}
+              onChange={(e) => setNaverBlogId(e.target.value)}
+              placeholder="blogId (필수)"
+              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+            />
+            <input
+              value={naverUser}
+              onChange={(e) => setNaverUser(e.target.value)}
+              placeholder="표시 이름 (선택)"
+              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+            />
+            <button
+              type="button"
+              disabled={savingAccount}
+              onClick={() => void saveNaverAccount()}
+              className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/30 disabled:opacity-50"
+            >
+              {savingAccount ? '추가 중…' : '계정 추가'}
+            </button>
+          </div>
+          {naverAccounts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-white/40">
+              아직 연결된 네이버 블로그가 없습니다.
+            </div>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {naverAccounts.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                      <p className="truncate text-sm font-semibold text-white">{a.username}</p>
+                    </div>
+                    <p className="mt-0.5 truncate text-[11px] text-white/40">{a.site_url}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void removeAccount(a.id)}
+                    className="shrink-0 rounded-lg px-2 py-1 text-[11px] text-red-300/80 hover:bg-red-500/15"
+                  >
+                    연결 해제
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-white/70">글쓰기 방식 선택</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            {MODES.map((item) => {
+              const Icon = item.icon
+              const count = posts.filter((p) =>
+                item.id === 'seo' ? p.mode === 'seo' || p.mode === 'folder' : p.mode === item.id
+              ).length
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectMode(item.id)}
+                  className={cn(
+                    'flex min-h-[200px] flex-col rounded-3xl border bg-gradient-to-br p-5 text-left transition hover:scale-[1.01]',
+                    item.accent
+                  )}
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">{item.title}</h3>
+                  <p className="mt-1 text-xs font-semibold text-white/55">{item.subtitle}</p>
+                  <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">{item.hint}</p>
+                  <p className="mt-4 text-[11px] text-white/40">초안 {count}개 · 시작하기 →</p>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
     )
@@ -713,32 +853,54 @@ export function BlogClient() {
       {subTab === 'folders' ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <FolderOpen className="h-4 w-4" /> 로컬 폴더 이미지 → AI 글
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <FolderOpen className="h-4 w-4" /> 로컬 폴더 이미지 → AI 글
+              </div>
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                  agentOnline ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/8 text-white/40'
+                )}
+              >
+                {agentOnline == null ? '에이전트 확인 중' : agentOnline ? '에이전트 연결됨' : '에이전트 꺼짐'}
+              </span>
             </div>
             <p className="text-xs text-white/40">
-              에이전트 PC 경로를 등록하세요. 이미지 N장이면 N장 각각 인식 후 순서대로 글을 써 초안에 저장합니다.
+              「폴더 찾아보기」로 PC에서 직접 선택합니다. (브라우저 보안상 경로 타이핑 대신 로컬 에이전트 창을
+              사용합니다)
             </p>
-            <input
-              value={folderPath}
-              onChange={(e) => setFolderPath(e.target.value)}
-              placeholder="D:\blog-images\폰케이스"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                disabled={pickingFolder}
+                onClick={() => void pickLocalFolder()}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+              >
+                {pickingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+                폴더 찾아보기
+              </button>
+              <button
+                type="button"
+                disabled={busyKey === 'folder' || !folderPath.trim()}
+                onClick={() => void addFolder()}
+                className="rounded-xl bg-gold/20 px-3 py-2.5 text-sm font-semibold text-gold disabled:opacity-50"
+              >
+                이 모드에 등록
+              </button>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-white/35">선택된 경로</p>
+              <p className="mt-1 break-all text-sm text-white/85">
+                {folderPath || '아직 선택하지 않았습니다'}
+              </p>
+            </div>
             <input
               value={folderLabel}
               onChange={(e) => setFolderLabel(e.target.value)}
-              placeholder="표시 이름 (선택)"
+              placeholder="표시 이름 (선택 · 자동 채움)"
               className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
             />
-            <button
-              type="button"
-              disabled={busyKey === 'folder'}
-              onClick={() => void addFolder()}
-              className="rounded-lg bg-gold/20 px-3 py-2 text-xs font-semibold text-gold disabled:opacity-50"
-            >
-              이 모드에 폴더 등록
-            </button>
           </div>
           <div className="space-y-2">
             {modeFolders.length === 0 ? (

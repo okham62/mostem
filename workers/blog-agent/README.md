@@ -19,6 +19,8 @@ npm run login   # 네이버 로그인 1회 (브라우저 열림)
 npm start
 ```
 
+에이전트가 켜지면 Mostem 「폴더 찾아보기」가 Windows 폴더 선택 창을 엽니다 (`http://127.0.0.1:39217`).
+
 Windows 작업 스케줄러에 `npm start`를 로그온 시 실행으로 등록하면 재부팅 후에도 감시됩니다.
 
 ## What it does

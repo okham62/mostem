@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { toggleCategoryVisibility } from './category'
 import { batchKey, listStableImages, mimeFor } from './folder'
+import { startLocalPickerServer } from './local-server'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -174,6 +175,7 @@ async function processFolders(
 
 async function loop() {
   console.log(`Mostem blog agent → ${BASE} user=${USER_ID}`)
+  startLocalPickerServer()
   for (;;) {
     try {
       const folders = await tickAndClaim()
