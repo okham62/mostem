@@ -27,6 +27,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
 
 # vercel
 .vercel
@@ -34,3 +35,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# blog local agent
+workers/blog-agent/.auth/
+workers/blog-agent/.shots/
+workers/blog-agent/node_modules/
+workers/blog-agent/.env

@@ -20,7 +20,8 @@ export const BLOG_PROVIDER_STATUS = {
     id: 'naver' as const,
     label: '네이버 블로그',
     ready: false,
-    notes: 'Playwright 워커(Render 등)에서 처리. 본 앱은 job 큐만 제공합니다.',
+    notes:
+      '카테고리 On/Off·폴더 글은 workers/blog-agent(로컬 PC). 글 본문 자동발행은 큐+후속. PC가 예약 시각에 켜져 있어야 합니다.',
   },
 }
 

@@ -1,6 +1,14 @@
-export type BlogMode = 'seo' | 'home' | 'product'
+export type BlogMode = 'seo' | 'home' | 'product' | 'folder'
 export type BlogProvider = 'wordpress' | 'tistory' | 'naver' | 'none'
 export type BlogPostStatus = 'draft' | 'scheduled' | 'published' | 'failed'
+export type BlogJobKind =
+  | 'publish'
+  | 'category_open'
+  | 'category_close'
+  | 'folder_article'
+
+/** 0 = Sunday … 6 = Saturday (JS getDay) */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 export type BlogProductSnapshot = {
   title: string
@@ -58,4 +66,53 @@ export type BlogAccountRow = {
   app_password: string
   meta: Record<string, unknown>
   created_at: string
+}
+
+export type BlogCategoryScheduleRow = {
+  id: string
+  user_id: string
+  account_id: string | null
+  category_name: string
+  blog_id: string
+  open_dow: Weekday
+  open_time: string
+  close_dow: Weekday
+  close_time: string
+  timezone: string
+  enabled: boolean
+  last_open_at: string | null
+  last_close_at: string | null
+  last_error: string | null
+  meta: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type BlogFolderWatcherRow = {
+  id: string
+  user_id: string
+  local_path: string
+  label: string
+  mode: BlogMode
+  enabled: boolean
+  last_scan_at: string | null
+  last_batch_key: string | null
+  last_error: string | null
+  meta: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type BlogJobRow = {
+  id: string
+  user_id: string | null
+  keyword: string
+  mode: string
+  provider: string
+  status: 'queued' | 'running' | 'done' | 'failed'
+  post_id: string | null
+  error: string | null
+  meta: Record<string, unknown>
+  created_at: string
+  finished_at: string | null
 }

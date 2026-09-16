@@ -1,6 +1,17 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { BlogAccountRow, BlogPostRow, BlogPostStatus, BlogProvider } from './blog-types'
+import type {
+  BlogAccountRow,
+  BlogCategoryScheduleRow,
+  BlogFolderWatcherRow,
+  BlogJobKind,
+  BlogJobRow,
+  BlogMode,
+  BlogPostRow,
+  BlogPostStatus,
+  BlogProvider,
+  Weekday,
+} from './blog-types'
 
 export async function listBlogPosts(userId: string, limit = 40) {
   const supabase = createAdminClient()
@@ -142,7 +153,7 @@ export async function insertBlogJob(input: {
     .select('*')
     .single()
   if (error) throw new Error(error.message)
-  return data
+  return data as BlogJobRow
 }
 
 export async function finishBlogJob(
@@ -171,5 +182,199 @@ export async function listQueuedProviderJobs(provider: 'tistory' | 'naver', limi
     .order('created_at', { ascending: true })
     .limit(limit)
   if (error) throw new Error(error.message)
-  return data ?? []
+  return (data ?? []) as BlogJobRow[]
+}
+
+export async function listQueuedAgentJobs(userId: string, limit = 20) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('blog_jobs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'queued')
+    .order('created_at', { ascending: true })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as BlogJobRow[]).filter((job) => {
+    const kind = String(job.meta?.kind || '')
+    return (
+      kind === 'category_open' ||
+      kind === 'category_close' ||
+      kind === 'folder_article' ||
+      kind === 'publish'
+    )
+  })
+}
+
+export async function markBlogJobRunning(id: string) {
+  const supabase = createAdminClient()
+  await supabase.from('blog_jobs').update({ status: 'running' }).eq('id', id).eq('status', 'queued')
+}
+
+export async function listCategorySchedules(userId: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('blog_category_schedules')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as BlogCategoryScheduleRow[]
+}
+
+export async function insertCategorySchedule(input: {
+  userId: string
+  accountId?: string | null
+  categoryName: string
+  blogId?: string
+  openDow: Weekday
+  openTime: string
+  closeDow: Weekday
+  closeTime: string
+  timezone?: string
+  enabled?: boolean
+}) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('blog_category_schedules')
+    .insert({
+      user_id: input.userId,
+      account_id: input.accountId ?? null,
+      category_name: input.categoryName,
+      blog_id: input.blogId ?? '',
+      open_dow: input.openDow,
+      open_time: input.openTime,
+      close_dow: input.closeDow,
+      close_time: input.closeTime,
+      timezone: input.timezone ?? 'Asia/Seoul',
+      enabled: input.enabled ?? true,
+      updated_at: new Date().toISOString(),
+    })
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  return data as BlogCategoryScheduleRow
+}
+
+export async function updateCategorySchedule(
+  userId: string,
+  id: string,
+  patch: Partial<{
+    account_id: string | null
+    category_name: string
+    blog_id: string
+    open_dow: Weekday
+    open_time: string
+    close_dow: Weekday
+    close_time: string
+    enabled: boolean
+    last_open_at: string | null
+    last_close_at: string | null
+    last_error: string | null
+  }>
+) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('blog_category_schedules')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  return data as BlogCategoryScheduleRow
+}
+
+export async function deleteCategorySchedule(userId: string, id: string) {
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('blog_category_schedules').delete().eq('user_id', userId).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function listFolderWatchers(userId: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('blog_folder_watchers')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as BlogFolderWatcherRow[]
+}
+
+export async function upsertFolderWatcher(input: {
+  userId: string
+  localPath: string
+  label?: string
+  mode?: BlogMode
+  enabled?: boolean
+}) {
+  const supabase = createAdminClient()
+  const path = input.localPath.trim()
+  const { data, error } = await supabase
+    .from('blog_folder_watchers')
+    .upsert(
+      {
+        user_id: input.userId,
+        local_path: path,
+        label: input.label ?? '',
+        mode: input.mode ?? 'folder',
+        enabled: input.enabled ?? true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,local_path' }
+    )
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  return data as BlogFolderWatcherRow
+}
+
+export async function updateFolderWatcher(
+  userId: string,
+  id: string,
+  patch: Partial<{
+    local_path: string
+    label: string
+    mode: BlogMode
+    enabled: boolean
+    last_scan_at: string | null
+    last_batch_key: string | null
+    last_error: string | null
+  }>
+) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('blog_folder_watchers')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  return data as BlogFolderWatcherRow
+}
+
+export async function deleteFolderWatcher(userId: string, id: string) {
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('blog_folder_watchers').delete().eq('user_id', userId).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function findExistingAgentJob(userId: string, kind: BlogJobKind, dedupeKey: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('blog_jobs')
+    .select('*')
+    .eq('user_id', userId)
+    .in('status', ['queued', 'running', 'done'])
+    .order('created_at', { ascending: false })
+    .limit(40)
+  if (error) throw new Error(error.message)
+  return (
+    ((data ?? []) as BlogJobRow[]).find((job) => {
+      const meta = job.meta || {}
+      return meta.kind === kind && meta.dedupeKey === dedupeKey
+    }) ?? null
+  )
 }

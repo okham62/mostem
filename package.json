@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "blog-agent": "npm --prefix workers/blog-agent start",
+    "blog-agent:login": "npm --prefix workers/blog-agent run login"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",

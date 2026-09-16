@@ -172,7 +172,7 @@ function ProductCard({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '생성 실패')
       setMsg('초안 생성됨')
-      window.location.href = '/blog'
+      window.location.href = '/blog?mode=product'
     } catch (error) {
       setMsg(error instanceof Error ? error.message : '실패')
     } finally {

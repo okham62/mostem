@@ -4,7 +4,7 @@ create table if not exists public.blog_posts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
   keyword text not null default '',
-  mode text not null default 'seo' check (mode in ('seo', 'home', 'product')),
+  mode text not null default 'seo' check (mode in ('seo', 'home', 'product', 'folder')),
   title text not null default '',
   body_html text not null default '',
   body_markdown text not null default '',
