@@ -371,7 +371,7 @@ export function GifConverterClient() {
       </Link>
 
       <div className="mb-4">
-        <h1 className="text-lg font-bold text-white">상세페이지 GIF 변환</h1>
+        <h1 className="text-lg font-bold text-white">동영상/이미지 - GIF 변환</h1>
         <p className="mt-1 text-sm text-white/45">
           서버 업로드 없이 브라우저에서만 GIF로 바꿉니다.
         </p>

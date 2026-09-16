@@ -8,7 +8,7 @@ export const AI_TOOLS = [
   },
   {
     id: 'gif',
-    title: '상세페이지 GIF 변환',
+    title: '동영상/이미지 - GIF 변환',
     description: 'MP4·이미지를 저용량 GIF로 일괄 변환합니다.',
     placeholder: '',
     hint: '',
