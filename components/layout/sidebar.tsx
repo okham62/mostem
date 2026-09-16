@@ -49,8 +49,8 @@ function BlogIcon() {
 
 export const publish = [
   { href: '/threads?status=collected', label: 'Threads', icon: ThreadsIcon },
-  { href: '/instagram', label: 'Instagram', icon: InstagramIcon },
-  { href: '/tiktok', label: 'TikTok', icon: TiktokIcon },
+  { href: '/instagram?status=collected', label: 'Instagram', icon: InstagramIcon },
+  { href: '/tiktok?status=collected', label: 'TikTok', icon: TiktokIcon },
   { href: '/blog', label: 'Blog Hub', icon: BlogIcon },
 ]
 

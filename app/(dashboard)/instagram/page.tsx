@@ -1,11 +1,41 @@
-import { PlatformHub } from '@/components/platform-hub'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { attachScheduleTimes, readScheduleMap } from '@/lib/schedule-store'
+import { CollectedBoard } from '@/components/collected/collected-board'
+import type { CollectedPost, ConnectedAccount } from '@/types'
 
-export default function InstagramPage() {
+export default async function InstagramPage() {
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
+
+  const supabase = createAdminClient()
+  const [postsRes, accountsRes, scheduleMap] = await Promise.all([
+    supabase
+      .from('collected_posts')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('platform', 'instagram')
+      .order('collected_at', { ascending: false }),
+    supabase
+      .from('connected_accounts')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('platform', 'instagram')
+      .order('created_at', { ascending: true }),
+    readScheduleMap(session.user.id),
+  ])
+
+  const posts = attachScheduleTimes((postsRes.data ?? []) as CollectedPost[], scheduleMap)
+
   return (
-    <PlatformHub
-      id="instagram"
-      title="인스타"
-      description="인스타그램 게시물을 모아 편집하고 발행하는 보드입니다."
-    />
+    <Suspense fallback={<div className="p-6 text-sm text-white/40">불러오는 중…</div>}>
+      <CollectedBoard
+        platform="instagram"
+        posts={posts}
+        accounts={(accountsRes.data ?? []) as ConnectedAccount[]}
+      />
+    </Suspense>
   )
 }
