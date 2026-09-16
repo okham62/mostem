@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Eye, EyeOff, CheckCircle } from 'lucide-react'
+import { Eye, EyeOff, CheckCircle } from 'lucide-react'
+import { MostemLogo } from '@/components/mostem-logo'
 
 export function RegisterForm() {
   const router = useRouter()
@@ -51,11 +52,8 @@ export function RegisterForm() {
   return (
     <div className="w-full max-w-sm px-4 py-[max(1rem,env(safe-area-inset-top))] pointer-events-auto">
       <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm md:p-8">
-        {/* 로고 */}
         <div className="mb-6 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand">
-            <Zap className="h-6 w-6 text-white" />
-          </div>
+          <MostemLogo size={48} rounded="2xl" />
           <div className="text-center">
             <h1 className="text-xl font-bold text-[var(--foreground)]">회원가입</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">관리자 승인 후 서비스 이용 가능</p>

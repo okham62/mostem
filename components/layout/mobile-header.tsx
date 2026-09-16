@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Zap } from 'lucide-react'
 import type { Session } from 'next-auth'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { MostemLogo } from '@/components/mostem-logo'
 
 const PAGE_TITLES: Record<string, string> = {
   '/keywords': '실시간 키워드',
@@ -46,9 +46,7 @@ export function MobileHeader({ session }: { session: Session | null }) {
       }}
     >
       <div className="flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand">
-          <Zap className="h-3.5 w-3.5 text-white" />
-        </div>
+        <MostemLogo size={28} rounded="lg" />
         <span className="text-sm font-bold text-white">{title}</span>
       </div>
       <div className="flex items-center gap-2">

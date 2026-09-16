@@ -12,11 +12,12 @@ export const metadata: Metadata = {
   applicationName: 'MOSTEM',
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icon.png', type: 'image/png', sizes: '128x128' },
+      { url: '/favicon.ico?v=20260917', sizes: 'any' },
+      { url: '/favicon-32.png?v=20260917', type: 'image/png', sizes: '32x32' },
+      { url: '/icon.png?v=20260917', type: 'image/png', sizes: '512x512' },
     ],
-    apple: [{ url: '/apple-icon.png', sizes: '128x128', type: 'image/png' }],
-    shortcut: ['/favicon.ico'],
+    apple: [{ url: '/apple-icon.png?v=20260917', sizes: '180x180', type: 'image/png' }],
+    shortcut: ['/favicon.ico?v=20260917'],
   },
   appleWebApp: {
     capable: true,

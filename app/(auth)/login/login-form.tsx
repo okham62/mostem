@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Monitor, Moon, Sun, Zap } from 'lucide-react'
+import { Eye, EyeOff, Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { MostemLogo } from '@/components/mostem-logo'
 import { cn } from '@/lib/utils'
 import type { ThemeChoice } from '@/lib/theme'
 
@@ -58,17 +59,8 @@ export function LoginForm() {
             boxShadow: '0 16px 48px rgba(0,0,0,0.12)',
           }}
         >
-          {/* 로고 */}
           <div className="mb-8 flex flex-col items-center gap-3">
-            <div
-              className="flex h-14 w-14 items-center justify-center rounded-2xl"
-              style={{
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                boxShadow: '0 8px 32px rgba(99, 102, 241, 0.4)',
-              }}
-            >
-              <Zap className="h-7 w-7 text-white" />
-            </div>
+            <MostemLogo size={56} rounded="2xl" className="shadow-[0_8px_32px_rgba(0,0,0,0.25)]" />
             <h1 className="text-2xl font-bold tracking-tight text-white">MOSTEM</h1>
           </div>
 

@@ -12,19 +12,19 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: 'ko',
     icons: [
       {
-        src: '/icon.png',
-        sizes: '128x128',
+        src: '/icon.png?v=20260917',
+        sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/icon-192.png',
+        src: '/icon-192.png?v=20260917',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/favicon.ico',
+        src: '/favicon.ico?v=20260917',
         sizes: '48x48',
         type: 'image/x-icon',
       },
