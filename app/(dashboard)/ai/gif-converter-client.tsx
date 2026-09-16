@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Download, Film, ImageIcon, LoaderCircle, Trash2, Upload } from 'lucide-react'
+import { Download, Film, ImageIcon, LoaderCircle, Trash2 } from 'lucide-react'
 import { zipSync } from 'fflate'
 import {
   convertImagesToGif,
@@ -47,6 +47,7 @@ function newId() {
 
 export function GifConverterClient() {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [mode, setMode] = useState<'video' | 'image'>('video')
   const [jobs, setJobs] = useState<Job[]>([])
   const jobsRef = useRef<Job[]>([])
   const [dragging, setDragging] = useState(false)
@@ -62,10 +63,20 @@ export function GifConverterClient() {
     })
   }, [])
 
-  const doneCount = useMemo(() => jobs.filter((j) => j.status === 'done').length, [jobs])
-  const totalBytes = useMemo(
-    () => jobs.reduce((sum, j) => sum + (j.result?.bytes ?? 0), 0),
-    [jobs]
+  const visibleJobs = useMemo(
+    () =>
+      jobs.filter((job) =>
+        mode === 'video' ? job.kind === 'video' : job.kind === 'image' || job.kind === 'slideshow'
+      ),
+    [jobs, mode]
+  )
+  const visibleDone = useMemo(
+    () => visibleJobs.filter((j) => j.status === 'done').length,
+    [visibleJobs]
+  )
+  const visibleBytes = useMemo(
+    () => visibleJobs.reduce((sum, j) => sum + (j.result?.bytes ?? 0), 0),
+    [visibleJobs]
   )
 
   const patchJob = useCallback(
@@ -125,7 +136,9 @@ export function GifConverterClient() {
 
   const addFiles = useCallback(
     (fileList: FileList | File[], asSlideshow = mergeImages) => {
-      const media = [...fileList].filter((file) => isVideoFile(file) || isImageFile(file))
+      const media = [...fileList].filter((file) =>
+        mode === 'video' ? isVideoFile(file) : isImageFile(file)
+      )
       if (!media.length) return
 
       const videos = media.filter(isVideoFile)
@@ -169,7 +182,7 @@ export function GifConverterClient() {
       syncJobs((prev) => [...prev, ...next])
       queueMicrotask(() => void pump())
     },
-    [mergeImages, pump, syncJobs]
+    [mergeImages, mode, pump, syncJobs]
   )
 
   function clearAll() {
@@ -199,7 +212,7 @@ export function GifConverterClient() {
   }
 
   function downloadAll() {
-    const done = jobs.filter((j) => j.status === 'done' && j.result)
+    const done = visibleJobs.filter((j) => j.status === 'done' && j.result)
     if (!done.length) return
     if (done.length === 1) {
       downloadOne(done[0])
@@ -237,23 +250,53 @@ export function GifConverterClient() {
         ← AI 도구
       </Link>
 
-      <div className="mb-5">
+      <div className="mb-4">
         <h1 className="text-lg font-bold text-white">상세페이지 GIF 변환</h1>
         <p className="mt-1 text-sm text-white/45">
-          영상(MP4)과 이미지를 GIF로 바꿉니다. 서버 업로드 없이 브라우저에서만 변환됩니다.
+          서버 업로드 없이 브라우저에서만 GIF로 바꿉니다.
         </p>
       </div>
 
-      <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-white/55">
-        <input
-          type="checkbox"
-          checked={mergeImages}
-          onChange={(e) => setMergeImages(e.target.checked)}
-          className="rounded border-white/20 bg-black/40"
-        />
-        여러 이미지를 <span className="font-semibold text-white/80">하나의 슬라이드 GIF</span>로
-        합치기
-      </label>
+      <div className="mb-5 flex gap-1.5 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+        {(
+          [
+            { id: 'video' as const, label: '동영상 → GIF', icon: Film },
+            { id: 'image' as const, label: '이미지 → GIF', icon: ImageIcon },
+          ]
+        ).map((tab) => {
+          const Icon = tab.icon
+          const active = mode === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setMode(tab.id)}
+              className={cn(
+                'inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition',
+                active
+                  ? 'bg-[var(--accent)] text-white shadow-[0_0_0_1px_rgba(139,92,246,0.45)]'
+                  : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {mode === 'image' ? (
+        <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-white/55">
+          <input
+            type="checkbox"
+            checked={mergeImages}
+            onChange={(e) => setMergeImages(e.target.checked)}
+            className="rounded border-white/20 bg-black/40"
+          />
+          여러 이미지를 <span className="font-semibold text-white/80">하나의 슬라이드 GIF</span>로
+          합치기
+        </label>
+      ) : null}
 
       <div
         onDragEnter={(e) => {
@@ -276,18 +319,27 @@ export function GifConverterClient() {
         )}
       >
         <span className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gold/15 text-gold">
-          <Upload className="h-5 w-5" />
+          {mode === 'video' ? <Film className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
         </span>
-        <p className="text-sm font-semibold text-white">파일 끌어다 놓거나 클릭</p>
-        <p className="mt-1 text-xs text-white/40">MP4 · WebM · MOV · PNG · JPG · WEBP</p>
+        <p className="text-sm font-semibold text-white">
+          {mode === 'video' ? '동영상 끌어다 놓거나 클릭' : '이미지 끌어다 놓거나 클릭'}
+        </p>
+        <p className="mt-1 text-xs text-white/40">
+          {mode === 'video' ? 'MP4 · WebM · MOV · M4V' : 'PNG · JPG · WEBP · BMP'}
+        </p>
         <p className="mt-3 text-[11px] text-white/30">
-          영상: 최대 가로 {MAX_WIDTH}px · {FPS}fps · 앞 12초 / 이미지: {MAX_COLORS}색 ·{' '}
-          {(IMAGE_DELAY / 100).toFixed(1)}초 유지
+          {mode === 'video'
+            ? `최대 가로 ${MAX_WIDTH}px · ${FPS}fps · 앞 12초`
+            : `${MAX_COLORS}색 · ${(IMAGE_DELAY / 100).toFixed(1)}초 유지 · 여러 장 슬라이드 가능`}
         </p>
         <input
           ref={inputRef}
           type="file"
-          accept="video/*,image/*,.mp4,.webm,.mov,.m4v,.png,.jpg,.jpeg,.webp,.bmp"
+          accept={
+            mode === 'video'
+              ? 'video/*,.mp4,.webm,.mov,.m4v'
+              : 'image/*,.png,.jpg,.jpeg,.webp,.bmp'
+          }
           multiple
           className="hidden"
           onChange={(e) => {
@@ -297,23 +349,23 @@ export function GifConverterClient() {
         />
       </div>
 
-      {jobs.length > 0 ? (
+      {visibleJobs.length > 0 ? (
         <div className="mt-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-white/45">
-              {doneCount}/{jobs.length} 완료
-              {totalBytes > 0 ? ` · 합계 ${formatBytes(totalBytes)}` : ''}
+              {visibleDone}/{visibleJobs.length} 완료
+              {visibleBytes > 0 ? ` · 합계 ${formatBytes(visibleBytes)}` : ''}
               {busy ? ' · 변환 중…' : ''}
             </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={downloadAll}
-                disabled={doneCount === 0}
+                disabled={visibleDone === 0}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
               >
                 <Download className="h-3.5 w-3.5" />
-                {doneCount > 1 ? 'ZIP 다운로드' : '다운로드'}
+                {visibleDone > 1 ? 'ZIP 다운로드' : '다운로드'}
               </button>
               <button
                 type="button"
@@ -327,7 +379,7 @@ export function GifConverterClient() {
           </div>
 
           <ul className="space-y-2">
-            {jobs.map((job) => (
+            {visibleJobs.map((job) => (
               <li key={job.id} className="rounded-xl border border-white/10 bg-[var(--card-bg)] p-3">
                 <div className="flex items-start gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/40">
