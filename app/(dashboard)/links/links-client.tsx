@@ -242,7 +242,7 @@ export function LinksClient() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full max-w-[920px] space-y-5">
       <div className="flex flex-wrap gap-1.5 border-b border-white/10 pb-3">
         {TABS.map((t) => {
           const Icon = t.icon
@@ -563,18 +563,21 @@ function ConvertPanel({
   const recent = links.slice(0, 5)
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
         <div>
-          <h2 className="text-lg font-semibold">링크 변환</h2>
+          <h2 className="text-lg font-semibold">링크 만들기</h2>
           <p className="mt-1 text-sm text-white/45">
-            쿠팡·토스·네이버 상품 URL을 넣으면 클릭 추적이 되는 Mostem 단축 링크로 바꿔 드려요. 최종 이동은 입력한 원본(파트너스) 주소
-            그대로입니다.
+            쿠팡·토스·네이버 URL을 Mostem 단축 링크로 바꿔 클릭을 추적해요. 최종 이동은 원본(파트너스) 주소 그대로입니다.
           </p>
         </div>
 
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200/90">
+          수수료는 100% 본인 몫입니다. Mostem은 중간에서 클릭만 기록합니다.
+        </div>
+
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-white/55">원본 링크</span>
+          <span className="text-xs font-medium text-white/55">링크 붙여넣기</span>
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -584,7 +587,7 @@ function ConvertPanel({
         </label>
 
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-white/55">제목 (선택)</span>
+          <span className="text-xs font-medium text-white/55">링크 제목</span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -594,10 +597,10 @@ function ConvertPanel({
         </label>
 
         <div className="space-y-1.5">
-          <span className="text-xs font-medium text-white/55">공유 카드 이미지 (선택)</span>
+          <span className="text-xs font-medium text-white/55">공유 카드 이미지</span>
           <ImageDropZone
             preview={ogPreview}
-            emptyHint="이미지를 드래그하거나 클릭해서 업로드 · 카톡·스레드 미리보기용"
+            emptyHint="이미지를 드래그하거나 클릭해서 업로드"
             onFile={(file) => void onPickImage(file)}
             onClear={() => setOgPreview(null)}
           />
@@ -609,7 +612,7 @@ function ConvertPanel({
           type="button"
           disabled={busy || !url.trim()}
           onClick={() => void convert()}
-          className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+          className="w-full rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40 sm:w-auto"
         >
           {busy ? '변환 중…' : '변환하기'}
         </button>
@@ -648,7 +651,7 @@ function ConvertPanel({
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-medium">최근 변환</h3>
             <span className="text-xs text-white/35">{recent.length}개</span>
@@ -701,34 +704,54 @@ function ConvertPanel({
         </div>
       </div>
 
-      <aside className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Settings2 className="h-4 w-4 text-[var(--accent)]" />
-          단축 주소 설정
-        </div>
-        <p className="text-xs text-white/40">
-          공개 주소 형태: <span className="font-mono text-white/60">mostem.kr/l/{prefixDraft}/코드</span>
-        </p>
-        <label className="block space-y-1.5">
-          <span className="text-xs text-white/50">접두사</span>
-          <div className="flex gap-2">
-            <input
-              value={prefixDraft}
-              onChange={(e) => setPrefixDraft(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12))}
-              className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2 font-mono text-sm outline-none focus:border-[var(--accent)]/60"
-            />
-            <button
-              type="button"
-              onClick={() => void onPrefixSave(prefixDraft)}
-              className="shrink-0 rounded-xl bg-white/10 px-3 text-xs font-medium hover:bg-white/15"
-            >
-              저장
-            </button>
+      <aside className="space-y-4">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <h3 className="mb-3 text-sm font-medium">미리보기</h3>
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
+            {ogPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={ogPreview} alt="" className="aspect-[1.91/1] w-full object-cover" />
+            ) : (
+              <div className="flex aspect-[1.91/1] flex-col items-center justify-center gap-2 px-4 text-center text-xs text-white/35">
+                <span className="text-2xl opacity-40">🖼️</span>
+                공유 카드 이미지가 여기에 보여요
+              </div>
+            )}
+            <div className="border-t border-white/10 px-3 py-2.5">
+              <p className="truncate text-sm font-medium text-white/85">{title.trim() || '링크 제목'}</p>
+              <p className="mt-0.5 truncate font-mono text-[11px] text-white/35">
+                mostem.kr/l/{prefixDraft}/…
+              </p>
+            </div>
           </div>
-        </label>
-        <p className="text-[11px] leading-relaxed text-white/35">
-          쿠팡 파트너스·토스 쉐어링크는 최종 도착 URL에 붙어 있어야 수수료가 인정됩니다. Mostem은 중간에서 클릭만 기록합니다.
-        </p>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Settings2 className="h-4 w-4 text-[var(--accent)]" />
+            단축 주소 설정
+          </div>
+          <p className="text-xs text-white/40">
+            공개 주소: <span className="font-mono text-white/60">/l/{prefixDraft}/코드</span>
+          </p>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-white/50">접두사</span>
+            <div className="flex gap-2">
+              <input
+                value={prefixDraft}
+                onChange={(e) => setPrefixDraft(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12))}
+                className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2 font-mono text-sm outline-none focus:border-[var(--accent)]/60"
+              />
+              <button
+                type="button"
+                onClick={() => void onPrefixSave(prefixDraft)}
+                className="shrink-0 rounded-xl bg-white/10 px-3 text-xs font-medium hover:bg-white/15"
+              >
+                저장
+              </button>
+            </div>
+          </label>
+        </div>
       </aside>
     </div>
   )
@@ -1229,7 +1252,7 @@ function ProfilePanel({
   const publicPath = slug ? `/u/${slug}` : null
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold">프로필 페이지</h2>
