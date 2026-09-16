@@ -56,6 +56,107 @@ function fileToDataUrl(file: File): Promise<string> {
   })
 }
 
+function ImageDropZone({
+  preview,
+  onFile,
+  onClear,
+  emptyHint = '이미지를 드래그하거나 클릭해서 업로드',
+}: {
+  preview: string | null
+  onFile: (file: File) => void | Promise<void>
+  onClear?: () => void
+  emptyHint?: string
+}) {
+  const [dragOver, setDragOver] = useState(false)
+
+  function takeFile(file: File | null | undefined) {
+    if (!file) return
+    void onFile(file)
+  }
+
+  return (
+    <div className="space-y-2">
+      <label
+        onDragEnter={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(true)
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(true)
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(false)
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(false)
+          const file = e.dataTransfer.files?.[0]
+          takeFile(file)
+        }}
+        className={cn(
+          'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 transition',
+          dragOver
+            ? 'border-[var(--accent)] bg-[var(--accent)]/15'
+            : 'border-white/15 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.04]'
+        )}
+      >
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview} alt="" className="max-h-36 w-auto max-w-full rounded-xl object-contain" />
+        ) : (
+          <>
+            <span className="text-2xl opacity-50">🖼️</span>
+            <span className="text-center text-xs text-white/50">
+              {dragOver ? '여기에 놓으세요' : emptyHint}
+            </span>
+            <span className="text-[11px] text-white/30">PNG · JPG · WEBP · 약 900KB 이하</span>
+          </>
+        )}
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            takeFile(e.target.files?.[0])
+            e.target.value = ''
+          }}
+        />
+      </label>
+      {preview ? (
+        <div className="flex gap-2">
+          <label className="cursor-pointer rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/15">
+            다른 이미지 선택
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                takeFile(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+          </label>
+          {onClear ? (
+            <button
+              type="button"
+              onClick={onClear}
+              className="rounded-lg px-3 py-1.5 text-xs text-rose-300/80 hover:bg-rose-500/10 hover:text-rose-300"
+            >
+              이미지 제거
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function LinksClient() {
   const [tab, setTab] = useState<TabId>('convert')
   const [settings, setSettings] = useState<LinkSettings | null>(null)
@@ -344,35 +445,15 @@ function EditLinkModal({
 
           <div className="space-y-1.5">
             <span className="text-xs text-white/55">공유 카드 이미지</span>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="cursor-pointer rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs text-white/50 hover:border-white/30">
-                {ogPreview && !clearImage ? '이미지 바꾸기' : '이미지 업로드'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => void onPickImage(e.target.files?.[0] ?? null)}
-                />
-              </label>
-              {ogPreview && !clearImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={ogPreview} alt="" className="h-14 w-20 rounded-lg object-cover" />
-              ) : (
-                <span className="text-xs text-white/30">아직 이미지 없음</span>
-              )}
-              {ogPreview && !clearImage ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOgPreview(null)
-                    setClearImage(true)
-                  }}
-                  className="text-xs text-rose-300/80 hover:text-rose-300"
-                >
-                  이미지 제거
-                </button>
-              ) : null}
-            </div>
+            <ImageDropZone
+              preview={ogPreview && !clearImage ? ogPreview : null}
+              emptyHint="이미지를 드래그하거나 클릭해서 업로드"
+              onFile={(file) => void onPickImage(file)}
+              onClear={() => {
+                setOgPreview(null)
+                setClearImage(true)
+              }}
+            />
           </div>
 
           {err ? <p className="text-sm text-rose-300">{err}</p> : null}
@@ -514,23 +595,12 @@ function ConvertPanel({
 
         <div className="space-y-1.5">
           <span className="text-xs font-medium text-white/55">공유 카드 이미지 (선택)</span>
-          <div className="flex items-center gap-3">
-            <label className="cursor-pointer rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs text-white/50 hover:border-white/30">
-              이미지 선택
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => void onPickImage(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            {ogPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ogPreview} alt="" className="h-14 w-20 rounded-lg object-cover" />
-            ) : (
-              <span className="text-xs text-white/30">카톡·스레드 미리보기에 쓰여요</span>
-            )}
-          </div>
+          <ImageDropZone
+            preview={ogPreview}
+            emptyHint="이미지를 드래그하거나 클릭해서 업로드 · 카톡·스레드 미리보기용"
+            onFile={(file) => void onPickImage(file)}
+            onClear={() => setOgPreview(null)}
+          />
         </div>
 
         {err ? <p className="text-sm text-rose-300">{err}</p> : null}
@@ -952,9 +1022,14 @@ function MinePanel({
           return (
             <li key={l.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-lg">
-                  {l.platform === 'coupang' ? '🐧' : l.platform === 'toss' ? '💙' : '🔗'}
-                </div>
+                {l.og_image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={l.og_image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-lg">
+                    {l.platform === 'coupang' ? '🐧' : l.platform === 'toss' ? '💙' : '🔗'}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{l.title || PLATFORM_LABEL[l.platform] || '링크'}</p>
                   <p className="font-mono text-[11px] text-white/40">
