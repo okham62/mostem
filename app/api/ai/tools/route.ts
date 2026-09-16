@@ -8,7 +8,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const PROMPTS: Record<Exclude<AiToolId, 'tags'>, string> = {
+const PROMPTS: Record<Exclude<AiToolId, 'tags' | 'gif'>, string> = {
   copy: `당신은 숏폼·스레드 카피라이터입니다. 입력한 상품/주제로 아래 형식을 그대로 지키세요.
 훅:
 (1줄, 첫 문장부터 시선을 잡기. 인사말 금지)
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   const toolId = typeof body.tool === 'string' ? body.tool : ''
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const tool = getAiTool(toolId)
-  if (!tool || tool.id === 'tags') {
+  if (!tool || tool.id === 'tags' || tool.id === 'gif') {
     return NextResponse.json({ error: '지원하지 않는 도구입니다.' }, { status: 400 })
   }
   if (prompt.length < 2) {

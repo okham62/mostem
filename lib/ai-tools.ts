@@ -7,6 +7,13 @@ export const AI_TOOLS = [
     hint: '',
   },
   {
+    id: 'gif',
+    title: '상세페이지 GIF 변환',
+    description: 'MP4·이미지를 저용량 GIF로 일괄 변환합니다.',
+    placeholder: '',
+    hint: '',
+  },
+  {
     id: 'copy',
     title: 'AI 카피 생성',
     description: '훅·본문·고정댓글 CTA를 한 세트로 만듭니다.',

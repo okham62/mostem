@@ -21,6 +21,8 @@
     "@types/ua-parser-js": "^0.7.39",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
+    "fflate": "^0.8.3",
+    "gifenc": "^1.0.3",
     "lucide-react": "^1.14.0",
     "next": "14.2.35",
     "next-auth": "^5.0.0-beta.25",

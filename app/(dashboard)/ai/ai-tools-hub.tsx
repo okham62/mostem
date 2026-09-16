@@ -8,11 +8,14 @@ import {
   Eraser,
   Film,
   ImageIcon,
+  Images,
   Languages,
   PenLine,
   Tags,
 } from 'lucide-react'
 import { AI_TOOLS } from '@/lib/ai-tools'
+
+const READY_TOOLS = new Set(['tags', 'gif'])
 
 const ICONS = {
   copy: PenLine,
@@ -24,6 +27,7 @@ const ICONS = {
   raw: Aperture,
   remix: Film,
   tags: Tags,
+  gif: Images,
 }
 
 export function AiToolsHub() {
@@ -41,7 +45,9 @@ export function AiToolsHub() {
           return (
             <Link
               key={tool.id}
-              href={tool.id === 'tags' ? '/ai/tags' : `/ai/${tool.id}`}
+              href={
+                tool.id === 'tags' ? '/ai/tags' : tool.id === 'gif' ? '/ai/gif' : `/ai/${tool.id}`
+              }
               className="group rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 transition hover:-translate-y-0.5 hover:border-gold/35 hover:bg-white/[0.04]"
             >
               <span className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gold/12 text-gold">
@@ -50,7 +56,7 @@ export function AiToolsHub() {
               <h2 className="text-sm font-bold text-white">{tool.title}</h2>
               <p className="mt-1 text-xs leading-relaxed text-white/40">{tool.description}</p>
               <p className="mt-3 text-[11px] font-semibold text-gold/80 group-hover:text-gold">
-                {tool.id === 'tags' ? '열기 →' : '준비중...'}
+                {READY_TOOLS.has(tool.id) ? '열기 →' : '준비중...'}
               </p>
             </Link>
           )
