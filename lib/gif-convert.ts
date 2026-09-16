@@ -4,7 +4,12 @@ export type GifConvertOptions = {
   maxWidth?: number
   fps?: number
   maxColors?: number
+  /** How many seconds of video to convert (from startSec). Default 12 */
   maxDurationSec?: number
+  /** Video start offset in seconds. Default 0 */
+  startSec?: number
+  /** Output playback speed (1 = realtime, 2 = 2x faster). Default 1 */
+  speed?: number
   /** Image / slideshow frame hold (hundredths of a second). Default 80 = 0.8s */
   imageDelay?: number
   onProgress?: (ratio: number) => void
@@ -144,14 +149,19 @@ export async function convertVideoToGif(
   const fps = options.fps ?? 10
   const maxColors = options.maxColors ?? 128
   const maxDurationSec = options.maxDurationSec ?? 12
+  const startSec = Math.max(0, options.startSec ?? 0)
+  const speed = Math.min(4, Math.max(0.25, options.speed ?? 1))
   const onProgress = options.onProgress
 
   const { GIFEncoder, quantize, applyPalette } = await import('gifenc')
 
   const video = await loadVideo(file)
-  const duration = Number.isFinite(video.duration)
-    ? Math.min(video.duration, maxDurationSec)
-    : maxDurationSec
+  if (!Number.isFinite(video.duration) || video.duration <= 0) {
+    throw new Error('영상 길이를 확인할 수 없습니다.')
+  }
+  const clippedStart = Math.min(startSec, Math.max(0, video.duration - 0.05))
+  const available = Math.max(0.05, video.duration - clippedStart)
+  const duration = Math.min(available, maxDurationSec)
   if (!duration || duration <= 0) {
     throw new Error('영상 길이를 확인할 수 없습니다.')
   }
@@ -164,12 +174,13 @@ export async function convertVideoToGif(
   if (!ctx) throw new Error('Canvas를 사용할 수 없습니다.')
 
   const gif = GIFEncoder()
-  const frameDelay = Math.max(2, Math.round(100 / fps))
+  // Faster speed → shorter frame delay so GIF plays quicker than source
+  const frameDelay = Math.max(2, Math.round(100 / fps / speed))
   const step = 1 / fps
   const totalFrames = Math.max(1, Math.floor(duration * fps))
 
   for (let i = 0; i < totalFrames; i++) {
-    const t = Math.min(duration - 0.001, i * step)
+    const t = Math.min(clippedStart + duration - 0.001, clippedStart + i * step)
     await seek(video, t)
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, width, height)
