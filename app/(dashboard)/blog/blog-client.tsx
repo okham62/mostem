@@ -36,6 +36,7 @@ type AccountRow = {
   site_url: string
   username: string
   hasPassword?: boolean
+  meta?: Record<string, unknown>
 }
 
 type Preview = {
@@ -117,6 +118,7 @@ export function BlogClient() {
   const [naverBlogId, setNaverBlogId] = useState('')
   const [savingAccount, setSavingAccount] = useState(false)
 
+  const [catAccountId, setCatAccountId] = useState('')
   const [catName, setCatName] = useState('')
   const [catBlogId, setCatBlogId] = useState('')
   const [openDow, setOpenDow] = useState<Weekday>(5)
@@ -286,6 +288,11 @@ export function BlogClient() {
   }
 
   async function saveNaverAccount() {
+    const blogId = naverBlogId.trim()
+    if (!blogId) {
+      setError('네이버 blogId를 입력하세요 (계정 개수 제한 없음)')
+      return
+    }
     setSavingAccount(true)
     setError('')
     try {
@@ -294,20 +301,27 @@ export function BlogClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: 'naver',
-          site_url: naverBlogId ? `https://blog.naver.com/${naverBlogId}` : 'naver',
-          username: naverUser || naverBlogId || 'naver',
-          app_password: '',
+          blogId,
+          username: naverUser.trim() || blogId,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '저장 실패')
+      setNaverBlogId('')
+      setNaverUser('')
       await loadAccounts()
-      ping('네이버 블로그 계정 등록됨 (로그인은 PC 에이전트에서)')
+      ping(`네이버 계정 추가됨 (총 ${accounts.filter((a) => a.provider === 'naver').length + 1}개)`)
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장 실패')
     } finally {
       setSavingAccount(false)
     }
+  }
+
+  async function removeAccount(id: string) {
+    await fetch(`/api/blog/accounts?id=${id}`, { method: 'DELETE' })
+    await loadAccounts()
+    ping('계정 삭제됨')
   }
 
   async function enqueueExternal(provider: 'tistory' | 'naver', postId?: string) {
@@ -337,6 +351,7 @@ export function BlogClient() {
         body: JSON.stringify({
           categoryName: catName,
           blogId: catBlogId,
+          accountId: catAccountId || null,
           openDow,
           openTime,
           closeDow,
@@ -781,6 +796,25 @@ export function BlogClient() {
               placeholder="카테고리명 (예: 폰케이스)"
               className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
             />
+            <select
+              value={catAccountId}
+              onChange={(e) => {
+                setCatAccountId(e.target.value)
+                const acc = accounts.find((a) => a.id === e.target.value)
+                const blogId = String(acc?.meta?.blogId || '')
+                if (blogId) setCatBlogId(blogId)
+              }}
+              className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-sm text-white"
+            >
+              <option value="">네이버 계정 선택 (선택)</option>
+              {accounts
+                .filter((a) => a.provider === 'naver')
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.username} · {a.site_url}
+                  </option>
+                ))}
+            </select>
             <input
               value={catBlogId}
               onChange={(e) => setCatBlogId(e.target.value)}
@@ -896,26 +930,58 @@ export function BlogClient() {
             >
               WP 연결 저장
             </button>
-            <input
-              value={naverBlogId}
-              onChange={(e) => setNaverBlogId(e.target.value)}
-              placeholder="네이버 blogId"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-            />
-            <input
-              value={naverUser}
-              onChange={(e) => setNaverUser(e.target.value)}
-              placeholder="표시용 아이디"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              disabled={savingAccount}
-              onClick={() => void saveNaverAccount()}
-              className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold"
-            >
-              네이버 계정 등록
-            </button>
+
+            <div className="border-t border-white/10 pt-3">
+              <p className="mb-1 text-sm font-semibold text-white">네이버 블로그 계정</p>
+              <p className="mb-2 text-[11px] text-white/40">개수 제한 없음 · blogId마다 추가</p>
+              <input
+                value={naverBlogId}
+                onChange={(e) => setNaverBlogId(e.target.value)}
+                placeholder="네이버 blogId (필수)"
+                className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              />
+              <input
+                value={naverUser}
+                onChange={(e) => setNaverUser(e.target.value)}
+                placeholder="표시 이름 (선택)"
+                className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={savingAccount}
+                onClick={() => void saveNaverAccount()}
+                className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold"
+              >
+                네이버 계정 추가
+              </button>
+              <ul className="mt-3 space-y-2">
+                {accounts.filter((a) => a.provider === 'naver').length === 0 ? (
+                  <li className="text-[11px] text-white/35">등록된 네이버 계정이 없습니다.</li>
+                ) : (
+                  accounts
+                    .filter((a) => a.provider === 'naver')
+                    .map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2 text-[11px] text-white/70"
+                      >
+                        <span className="min-w-0 truncate">
+                          <span className="font-semibold text-white">{a.username}</span>
+                          <span className="text-white/35"> · {a.site_url}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void removeAccount(a.id)}
+                          className="shrink-0 text-red-300/80 hover:text-red-200"
+                        >
+                          삭제
+                        </button>
+                      </li>
+                    ))
+                )}
+              </ul>
+            </div>
+
             <p className="text-[11px] text-white/40">
               에이전트: <code className="text-white/60">workers/blog-agent</code> ·{' '}
               <code className="text-white/60">npm run blog-agent</code>
@@ -926,11 +992,18 @@ export function BlogClient() {
               </div>
             ))}
             <ul className="space-y-1 text-[11px] text-white/40">
-              {accounts.map((a) => (
-                <li key={a.id}>
-                  {a.provider} · {a.site_url} · {a.username}
-                </li>
-              ))}
+              {accounts
+                .filter((a) => a.provider !== 'naver')
+                .map((a) => (
+                  <li key={a.id} className="flex justify-between gap-2">
+                    <span>
+                      {a.provider} · {a.site_url} · {a.username}
+                    </span>
+                    <button type="button" onClick={() => void removeAccount(a.id)} className="text-red-300/70">
+                      삭제
+                    </button>
+                  </li>
+                ))}
             </ul>
             <a
               href="https://www.mostem.kr/privacy"

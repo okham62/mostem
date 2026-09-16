@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import {
   deleteBlogAccount,
+  insertBlogAccount,
   listBlogAccounts,
   upsertBlogAccount,
 } from '@/lib/blog-db'
@@ -8,6 +9,14 @@ import { testWordPressAccount } from '@/lib/blog-wordpress'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+
+function normalizeNaverBlogId(raw: string) {
+  return raw
+    .trim()
+    .replace(/^https?:\/\/(m\.)?blog\.naver\.com\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/^@/, '')
+}
 
 export async function GET() {
   const session = await auth()
@@ -24,6 +33,7 @@ export async function GET() {
         username: a.username,
         created_at: a.created_at,
         hasPassword: Boolean(a.app_password),
+        meta: a.meta ?? {},
       })),
     })
   } catch (error) {
@@ -41,9 +51,10 @@ export async function POST(req: Request) {
   }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
   const provider = body.provider === 'tistory' || body.provider === 'naver' ? body.provider : 'wordpress'
-  const site_url = typeof body.site_url === 'string' ? body.site_url.trim() : ''
+  let site_url = typeof body.site_url === 'string' ? body.site_url.trim() : ''
   const username = typeof body.username === 'string' ? body.username.trim() : ''
   const app_password = typeof body.app_password === 'string' ? body.app_password.trim() : ''
+  const blogIdRaw = typeof body.blogId === 'string' ? body.blogId : ''
 
   if (provider === 'wordpress') {
     if (!site_url || !username || !app_password) {
@@ -57,15 +68,48 @@ export async function POST(req: Request) {
         { status: 400 }
       )
     }
+
+    try {
+      const account = await upsertBlogAccount({
+        userId: session.user.id,
+        provider: 'wordpress',
+        site_url,
+        username,
+        app_password,
+      })
+      return NextResponse.json({
+        ok: true,
+        account: {
+          id: account.id,
+          provider: account.provider,
+          site_url: account.site_url,
+          username: account.username,
+        },
+      })
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : '저장 실패' },
+        { status: 500 }
+      )
+    }
   }
 
+  // Naver / Tistory: unlimited accounts — always insert a new row per blogId
+  const blogId = normalizeNaverBlogId(blogIdRaw || site_url || username)
+  if (!blogId) {
+    return NextResponse.json({ error: 'blogId(블로그 아이디)가 필요합니다' }, { status: 400 })
+  }
+  site_url = provider === 'naver' ? `https://blog.naver.com/${blogId}` : site_url || `https://${blogId}`
+  const displayName = username || blogId
+
   try {
-    const account = await upsertBlogAccount({
+    const account = await insertBlogAccount({
       userId: session.user.id,
       provider,
-      site_url: site_url || provider,
-      username: username || 'pending',
+      site_url,
+      username: displayName,
       app_password: app_password || '',
+      meta: { blogId },
     })
     return NextResponse.json({
       ok: true,
@@ -74,13 +118,13 @@ export async function POST(req: Request) {
         provider: account.provider,
         site_url: account.site_url,
         username: account.username,
+        meta: account.meta,
       },
     })
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : '저장 실패' },
-      { status: 500 }
-    )
+    const message = error instanceof Error ? error.message : '저장 실패'
+    const status = message.includes('이미 등록') ? 409 : 500
+    return NextResponse.json({ error: message }, { status })
   }
 }
 

@@ -121,6 +121,38 @@ export async function upsertBlogAccount(input: {
   return data as BlogAccountRow
 }
 
+/** Always insert a new row — used for unlimited Naver (and other) accounts. */
+export async function insertBlogAccount(input: {
+  userId: string
+  provider: 'wordpress' | 'tistory' | 'naver'
+  site_url: string
+  username: string
+  app_password?: string
+  meta?: Record<string, unknown>
+}) {
+  const supabase = createAdminClient()
+  const site = input.site_url.replace(/\/+$/, '')
+  const { data, error } = await supabase
+    .from('blog_accounts')
+    .insert({
+      user_id: input.userId,
+      provider: input.provider,
+      site_url: site,
+      username: input.username,
+      app_password: input.app_password ?? '',
+      meta: input.meta ?? {},
+    })
+    .select('*')
+    .single()
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('이미 등록된 블로그입니다. 다른 blogId를 사용하세요.')
+    }
+    throw new Error(error.message)
+  }
+  return data as BlogAccountRow
+}
+
 export async function deleteBlogAccount(userId: string, id: string) {
   const supabase = createAdminClient()
   const { error } = await supabase.from('blog_accounts').delete().eq('user_id', userId).eq('id', id)
