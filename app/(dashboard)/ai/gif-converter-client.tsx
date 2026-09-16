@@ -52,7 +52,7 @@ export function GifConverterClient() {
   const jobsRef = useRef<Job[]>([])
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [mergeImages, setMergeImages] = useState(false)
+  const [mergeImages, setMergeImages] = useState(true)
   const runningRef = useRef(false)
 
   const syncJobs = useCallback((updater: (prev: Job[]) => Job[]) => {
@@ -90,43 +90,49 @@ export function GifConverterClient() {
     if (runningRef.current) return
     runningRef.current = true
     setBusy(true)
+    const CONCURRENCY = 3
     try {
       while (true) {
-        const next = jobsRef.current.find((job) => job.status === 'queued')
-        if (!next) break
-        patchJob(next.id, { status: 'running', progress: 0, error: undefined })
-        try {
-          const opts = {
-            maxWidth: MAX_WIDTH,
-            fps: FPS,
-            maxColors: MAX_COLORS,
-            imageDelay: IMAGE_DELAY,
-            onProgress: (ratio: number) => patchJob(next.id, { progress: ratio }),
-          }
-          const result =
-            next.kind === 'slideshow'
-              ? await convertImagesToGif(next.files, opts)
-              : await convertMediaToGif(next.files[0], opts)
-          const url = URL.createObjectURL(result.blob)
-          patchJob(next.id, {
-            status: 'done',
-            progress: 1,
-            result: {
-              blob: result.blob,
-              url,
-              bytes: result.bytes,
-              width: result.width,
-              height: result.height,
-              frames: result.frames,
-            },
+        const queued = jobsRef.current.filter((job) => job.status === 'queued').slice(0, CONCURRENCY)
+        if (!queued.length) break
+
+        await Promise.all(
+          queued.map(async (next) => {
+            patchJob(next.id, { status: 'running', progress: 0, error: undefined })
+            try {
+              const opts = {
+                maxWidth: MAX_WIDTH,
+                fps: FPS,
+                maxColors: MAX_COLORS,
+                imageDelay: IMAGE_DELAY,
+                onProgress: (ratio: number) => patchJob(next.id, { progress: ratio }),
+              }
+              const result =
+                next.kind === 'slideshow'
+                  ? await convertImagesToGif(next.files, opts)
+                  : await convertMediaToGif(next.files[0], opts)
+              const url = URL.createObjectURL(result.blob)
+              patchJob(next.id, {
+                status: 'done',
+                progress: 1,
+                result: {
+                  blob: result.blob,
+                  url,
+                  bytes: result.bytes,
+                  width: result.width,
+                  height: result.height,
+                  frames: result.frames,
+                },
+              })
+            } catch (error) {
+              patchJob(next.id, {
+                status: 'error',
+                progress: 0,
+                error: error instanceof Error ? error.message : '변환 실패',
+              })
+            }
           })
-        } catch (error) {
-          patchJob(next.id, {
-            status: 'error',
-            progress: 0,
-            error: error instanceof Error ? error.message : '변환 실패',
-          })
-        }
+        )
       }
     } finally {
       runningRef.current = false
@@ -142,7 +148,9 @@ export function GifConverterClient() {
       if (!media.length) return
 
       const videos = media.filter(isVideoFile)
-      const images = media.filter(isImageFile)
+      const images = media
+        .filter(isImageFile)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }))
       const next: Job[] = []
 
       videos.forEach((file) => {
@@ -156,10 +164,11 @@ export function GifConverterClient() {
         })
       })
 
-      if (asSlideshow && images.length >= 2) {
+      // Image tab: 2+ files → one slideshow GIF by default (unless opt-out)
+      if (mode === 'image' && asSlideshow && images.length >= 2) {
         next.push({
           id: newId(),
-          label: `이미지 ${images.length}장 슬라이드`,
+          label: `이미지 ${images.length}장 슬라이드 GIF`,
           files: images,
           kind: 'slideshow',
           status: 'queued',
@@ -260,8 +269,8 @@ export function GifConverterClient() {
       <div className="mb-5 flex gap-1.5 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
         {(
           [
-            { id: 'video' as const, label: '동영상 → GIF', icon: Film },
-            { id: 'image' as const, label: '이미지 → GIF', icon: ImageIcon },
+            { id: 'video' as const, label: '동영상-gif', icon: Film },
+            { id: 'image' as const, label: '이미지-gif', icon: ImageIcon },
           ]
         ).map((tab) => {
           const Icon = tab.icon
@@ -286,16 +295,21 @@ export function GifConverterClient() {
       </div>
 
       {mode === 'image' ? (
-        <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-white/55">
-          <input
-            type="checkbox"
-            checked={mergeImages}
-            onChange={(e) => setMergeImages(e.target.checked)}
-            className="rounded border-white/20 bg-black/40"
-          />
-          여러 이미지를 <span className="font-semibold text-white/80">하나의 슬라이드 GIF</span>로
-          합치기
-        </label>
+        <div className="mb-3 space-y-1.5">
+          <p className="text-xs text-white/50">
+            이미지를 <span className="font-semibold text-white/75">여러 장</span> 올리면 기본으로{' '}
+            <span className="font-semibold text-gold">하나의 슬라이드 GIF</span>를 만듭니다.
+          </p>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-white/45">
+            <input
+              type="checkbox"
+              checked={!mergeImages}
+              onChange={(e) => setMergeImages(!e.target.checked)}
+              className="rounded border-white/20 bg-black/40"
+            />
+            이미지마다 따로 GIF 만들기 (1장=1GIF)
+          </label>
+        </div>
       ) : null}
 
       <div
@@ -382,10 +396,24 @@ export function GifConverterClient() {
             {visibleJobs.map((job) => (
               <li key={job.id} className="rounded-xl border border-white/10 bg-[var(--card-bg)] p-3">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/40">
+                  <div className="group relative flex h-14 w-14 shrink-0 items-center justify-center overflow-visible rounded-lg bg-black/40">
                     {job.result?.url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={job.result.url} alt="" className="h-full w-full object-cover" />
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={job.result.url}
+                          alt=""
+                          className="h-14 w-14 rounded-lg object-cover"
+                        />
+                        <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[220px] rounded-xl border border-white/15 bg-black/95 p-1.5 shadow-2xl group-hover:block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={job.result.url}
+                            alt=""
+                            className="max-h-[320px] w-full rounded-lg object-contain"
+                          />
+                        </div>
+                      </>
                     ) : job.kind === 'image' || job.kind === 'slideshow' ? (
                       <ImageIcon className="h-5 w-5 text-white/35" />
                     ) : (
