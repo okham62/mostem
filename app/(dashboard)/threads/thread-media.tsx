@@ -69,6 +69,7 @@ function MediaTile({
   const imageUrl = imagePosterUrl(item.poster, item.url)
   const videoUrl = cleanMediaUrl(item.videoUrl) ?? (item.type === 'video' ? cleanMediaUrl(item.url) : null)
   const tileRef = useRef<HTMLButtonElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [inView, setInView] = useState(false)
   const [videoReady, setVideoReady] = useState(false)
 
@@ -77,13 +78,44 @@ function MediaTile({
     if (!node || !videoUrl) return
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting) setInView(true)
+        setInView(Boolean(entry?.isIntersecting))
       },
-      { rootMargin: '200px', threshold: 0.01 }
+      { rootMargin: '320px', threshold: 0.05 }
     )
     observer.observe(node)
     return () => observer.disconnect()
   }, [videoUrl])
+
+  // Browsers often ignore the autoPlay attribute — force muted infinite play while visible.
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el || !videoUrl) return
+    el.defaultMuted = true
+    el.muted = true
+    el.volume = 0
+    el.loop = true
+    el.playsInline = true
+
+    if (!inView) {
+      el.pause()
+      return
+    }
+
+    const tryPlay = () => {
+      el.muted = true
+      void el.play().catch(() => {
+        /* autoplay may still be blocked until a user gesture elsewhere */
+      })
+    }
+
+    tryPlay()
+    el.addEventListener('loadeddata', tryPlay)
+    el.addEventListener('canplay', tryPlay)
+    return () => {
+      el.removeEventListener('loadeddata', tryPlay)
+      el.removeEventListener('canplay', tryPlay)
+    }
+  }, [inView, videoUrl])
 
   return (
     <button ref={tileRef} type="button" onClick={onOpen} className="relative h-full w-full cursor-pointer bg-black">
@@ -94,6 +126,7 @@ function MediaTile({
       ) : null}
       {videoUrl && inView ? (
         <video
+          ref={videoRef}
           src={mediaSrc(videoUrl) ?? videoUrl}
           poster={imageUrl ? mediaSrc(imageUrl) ?? imageUrl : undefined}
           muted
@@ -101,11 +134,17 @@ function MediaTile({
           playsInline
           autoPlay
           preload="auto"
-          onLoadedData={() => setVideoReady(true)}
+          disablePictureInPicture
+          onLoadedData={(event) => {
+            setVideoReady(true)
+            const el = event.currentTarget
+            el.muted = true
+            void el.play().catch(() => undefined)
+          }}
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : null}
-      {(item.type === 'video' || videoUrl) && <MuteIcon />}
+      {(item.type === 'video' || videoUrl) && <MuteIcon muted />}
       {extraCount ? (
         <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-2xl font-bold text-white">
           +{extraCount}
@@ -120,19 +159,30 @@ function stopBubble(event: { stopPropagation: () => void }) {
 }
 
 function VideoViewer({ item, onClose }: { item: CollectMediaItem; onClose: () => void }) {
+  // Sound on only after the user explicitly opens (clicks) the video.
   const [muted, setMuted] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const imageUrl = imagePosterUrl(item.poster, item.url)
   const videoUrl = cleanMediaUrl(item.videoUrl) ?? cleanMediaUrl(item.url)
+
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+    el.muted = muted
+    void el.play().catch(() => undefined)
+  }, [muted, videoUrl])
 
   return (
     <div className="pointer-events-none flex h-full w-full items-center justify-center px-4 py-12">
       {videoUrl ? (
         <video
+          ref={videoRef}
           key={videoUrl}
           src={mediaSrc(videoUrl) ?? videoUrl}
           poster={imageUrl ? mediaSrc(imageUrl) ?? imageUrl : undefined}
           autoPlay
           controls
+          loop
           playsInline
           muted={muted}
           onClick={stopBubble}
