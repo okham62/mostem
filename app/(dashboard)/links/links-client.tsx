@@ -8,12 +8,14 @@ import {
   Hash,
   Link2,
   PackageSearch,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
   Settings2,
   Store,
   UserRound,
+  X,
 } from 'lucide-react'
 import {
   HOTDEAL_CATEGORIES,
@@ -61,10 +63,18 @@ export function LinksClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
+  const [editing, setEditing] = useState<TrackedLink | null>(null)
 
   const ping = useCallback((msg: string) => {
     setToast(msg)
     window.setTimeout(() => setToast(''), 2200)
+  }, [])
+
+  const upsertLink = useCallback((link: TrackedLink) => {
+    setLinks((prev) => {
+      const rest = prev.filter((x) => x.id !== link.id)
+      return [link, ...rest].sort((a, b) => b.created_at.localeCompare(a.created_at))
+    })
   }, [])
 
   const load = useCallback(async () => {
@@ -160,9 +170,10 @@ export function LinksClient() {
           settings={settings}
           links={links}
           onCreated={(link) => {
-            setLinks((prev) => [link, ...prev])
+            upsertLink(link)
             ping('링크가 만들어졌어요')
           }}
+          onEdit={setEditing}
           onPrefixSave={async (prefix) => {
             await patchSettings({ prefix })
             await load()
@@ -182,7 +193,13 @@ export function LinksClient() {
       )}
 
       {tab === 'mine' && settings && (
-        <MinePanel links={links} settings={settings} copyText={copyText} onRefresh={() => void load()} />
+        <MinePanel
+          links={links}
+          settings={settings}
+          copyText={copyText}
+          onRefresh={() => void load()}
+          onEdit={setEditing}
+        />
       )}
 
       {tab === 'channel' && settings && (
@@ -209,6 +226,18 @@ export function LinksClient() {
         />
       )}
 
+      {editing ? (
+        <EditLinkModal
+          link={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(link) => {
+            upsertLink(link)
+            setEditing(null)
+            ping('링크를 수정했어요')
+          }}
+        />
+      ) : null}
+
       {toast ? (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium text-black shadow-lg">
           {toast}
@@ -218,16 +247,171 @@ export function LinksClient() {
   )
 }
 
+function EditLinkModal({
+  link,
+  onClose,
+  onSaved,
+}: {
+  link: TrackedLink
+  onClose: () => void
+  onSaved: (link: TrackedLink) => void
+}) {
+  const [title, setTitle] = useState(link.title || '')
+  const [url, setUrl] = useState(link.destination_url || '')
+  const [ogPreview, setOgPreview] = useState<string | null>(link.og_image_url || null)
+  const [clearImage, setClearImage] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function onPickImage(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setErr('이미지 파일만 올릴 수 있어요')
+      return
+    }
+    if (file.size > 900_000) {
+      setErr('이미지는 약 900KB 이하로 올려 주세요')
+      return
+    }
+    setOgPreview(await fileToDataUrl(file))
+    setClearImage(false)
+    setErr('')
+  }
+
+  async function save() {
+    setBusy(true)
+    setErr('')
+    try {
+      const body: Record<string, unknown> = {
+        title,
+        url,
+      }
+      if (clearImage) body.clearImage = true
+      else if (ogPreview && ogPreview !== link.og_image_url) body.ogImageUrl = ogPreview
+      else if (ogPreview && !link.og_image_url) body.ogImageUrl = ogPreview
+
+      const res = await fetch(`/api/links/${link.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '수정 실패')
+      onSaved(data.link as TrackedLink)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '수정 실패')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#16161b] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold">링크 편집</h3>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-white/50 hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <p className="mb-3 font-mono text-[11px] text-white/40">
+          {origin()}
+          {shortPath(link.prefix, link.code)}
+        </p>
+
+        <div className="space-y-3">
+          <label className="block space-y-1.5">
+            <span className="text-xs text-white/55">제목</span>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
+            />
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="text-xs text-white/55">원본 링크</span>
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
+            />
+          </label>
+
+          <div className="space-y-1.5">
+            <span className="text-xs text-white/55">공유 카드 이미지</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="cursor-pointer rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs text-white/50 hover:border-white/30">
+                {ogPreview && !clearImage ? '이미지 바꾸기' : '이미지 업로드'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => void onPickImage(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {ogPreview && !clearImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ogPreview} alt="" className="h-14 w-20 rounded-lg object-cover" />
+              ) : (
+                <span className="text-xs text-white/30">아직 이미지 없음</span>
+              )}
+              {ogPreview && !clearImage ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOgPreview(null)
+                    setClearImage(true)
+                  }}
+                  className="text-xs text-rose-300/80 hover:text-rose-300"
+                >
+                  이미지 제거
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {err ? <p className="text-sm text-rose-300">{err}</p> : null}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void save()}
+              className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              {busy ? '저장 중…' : '저장'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl bg-white/10 px-4 py-2.5 text-sm text-white/70"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ConvertPanel({
   settings,
   links,
   onCreated,
+  onEdit,
   onPrefixSave,
   copyText,
 }: {
   settings: LinkSettings
   links: TrackedLink[]
   onCreated: (link: TrackedLink) => void
+  onEdit: (link: TrackedLink) => void
   onPrefixSave: (prefix: string) => Promise<void>
   copyText: (t: string) => void
 }) {
@@ -375,6 +559,13 @@ function ConvertPanel({
               >
                 <Copy className="h-3.5 w-3.5" /> 복사
               </button>
+              <button
+                type="button"
+                onClick={() => onEdit(last)}
+                className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs"
+              >
+                <Pencil className="h-3.5 w-3.5" /> 편집
+              </button>
               <a
                 href={last.destination_url}
                 target="_blank"
@@ -401,19 +592,38 @@ function ConvertPanel({
                   key={l.id}
                   className="flex items-center justify-between gap-2 rounded-xl border border-white/5 bg-black/20 px-3 py-2"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm">{l.title}</p>
-                    <p className="font-mono text-[11px] text-white/40">
-                      /{l.prefix}/{l.code} · {l.click_count}클릭
-                    </p>
+                  <div className="flex min-w-0 items-center gap-2">
+                    {l.og_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={l.og_image_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                    ) : (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 text-[10px] text-white/30">
+                        없음
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm">{l.title}</p>
+                      <p className="font-mono text-[11px] text-white/40">
+                        /{l.prefix}/{l.code} · {l.click_count}클릭
+                      </p>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => copyText(`${origin()}${shortPath(l.prefix, l.code)}`)}
-                    className="shrink-0 rounded-lg px-2 py-1 text-xs text-white/60 hover:bg-white/10"
-                  >
-                    복사
-                  </button>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(l)}
+                      className="rounded-lg px-2 py-1 text-xs text-white/60 hover:bg-white/10"
+                    >
+                      편집
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyText(`${origin()}${shortPath(l.prefix, l.code)}`)}
+                      className="rounded-lg px-2 py-1 text-xs text-white/60 hover:bg-white/10"
+                    >
+                      복사
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -669,11 +879,13 @@ function MinePanel({
   settings,
   copyText,
   onRefresh,
+  onEdit,
 }: {
   links: TrackedLink[]
   settings: LinkSettings
   copyText: (t: string) => void
   onRefresh: () => void
+  onEdit: (link: TrackedLink) => void
 }) {
   const [sort, setSort] = useState<MineSort>('clicks')
   const totalClicks = links.reduce((s, l) => s + (l.click_count || 0), 0)
@@ -753,6 +965,13 @@ function MinePanel({
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(l)}
+                    className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/60"
+                  >
+                    편집
+                  </button>
                   <a
                     href={l.destination_url}
                     target="_blank"
