@@ -212,6 +212,12 @@ function InlineOgCrop({
     setOffset((o) => clampOffset(o.x, o.y, z))
   }
 
+  function resetCrop() {
+    setZoom(1)
+    setOffset({ x: 0, y: 0 })
+    setFrame({ x: pad / 2, y: pad / 2 })
+  }
+
   function hitFrame(clientX: number, clientY: number, el: HTMLElement) {
     const r = el.getBoundingClientRect()
     const x = clientX - r.left
@@ -324,6 +330,13 @@ function InlineOgCrop({
           +
         </button>
         <span className="w-10 shrink-0 text-right text-[11px] text-white/40">{zoom.toFixed(1)}x</span>
+        <button
+          type="button"
+          onClick={resetCrop}
+          className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white/70 hover:bg-white/15"
+        >
+          초기화
+        </button>
       </div>
       <p className="text-[11px] text-white/35">
         노란 테두리 드래그 = 등록 영역 · 바깥 드래그 = 이미지 이동 · 휠/+− = 확대·축소
