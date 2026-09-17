@@ -66,13 +66,18 @@ function loadHtmlImage(src: string): Promise<HTMLImageElement> {
 
 const CROP_EXPORT = 1080
 const CROP_VIEW = 320
+/** Movable 1:1 registration frame size inside the editor viewport */
+const CROP_FRAME = Math.round(CROP_VIEW * 0.72)
 
 async function exportSquareCrop(
   src: string,
   zoom: number,
   offsetX: number,
   offsetY: number,
-  viewSize: number
+  viewSize: number,
+  frameSize: number,
+  frameX: number,
+  frameY: number
 ): Promise<string> {
   const img = await loadHtmlImage(src)
   const nw = img.naturalWidth || img.width
@@ -93,8 +98,9 @@ async function exportSquareCrop(
   if (!ctx) throw new Error('Canvas를 사용할 수 없어요')
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, CROP_EXPORT, CROP_EXPORT)
-  const k = CROP_EXPORT / viewSize
-  ctx.drawImage(img, dx * k, dy * k, dw * k, dh * k)
+  const k = CROP_EXPORT / frameSize
+  // Draw only the region under the yellow frame into the export canvas
+  ctx.drawImage(img, (dx - frameX) * k, (dy - frameY) * k, dw * k, dh * k)
 
   let quality = 0.88
   let out = canvas.toDataURL('image/jpeg', quality)
@@ -106,7 +112,7 @@ async function exportSquareCrop(
   return out
 }
 
-/** Inline 1:1 crop — hover shows registration frame; pan + zoom controls. */
+/** Inline 1:1 crop — drag the yellow frame to choose the registered area. */
 function InlineOgCrop({
   src,
   onCropped,
@@ -116,11 +122,25 @@ function InlineOgCrop({
 }) {
   const [zoom, setZoom] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [frame, setFrame] = useState({
+    x: (CROP_VIEW - CROP_FRAME) / 2,
+    y: (CROP_VIEW - CROP_FRAME) / 2,
+  })
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
-  const [hover, setHover] = useState(false)
-  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const dragRef = useRef<{
+    mode: 'frame' | 'image'
+    x: number
+    y: number
+    ox: number
+    oy: number
+    fx: number
+    fy: number
+  } | null>(null)
   const exportTimer = useRef<number | null>(null)
   const view = CROP_VIEW
+  const frameSize = CROP_FRAME
+  const pad = view - frameSize
 
   useEffect(() => {
     let alive = true
@@ -130,12 +150,13 @@ function InlineOgCrop({
         setNatural({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height })
         setZoom(1)
         setOffset({ x: 0, y: 0 })
+        setFrame({ x: pad / 2, y: pad / 2 })
       })
       .catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [src])
+  }, [src, pad])
 
   const cover = natural ? view / Math.min(natural.w, natural.h) : 1
   const scale = cover * zoom
@@ -155,22 +176,29 @@ function InlineOgCrop({
     }
   }
 
+  function clampFrame(x: number, y: number) {
+    return {
+      x: Math.min(pad, Math.max(0, x)),
+      y: Math.min(pad, Math.max(0, y)),
+    }
+  }
+
   const scheduleExport = useCallback(
-    (z: number, ox: number, oy: number) => {
+    (z: number, ox: number, oy: number, fx: number, fy: number) => {
       if (exportTimer.current) window.clearTimeout(exportTimer.current)
       exportTimer.current = window.setTimeout(() => {
-        void exportSquareCrop(src, z, ox, oy, view)
+        void exportSquareCrop(src, z, ox, oy, view, frameSize, fx, fy)
           .then(onCropped)
           .catch(() => undefined)
       }, 120)
     },
-    [onCropped, src, view]
+    [onCropped, src, view, frameSize]
   )
 
   useEffect(() => {
     if (!natural) return
-    scheduleExport(zoom, offset.x, offset.y)
-  }, [natural, zoom, offset.x, offset.y, scheduleExport])
+    scheduleExport(zoom, offset.x, offset.y, frame.x, frame.y)
+  }, [natural, zoom, offset.x, offset.y, frame.x, frame.y, scheduleExport])
 
   useEffect(() => {
     return () => {
@@ -184,27 +212,58 @@ function InlineOgCrop({
     setOffset((o) => clampOffset(o.x, o.y, z))
   }
 
+  function hitFrame(clientX: number, clientY: number, el: HTMLElement) {
+    const r = el.getBoundingClientRect()
+    const x = clientX - r.left
+    const y = clientY - r.top
+    return x >= frame.x && x <= frame.x + frameSize && y >= frame.y && y <= frame.y + frameSize
+  }
+
   return (
     <div className="space-y-2">
+      <p className="rounded-lg bg-black/70 px-3 py-1.5 text-center text-[11px] font-medium text-[var(--gold)] ring-1 ring-[var(--gold)]/35">
+        노란 테두리를 드래그해서 등록 영역을 정하세요
+      </p>
       <div
         className="relative mx-auto touch-none overflow-hidden rounded-2xl border border-dashed border-white/20 bg-black"
-        style={{ width: view, height: view, maxWidth: '100%', cursor: 'grab' }}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
+        style={{
+          width: view,
+          height: view,
+          maxWidth: '100%',
+          cursor: dragging ? 'grabbing' : 'grab',
+        }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)
-          dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y }
+          const mode = hitFrame(e.clientX, e.clientY, e.currentTarget) ? 'frame' : 'image'
+          setDragging(true)
+          dragRef.current = {
+            mode,
+            x: e.clientX,
+            y: e.clientY,
+            ox: offset.x,
+            oy: offset.y,
+            fx: frame.x,
+            fy: frame.y,
+          }
         }}
         onPointerMove={(e) => {
           const d = dragRef.current
           if (!d) return
-          setOffset(clampOffset(d.ox + (e.clientX - d.x), d.oy + (e.clientY - d.y), zoom))
+          const dx = e.clientX - d.x
+          const dy = e.clientY - d.y
+          if (d.mode === 'frame') {
+            setFrame(clampFrame(d.fx + dx, d.fy + dy))
+          } else {
+            setOffset(clampOffset(d.ox + dx, d.oy + dy, zoom))
+          }
         }}
         onPointerUp={() => {
           dragRef.current = null
+          setDragging(false)
         }}
         onPointerCancel={() => {
           dragRef.current = null
+          setDragging(false)
         }}
         onWheel={(e) => {
           e.preventDefault()
@@ -225,25 +284,17 @@ function InlineOgCrop({
           }}
         />
 
-        {/* 1:1 registration frame — hover emphasizes "this is what gets saved" */}
+        {/* Movable 1:1 registration frame */}
         <div
-          className={cn(
-            'pointer-events-none absolute inset-[7%] rounded-xl transition duration-150',
-            hover
-              ? 'shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ring-[3px] ring-[var(--gold)]'
-              : 'shadow-[0_0_0_9999px_rgba(0,0,0,0.3)] ring-2 ring-white/45'
-          )}
+          className="absolute rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ring-[3px] ring-[var(--gold)]"
+          style={{
+            left: frame.x,
+            top: frame.y,
+            width: frameSize,
+            height: frameSize,
+            cursor: dragging ? 'grabbing' : 'move',
+          }}
         />
-
-        {hover ? (
-          <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/85 px-3 py-1 text-[11px] font-medium text-[var(--gold)] shadow-lg">
-            등록 시 이 테두리 안이 보여요
-          </div>
-        ) : (
-          <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/55 px-2.5 py-0.5 text-[10px] text-white/55">
-            마우스를 올려 등록 미리보기
-          </div>
-        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -274,7 +325,9 @@ function InlineOgCrop({
         </button>
         <span className="w-10 shrink-0 text-right text-[11px] text-white/40">{zoom.toFixed(1)}x</span>
       </div>
-      <p className="text-[11px] text-white/35">드래그로 위치 · +/− 또는 휠로 확대·축소 · 노란 테두리 = 등록 결과</p>
+      <p className="text-[11px] text-white/35">
+        노란 테두리 드래그 = 등록 영역 · 바깥 드래그 = 이미지 이동 · 휠/+− = 확대·축소
+      </p>
     </div>
   )
 }
