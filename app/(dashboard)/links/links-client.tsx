@@ -1743,48 +1743,42 @@ function MinePanel({
         <span className="text-white/35">전체 ({links.length})</span>
         <span className="text-white/35">클릭 있음 ({withClicks})</span>
         <span className="text-white/35">쿠팡 ({coupangCount})</span>
-      </div>
 
-      {links.length > 0 ? (
-        <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-3 py-3">
-          <p className="mb-2 text-xs font-semibold text-rose-200">링크 삭제</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-black/30 px-2.5 py-1.5 text-xs text-white/70">
+        {links.length > 0 ? (
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-white/55 hover:bg-white/10">
               <input
                 type="checkbox"
                 checked={allSelected}
                 onChange={toggleAll}
                 className="rounded border-white/20 bg-black/40"
               />
-              전체 선택
+              전체
+              {selected.size > 0 ? (
+                <span className="text-white/35">({selected.size})</span>
+              ) : null}
             </label>
-            <span className="text-[11px] text-white/40">선택 {selected.size}개</span>
-            <div className="ml-auto flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy || selected.size === 0}
-                onClick={() => void runDeleteSelected()}
-                className="inline-flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                선택 삭제
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void runDeleteAll()}
-                className="inline-flex items-center gap-1 rounded-xl border border-rose-400/50 bg-black/40 px-3 py-2 text-xs font-bold text-rose-200 disabled:opacity-40"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                전체 삭제
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={busy || selected.size === 0}
+              onClick={() => void runDeleteSelected()}
+              className="rounded-full bg-rose-500/15 px-2.5 py-1 font-medium text-rose-300 hover:bg-rose-500/25 disabled:opacity-35"
+              title="선택한 링크 삭제"
+            >
+              선택 삭제
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void runDeleteAll()}
+              className="rounded-full px-2.5 py-1 text-white/40 hover:bg-white/10 hover:text-rose-300 disabled:opacity-35"
+              title="모든 링크 삭제"
+            >
+              전체 삭제
+            </button>
           </div>
-          <p className="mt-2 text-[10px] text-white/40">
-            ① 각 행의 「삭제」 ② 체크 후 「선택 삭제」 ③ 「전체 삭제」
-          </p>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <ul className="space-y-2">
         {sorted.map((l) => {
