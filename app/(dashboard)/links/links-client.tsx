@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   BarChart3,
   Copy,
@@ -57,15 +57,237 @@ function fileToDataUrl(file: File): Promise<string> {
   })
 }
 
+function loadHtmlImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('이미지를 불러오지 못했어요'))
+    img.src = src
+  })
+}
+
+const CROP_EXPORT = 1080
+
+async function exportSquareCrop(
+  src: string,
+  zoom: number,
+  offsetX: number,
+  offsetY: number,
+  viewSize: number
+): Promise<string> {
+  const img = await loadHtmlImage(src)
+  const nw = img.naturalWidth || img.width
+  const nh = img.naturalHeight || img.height
+  if (!nw || !nh) throw new Error('이미지 크기를 알 수 없어요')
+
+  const cover = viewSize / Math.min(nw, nh)
+  const scale = cover * Math.max(1, zoom)
+  const dw = nw * scale
+  const dh = nh * scale
+  const dx = (viewSize - dw) / 2 + offsetX
+  const dy = (viewSize - dh) / 2 + offsetY
+
+  const canvas = document.createElement('canvas')
+  canvas.width = CROP_EXPORT
+  canvas.height = CROP_EXPORT
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas를 사용할 수 없어요')
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, CROP_EXPORT, CROP_EXPORT)
+  const k = CROP_EXPORT / viewSize
+  ctx.drawImage(img, dx * k, dy * k, dw * k, dh * k)
+
+  let quality = 0.88
+  let out = canvas.toDataURL('image/jpeg', quality)
+  while (out.length > 900_000 && quality > 0.45) {
+    quality -= 0.08
+    out = canvas.toDataURL('image/jpeg', quality)
+  }
+  if (out.length > 1_400_000) throw new Error('이미지가 너무 커요. 조금 더 축소해 주세요')
+  return out
+}
+
+function SquareCropModal({
+  src,
+  onCancel,
+  onConfirm,
+}: {
+  src: string
+  onCancel: () => void
+  onConfirm: (dataUrl: string) => void
+}) {
+  const VIEW = 280
+  const [zoom, setZoom] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void loadHtmlImage(src)
+      .then((img) => {
+        if (!alive) return
+        setNatural({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height })
+        setZoom(1)
+        setOffset({ x: 0, y: 0 })
+      })
+      .catch(() => setErr('이미지를 불러오지 못했어요'))
+    return () => {
+      alive = false
+    }
+  }, [src])
+
+  const cover = natural ? VIEW / Math.min(natural.w, natural.h) : 1
+  const scale = cover * zoom
+  const dw = natural ? natural.w * scale : VIEW
+  const dh = natural ? natural.h * scale : VIEW
+
+  function clampOffset(x: number, y: number, z: number) {
+    if (!natural) return { x: 0, y: 0 }
+    const s = cover * Math.max(1, z)
+    const w = natural.w * s
+    const h = natural.h * s
+    const maxX = Math.max(0, (w - VIEW) / 2)
+    const maxY = Math.max(0, (h - VIEW) / 2)
+    return {
+      x: Math.min(maxX, Math.max(-maxX, x)),
+      y: Math.min(maxY, Math.max(-maxY, y)),
+    }
+  }
+
+  function onPointerDown(e: ReactPointerEvent) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y }
+  }
+
+  function onPointerMove(e: ReactPointerEvent) {
+    const d = dragRef.current
+    if (!d) return
+    setOffset(
+      clampOffset(d.ox + (e.clientX - d.x), d.oy + (e.clientY - d.y), zoom)
+    )
+  }
+
+  function onPointerUp() {
+    dragRef.current = null
+  }
+
+  async function confirm() {
+    setBusy(true)
+    setErr('')
+    try {
+      const dataUrl = await exportSquareCrop(src, zoom, offset.x, offset.y, VIEW)
+      onConfirm(dataUrl)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '크롭 실패')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#16161b] p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold">1:1 위치 조절</h3>
+            <p className="mt-0.5 text-[11px] text-white/40">드래그로 위치 · 슬라이더로 확대/축소</p>
+          </div>
+          <button type="button" onClick={onCancel} className="rounded-lg p-1 text-white/50 hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div
+          className="relative mx-auto touch-none overflow-hidden rounded-2xl border border-white/15 bg-black"
+          style={{ width: VIEW, height: VIEW, cursor: 'grab' }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onWheel={(e) => {
+            e.preventDefault()
+            const next = Math.min(3, Math.max(1, zoom + (e.deltaY > 0 ? -0.08 : 0.08)))
+            setZoom(next)
+            setOffset((o) => clampOffset(o.x, o.y, next))
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt=""
+            draggable={false}
+            className="pointer-events-none absolute max-w-none select-none"
+            style={{
+              width: dw,
+              height: dh,
+              left: (VIEW - dw) / 2 + offset.x,
+              top: (VIEW - dh) / 2 + offset.y,
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-[var(--gold)]/70" />
+        </div>
+
+        <label className="mt-4 block space-y-1.5">
+          <div className="flex justify-between text-[11px] text-white/45">
+            <span>확대 / 축소</span>
+            <span>{zoom.toFixed(2)}x</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={3}
+            step={0.01}
+            value={zoom}
+            onChange={(e) => {
+              const next = Number(e.target.value)
+              setZoom(next)
+              setOffset((o) => clampOffset(o.x, o.y, next))
+            }}
+            className="w-full accent-[var(--accent)]"
+          />
+        </label>
+
+        {err ? <p className="mt-2 text-xs text-rose-300">{err}</p> : null}
+
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            disabled={busy || !natural}
+            onClick={() => void confirm()}
+            className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            {busy ? '적용 중…' : '1:1로 적용'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl bg-white/10 px-4 py-2.5 text-sm text-white/70"
+          >
+            취소
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ImageDropZone({
   preview,
   onFile,
   onClear,
+  onRecrop,
   emptyHint = '이미지를 드래그하거나 클릭해서 업로드',
 }: {
   preview: string | null
   onFile: (file: File) => void | Promise<void>
   onClear?: () => void
+  onRecrop?: () => void
   emptyHint?: string
 }) {
   const [dragOver, setDragOver] = useState(false)
@@ -109,14 +331,14 @@ function ImageDropZone({
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="" className="max-h-36 w-auto max-w-full rounded-xl object-contain" />
+          <img src={preview} alt="" className="aspect-square max-h-44 w-auto max-w-full rounded-xl object-cover" />
         ) : (
           <>
             <span className="text-2xl opacity-50">🖼️</span>
             <span className="text-center text-xs text-white/50">
               {dragOver ? '여기에 놓으세요' : emptyHint}
             </span>
-            <span className="text-[11px] text-white/30">PNG · JPG · WEBP · 약 900KB 이하</span>
+            <span className="text-[11px] text-white/30">가로·세로 모두 → 1:1 크롭 · PNG · JPG · WEBP</span>
           </>
         )}
         <input
@@ -130,7 +352,7 @@ function ImageDropZone({
         />
       </label>
       {preview ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <label className="cursor-pointer rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/15">
             다른 이미지 선택
             <input
@@ -143,6 +365,15 @@ function ImageDropZone({
               }}
             />
           </label>
+          {onRecrop ? (
+            <button
+              type="button"
+              onClick={onRecrop}
+              className="rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/15"
+            >
+              위치·확대 다시 조절
+            </button>
+          ) : null}
           {onClear ? (
             <button
               type="button"
@@ -406,6 +637,7 @@ function EditLinkModal({
   const [title, setTitle] = useState(link.title || '')
   const [url, setUrl] = useState(link.destination_url || '')
   const [ogPreview, setOgPreview] = useState<string | null>(link.og_image_url || null)
+  const [cropSource, setCropSource] = useState<string | null>(null)
   const [clearImage, setClearImage] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -416,12 +648,11 @@ function EditLinkModal({
       setErr('이미지 파일만 올릴 수 있어요')
       return
     }
-    if (file.size > 900_000) {
-      setErr('이미지는 약 900KB 이하로 올려 주세요')
+    if (file.size > 4_000_000) {
+      setErr('원본은 4MB 이하로 올려 주세요 (저장 시 1:1로 압축됩니다)')
       return
     }
-    setOgPreview(await fileToDataUrl(file))
-    setClearImage(false)
+    setCropSource(await fileToDataUrl(file))
     setErr('')
   }
 
@@ -490,14 +721,20 @@ function EditLinkModal({
           </label>
 
           <div className="space-y-1.5">
-            <span className="text-xs text-white/55">공유 카드 이미지</span>
+            <span className="text-xs text-white/55">공유 카드 이미지 (1:1)</span>
             <ImageDropZone
               preview={ogPreview && !clearImage ? ogPreview : null}
-              emptyHint="이미지를 드래그하거나 클릭해서 업로드"
+              emptyHint="올리면 1:1로 위치·확대를 고를 수 있어요"
               onFile={(file) => void onPickImage(file)}
+              onRecrop={
+                ogPreview && !clearImage
+                  ? () => setCropSource(ogPreview)
+                  : undefined
+              }
               onClear={() => {
                 setOgPreview(null)
                 setClearImage(true)
+                setCropSource(null)
               }}
             />
           </div>
@@ -523,6 +760,17 @@ function EditLinkModal({
           </div>
         </div>
       </div>
+      {cropSource ? (
+        <SquareCropModal
+          src={cropSource}
+          onCancel={() => setCropSource(null)}
+          onConfirm={(dataUrl) => {
+            setOgPreview(dataUrl)
+            setClearImage(false)
+            setCropSource(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -547,6 +795,7 @@ function ConvertPanel({
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [ogPreview, setOgPreview] = useState<string | null>(null)
+  const [cropSource, setCropSource] = useState<string | null>(null)
   const [prefixDraft, setPrefixDraft] = useState(settings.prefix)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -572,11 +821,11 @@ function ConvertPanel({
       setErr('이미지 파일만 올릴 수 있어요')
       return
     }
-    if (file.size > 900_000) {
-      setErr('이미지는 약 900KB 이하로 올려 주세요')
+    if (file.size > 4_000_000) {
+      setErr('원본은 4MB 이하로 올려 주세요 (저장 시 1:1로 압축됩니다)')
       return
     }
-    setOgPreview(await fileToDataUrl(file))
+    setCropSource(await fileToDataUrl(file))
     setErr('')
   }
 
@@ -645,12 +894,16 @@ function ConvertPanel({
         </label>
 
         <div className="space-y-1.5">
-          <span className="text-xs font-medium text-white/55">공유 카드 이미지</span>
+          <span className="text-xs font-medium text-white/55">공유 카드 이미지 (1:1)</span>
           <ImageDropZone
             preview={ogPreview}
-            emptyHint="이미지를 드래그하거나 클릭해서 업로드"
+            emptyHint="올리면 1:1로 위치·확대를 고를 수 있어요"
             onFile={(file) => void onPickImage(file)}
-            onClear={() => setOgPreview(null)}
+            onRecrop={ogPreview ? () => setCropSource(ogPreview) : undefined}
+            onClear={() => {
+              setOgPreview(null)
+              setCropSource(null)
+            }}
           />
         </div>
 
@@ -771,11 +1024,11 @@ function ConvertPanel({
           <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
             {ogPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={ogPreview} alt="" className="aspect-[1.91/1] w-full object-cover" />
+              <img src={ogPreview} alt="" className="aspect-square w-full object-cover" />
             ) : (
-              <div className="flex aspect-[1.91/1] flex-col items-center justify-center gap-2 px-4 text-center text-xs text-white/35">
+              <div className="flex aspect-square flex-col items-center justify-center gap-2 px-4 text-center text-xs text-white/35">
                 <span className="text-2xl opacity-40">🖼️</span>
-                공유 카드 이미지가 여기에 보여요
+                1:1 공유 카드 미리보기
               </div>
             )}
             <div className="border-t border-white/10 px-3 py-2.5">
@@ -814,6 +1067,17 @@ function ConvertPanel({
           </label>
         </div>
       </aside>
+
+      {cropSource ? (
+        <SquareCropModal
+          src={cropSource}
+          onCancel={() => setCropSource(null)}
+          onConfirm={(dataUrl) => {
+            setOgPreview(dataUrl)
+            setCropSource(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
