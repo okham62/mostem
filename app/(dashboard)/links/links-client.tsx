@@ -728,10 +728,43 @@ function EditLinkModal({
   const [title, setTitle] = useState(link.title || '')
   const [url, setUrl] = useState(link.destination_url || '')
   const [ogPreview, setOgPreview] = useState<string | null>(link.og_image_url || null)
-  const [cropSource, setCropSource] = useState<string | null>(link.og_image_url || null)
+  const [cropSource, setCropSource] = useState<string | null>(
+    link.og_image_url?.startsWith('data:') ? link.og_image_url : null
+  )
   const [clearImage, setClearImage] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [fetchingThumb, setFetchingThumb] = useState(false)
   const [err, setErr] = useState('')
+
+  useEffect(() => {
+    const src = link.og_image_url
+    if (!src) return
+    if (src.startsWith('data:')) {
+      setCropSource(src)
+      setOgPreview(src)
+      return
+    }
+    if (!/^https?:\/\//i.test(src)) return
+    let alive = true
+    setFetchingThumb(true)
+    void fetch('/api/links/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: src }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}))
+        if (!alive || !res.ok || typeof data.imageDataUrl !== 'string') return
+        setCropSource(data.imageDataUrl)
+        setOgPreview(data.imageDataUrl)
+      })
+      .finally(() => {
+        if (alive) setFetchingThumb(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [link.id, link.og_image_url])
 
   async function onPickImage(file: File | null) {
     if (!file) return
@@ -743,8 +776,57 @@ function EditLinkModal({
       setErr('원본은 4MB 이하로 올려 주세요 (저장 시 1:1로 압축됩니다)')
       return
     }
+    setClearImage(false)
     setCropSource(await fileToDataUrl(file))
     setErr('')
+  }
+
+  async function refetchProductThumb() {
+    const pageUrl = url.trim()
+    if (!/^https?:\/\//i.test(pageUrl)) {
+      setErr('상품 URL이 있어야 썸네일을 다시 가져올 수 있어요')
+      return
+    }
+    setFetchingThumb(true)
+    setErr('')
+    try {
+      let imageDataUrl: string | null = null
+
+      const res = await fetch('/api/links/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: pageUrl }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && typeof data.imageDataUrl === 'string') {
+        imageDataUrl = data.imageDataUrl
+      }
+
+      if (!imageDataUrl && isHamiOnline()) {
+        const hami = await requestHamiLinkPreview(pageUrl)
+        if (hami.ok && hami.imageUrl) {
+          const imgRes = await fetch('/api/links/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: hami.imageUrl }),
+          })
+          const imgData = await imgRes.json().catch(() => ({}))
+          if (imgRes.ok && typeof imgData.imageDataUrl === 'string') {
+            imageDataUrl = imgData.imageDataUrl
+          }
+        }
+      }
+
+      if (!imageDataUrl) {
+        throw new Error('상품 썸네일을 가져오지 못했어요. 이미지를 직접 올려 주세요.')
+      }
+      setClearImage(false)
+      setCropSource(imageDataUrl)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '썸네일 불러오기 실패')
+    } finally {
+      setFetchingThumb(false)
+    }
   }
 
   async function save() {
@@ -824,7 +906,17 @@ function EditLinkModal({
           </label>
 
           <div className="space-y-1.5">
-            <span className="text-xs text-white/55">공유 카드 이미지 (1:1)</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-white/55">공유 카드 이미지 (1:1) · 언제든 교체 가능</span>
+              <button
+                type="button"
+                disabled={busy || fetchingThumb || !url.trim()}
+                onClick={() => void refetchProductThumb()}
+                className="rounded-lg bg-white/10 px-2 py-1 text-[11px] text-white/70 hover:bg-white/15 disabled:opacity-40"
+              >
+                {fetchingThumb ? '불러오는 중…' : '상품에서 다시 가져오기'}
+              </button>
+            </div>
             <ImageDropZone
               source={!clearImage ? cropSource : null}
               preview={ogPreview && !clearImage ? ogPreview : null}

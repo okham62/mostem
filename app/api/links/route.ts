@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { resolveOgImageForStorage } from '@/lib/link-preview'
 import {
   detectLinkPlatform,
   isValidPrefix,
@@ -106,11 +107,11 @@ export async function POST(req: Request) {
 
     const destination = normalizeDestinationUrl(body.url ?? '')
     const title = (body.title ?? '').trim() || '추천 상품'
-    const ogImageUrl =
-      typeof body.ogImageUrl === 'string' && body.ogImageUrl.trim() ? body.ogImageUrl.trim() : null
-    if (ogImageUrl && ogImageUrl.length > 1_500_000) {
-      return NextResponse.json({ error: '이미지가 너무 큽니다 (약 1MB 이하)' }, { status: 400 })
-    }
+    // Remote Coupang CDN URLs are inlined to data URLs so list/share cards always show.
+    // Soft-fail: link still creates if the image cannot be fetched.
+    const ogImageUrl = await resolveOgImageForStorage(
+      typeof body.ogImageUrl === 'string' ? body.ogImageUrl : null
+    )
 
     const settings = await ensureSettings(session.user.id)
     const supabase = createAdminClient()

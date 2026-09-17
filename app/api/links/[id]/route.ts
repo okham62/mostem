@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { resolveOgImageForStorage } from '@/lib/link-preview'
 import { detectLinkPlatform, normalizeDestinationUrl, type TrackedLink } from '@/lib/links'
 import { NextResponse } from 'next/server'
 
@@ -49,12 +50,14 @@ export async function PATCH(
     if (body.clearImage) {
       patch.og_image_url = null
     } else if (body.ogImageUrl !== undefined) {
-      const og =
-        typeof body.ogImageUrl === 'string' && body.ogImageUrl.trim()
-          ? body.ogImageUrl.trim()
-          : null
-      if (og && og.length > 1_500_000) {
-        return NextResponse.json({ error: '이미지가 너무 큽니다 (약 1MB 이하)' }, { status: 400 })
+      const og = await resolveOgImageForStorage(
+        typeof body.ogImageUrl === 'string' ? body.ogImageUrl : null
+      )
+      if (typeof body.ogImageUrl === 'string' && body.ogImageUrl.trim() && !og) {
+        return NextResponse.json(
+          { error: '이미지를 저장하지 못했어요. 다른 파일을 올려 주세요.' },
+          { status: 400 }
+        )
       }
       patch.og_image_url = og
     }

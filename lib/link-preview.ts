@@ -106,23 +106,56 @@ export async function imageUrlToDataUrl(imageUrl: string): Promise<string | null
   const parsed = isPublicHttpUrl(imageUrl)
   if (!parsed) return null
 
-  const res = await fetch(parsed.toString(), {
-    redirect: 'follow',
-    headers: {
-      'User-Agent': UA,
-      Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-      Referer: `${parsed.origin}/`,
-    },
-    signal: AbortSignal.timeout(12_000),
-  })
-  if (!res.ok) return null
+  const candidates = [parsed.toString()]
+  // Prefer a mid-size Coupang CDN thumb when the URL embeds a size token
+  if (/coupangcdn\.com/i.test(parsed.hostname)) {
+    const mid = parsed
+      .toString()
+      .replace(/\/thumbnails\/remote\/\d+x\d+[a-z]*\//i, '/thumbnails/remote/492x492ex/')
+      .replace(/\/image\/\d+x\d+[a-z]*\//i, '/image/492x492ex/')
+    if (mid !== candidates[0]) candidates.unshift(mid)
+  }
 
-  const ctype = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
-  if (ctype && !ctype.startsWith('image/')) return null
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate, {
+        redirect: 'follow',
+        headers: {
+          'User-Agent': UA,
+          Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          Referer: 'https://www.coupang.com/',
+        },
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (!res.ok) continue
 
-  const buf = Buffer.from(await res.arrayBuffer())
-  if (!buf.byteLength || buf.byteLength > MAX_IMAGE_BYTES) return null
+      const ctype = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+      if (ctype && !ctype.startsWith('image/')) continue
 
-  const outType = ctype && ctype.startsWith('image/') ? ctype : 'image/jpeg'
-  return `data:${outType};base64,${buf.toString('base64')}`
+      const buf = Buffer.from(await res.arrayBuffer())
+      if (!buf.byteLength || buf.byteLength > MAX_IMAGE_BYTES) continue
+
+      const outType = ctype && ctype.startsWith('image/') ? ctype : 'image/jpeg'
+      return `data:${outType};base64,${buf.toString('base64')}`
+    } catch {
+      // try next candidate
+    }
+  }
+  return null
+}
+
+/** Store-ready OG image: keep data URLs, fetch+inline remote http(s) images. */
+export async function resolveOgImageForStorage(input: string | null | undefined): Promise<string | null> {
+  if (typeof input !== 'string') return null
+  const raw = input.trim()
+  if (!raw) return null
+  if (raw.startsWith('data:image/')) {
+    return raw.length > 1_500_000 ? null : raw
+  }
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    const dataUrl = await imageUrlToDataUrl(raw)
+    if (!dataUrl) return null
+    return dataUrl.length > 1_500_000 ? null : dataUrl
+  }
+  return null
 }
