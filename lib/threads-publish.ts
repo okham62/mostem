@@ -21,6 +21,58 @@ export function isHamiOnline() {
   return at > 0 && Date.now() - at < 4000
 }
 
+/** Ask hami extension to open the URL briefly and read og:image / title (for Coupang etc.). */
+export function requestHamiLinkPreview(pageUrl: string): Promise<{
+  ok: boolean
+  title?: string | null
+  imageUrl?: string | null
+  error?: string
+}> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve({ ok: false, error: '브라우저에서만 가능해요' })
+  }
+  if (!isHamiOnline()) {
+    return Promise.resolve({ ok: false, error: '하미 확장이 필요해요' })
+  }
+
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      window.removeEventListener('message', onMessage)
+      resolve({ ok: false, error: '썸네일 불러오기 시간 초과' })
+    }, 25_000)
+
+    function onMessage(event: MessageEvent) {
+      const data = event.data as {
+        source?: string
+        type?: string
+        id?: string
+        ok?: boolean
+        error?: string
+        title?: string | null
+        imageUrl?: string | null
+      }
+      if (event.source !== window) return
+      if (data?.source !== 'hami-extension' || data.type !== 'link-preview-result') return
+      if (data.id !== requestId) return
+      window.clearTimeout(timer)
+      window.removeEventListener('message', onMessage)
+      resolve({
+        ok: Boolean(data.ok),
+        title: data.title,
+        imageUrl: data.imageUrl,
+        error: data.ok ? undefined : data.error || '썸네일을 가져오지 못했어요',
+      })
+    }
+
+    window.addEventListener('message', onMessage)
+    window.postMessage(
+      { source: 'mostem', type: 'link-preview', id: requestId, payload: { url: pageUrl } },
+      '*'
+    )
+  })
+}
+
 function parseVersion(value: string) {
   return value.split('.').map((part) => Number(part.replace(/\D/g, '')) || 0)
 }

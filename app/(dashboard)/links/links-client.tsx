@@ -25,6 +25,7 @@ import {
   type TrackedLink,
 } from '@/lib/links'
 import type { ShoppingProduct } from '@/lib/shopping'
+import { isHamiOnline, requestHamiLinkPreview } from '@/lib/threads-publish'
 import { cn } from '@/lib/utils'
 import { ProfilePanel } from './profile-panel'
 
@@ -629,9 +630,11 @@ export function LinksClient() {
 
       {tab === 'find' && (
         <FindPanel
-          onUseUrl={(url, title) => {
+          onUseUrl={(url, title, image) => {
             setTab('convert')
-            window.dispatchEvent(new CustomEvent('mostem-links-prefill', { detail: { url, title } }))
+            window.dispatchEvent(
+              new CustomEvent('mostem-links-prefill', { detail: { url, title, image } })
+            )
           }}
         />
       )}
@@ -895,22 +898,129 @@ function ConvertPanel({
   const [cropSource, setCropSource] = useState<string | null>(null)
   const [prefixDraft, setPrefixDraft] = useState(settings.prefix)
   const [busy, setBusy] = useState(false)
+  const [fetchingThumb, setFetchingThumb] = useState(false)
+  const [thumbHint, setThumbHint] = useState('')
   const [err, setErr] = useState('')
   const [last, setLast] = useState<TrackedLink | null>(null)
+  const titleTouched = useRef(false)
+  const imageTouched = useRef(false)
+  const previewSeq = useRef(0)
 
   useEffect(() => {
     setPrefixDraft(settings.prefix)
   }, [settings.prefix])
 
+  async function applyRemoteImage(imageUrl: string) {
+    const res = await fetch('/api/links/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || typeof data.imageDataUrl !== 'string') return false
+    setCropSource(data.imageDataUrl)
+    setThumbHint('')
+    setErr('')
+    return true
+  }
+
+  async function fetchPreviewForUrl(pageUrl: string) {
+    const seq = ++previewSeq.current
+    setFetchingThumb(true)
+    setThumbHint('')
+    try {
+      const res = await fetch('/api/links/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: pageUrl }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (seq !== previewSeq.current) return
+
+      if (res.ok) {
+        if (!titleTouched.current && typeof data.title === 'string' && data.title.trim()) {
+          setTitle(data.title.trim())
+        }
+        if (!imageTouched.current && typeof data.imageDataUrl === 'string') {
+          setCropSource(data.imageDataUrl)
+          setThumbHint('')
+          return
+        }
+        if (!imageTouched.current && data.partial) {
+          setThumbHint('제목은 가져왔어요. 썸네일은 직접 올려 주세요.')
+        }
+      }
+
+      // Coupang (and similar) block server scrapes — try hami extension tab scrape
+      const host = (() => {
+        try {
+          return new URL(pageUrl).hostname.toLowerCase()
+        } catch {
+          return ''
+        }
+      })()
+      const needsHami = host.includes('coupang') || !res.ok || !data.imageDataUrl
+      if (!needsHami || imageTouched.current || !isHamiOnline()) {
+        if (!res.ok && typeof data.error === 'string' && data.error) setThumbHint(data.error)
+        return
+      }
+
+      setThumbHint('하미로 상품 썸네일 불러오는 중…')
+      const hami = await requestHamiLinkPreview(pageUrl)
+      if (seq !== previewSeq.current) return
+      if (!hami.ok) {
+        setThumbHint(
+          typeof data.error === 'string' && data.error
+            ? data.error
+            : '자동 썸네일을 못 가져왔어요. 상품찾기에서 고르거나 이미지를 직접 올려 주세요.'
+        )
+        return
+      }
+      if (!titleTouched.current && hami.title?.trim()) setTitle(hami.title.trim())
+      if (!imageTouched.current && hami.imageUrl) {
+        const ok = await applyRemoteImage(hami.imageUrl)
+        if (seq !== previewSeq.current) return
+        if (ok) setThumbHint('')
+        else setThumbHint('이미지는 찾았지만 불러오지 못했어요. 직접 올려 주세요.')
+      }
+    } finally {
+      if (seq === previewSeq.current) setFetchingThumb(false)
+    }
+  }
+
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ url: string; title?: string }>).detail
-      if (detail?.url) setUrl(detail.url)
-      if (detail?.title) setTitle(detail.title)
+      const detail = (e as CustomEvent<{ url: string; title?: string; image?: string }>).detail
+      if (!detail?.url) return
+      titleTouched.current = Boolean(detail.title)
+      imageTouched.current = false
+      setUrl(detail.url)
+      if (detail.title) setTitle(detail.title)
+      if (detail.image) {
+        imageTouched.current = true
+        void applyRemoteImage(detail.image).then((ok) => {
+          if (!ok) {
+            imageTouched.current = false
+            void fetchPreviewForUrl(detail.url)
+          }
+        })
+      } else {
+        void fetchPreviewForUrl(detail.url)
+      }
     }
     window.addEventListener('mostem-links-prefill', handler)
     return () => window.removeEventListener('mostem-links-prefill', handler)
   }, [])
+
+  useEffect(() => {
+    const trimmed = url.trim()
+    if (!/^https?:\/\//i.test(trimmed)) return
+    const timer = window.setTimeout(() => {
+      if (imageTouched.current && titleTouched.current) return
+      void fetchPreviewForUrl(trimmed)
+    }, 700)
+    return () => window.clearTimeout(timer)
+  }, [url])
 
   async function onPickImage(file: File | null) {
     if (!file) return
@@ -922,6 +1032,7 @@ function ConvertPanel({
       setErr('원본은 4MB 이하로 올려 주세요 (저장 시 1:1로 압축됩니다)')
       return
     }
+    imageTouched.current = true
     setCropSource(await fileToDataUrl(file))
     setErr('')
   }
@@ -948,6 +1059,8 @@ function ConvertPanel({
       setTitle('')
       setOgPreview(null)
       setCropSource(null)
+      titleTouched.current = false
+      imageTouched.current = false
     } catch (e) {
       setErr(e instanceof Error ? e.message : '변환 실패')
     } finally {
@@ -975,17 +1088,31 @@ function ConvertPanel({
           <span className="text-xs font-medium text-white/55">링크 붙여넣기</span>
           <input
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              imageTouched.current = false
+              titleTouched.current = false
+              setUrl(e.target.value)
+            }}
             placeholder="https://www.coupang.com/vp/products/..."
             className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
           />
+          {fetchingThumb ? (
+            <p className="text-[11px] text-white/40">썸네일·제목 불러오는 중…</p>
+          ) : thumbHint ? (
+            <p className="text-[11px] text-amber-200/80">{thumbHint}</p>
+          ) : (
+            <p className="text-[11px] text-white/30">붙여넣으면 상품 썸네일·제목을 자동으로 가져와요</p>
+          )}
         </label>
 
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-white/55">링크 제목</span>
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              titleTouched.current = true
+              setTitle(e.target.value)
+            }}
             placeholder="예: 쿠팡 추천 상품"
             className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
           />
@@ -1000,6 +1127,7 @@ function ConvertPanel({
             onFile={(file) => void onPickImage(file)}
             onCropped={setOgPreview}
             onClear={() => {
+              imageTouched.current = true
               setOgPreview(null)
               setCropSource(null)
             }}
@@ -1190,7 +1318,7 @@ function ConvertPanel({
   )
 }
 
-function FindPanel({ onUseUrl }: { onUseUrl: (url: string, title: string) => void }) {
+function FindPanel({ onUseUrl }: { onUseUrl: (url: string, title: string, image?: string) => void }) {
   const [sub, setSub] = useState<FindSub>('coupang')
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1358,7 +1486,7 @@ function ProductColumn({
 }: {
   title: string
   products: ShoppingProduct[]
-  onUse: (url: string, title: string) => void
+  onUse: (url: string, title: string, image?: string) => void
 }) {
   if (!products.length) return null
   return (
@@ -1386,7 +1514,7 @@ function ProductColumn({
                 </a>
                 <button
                   type="button"
-                  onClick={() => onUse(p.url, p.title)}
+                  onClick={() => onUse(p.url, p.title, p.image || undefined)}
                   className="rounded-lg bg-[var(--accent)]/80 px-2 py-1 text-[11px] text-white"
                 >
                   링크로 변환
