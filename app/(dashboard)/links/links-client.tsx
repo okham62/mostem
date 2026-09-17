@@ -9,7 +9,6 @@ import {
   Link2,
   PackageSearch,
   Pencil,
-  Plus,
   RefreshCw,
   Search,
   Settings2,
@@ -23,12 +22,10 @@ import {
   PLATFORM_LABEL,
   shortPath,
   type LinkSettings,
-  type ProfileBlock,
   type TrackedLink,
 } from '@/lib/links'
 import type { ShoppingProduct } from '@/lib/shopping'
 import { cn } from '@/lib/utils'
-import { MostemLogo } from '@/components/mostem-logo'
 import { ProfilePanel } from './profile-panel'
 
 type TabId = 'convert' | 'find' | 'mine' | 'channel' | 'profile' | 'hotdeal'

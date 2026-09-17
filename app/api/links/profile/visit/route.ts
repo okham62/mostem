@@ -1,4 +1,3 @@
-import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
