@@ -268,3 +268,38 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }
+
+/** Bulk delete: { ids: string[] } or { all: true } */
+export async function DELETE(req: Request) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const body = (await req.json().catch(() => ({}))) as { ids?: string[]; all?: boolean }
+    const supabase = createAdminClient()
+
+    if (body.all) {
+      const { error, count } = await supabase
+        .from('tracked_links')
+        .delete({ count: 'exact' })
+        .eq('user_id', session.user.id)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true, deleted: count ?? 0 })
+    }
+
+    const ids = Array.isArray(body.ids) ? body.ids.filter((id) => typeof id === 'string' && id) : []
+    if (!ids.length) return NextResponse.json({ error: '삭제할 링크를 선택하세요' }, { status: 400 })
+
+    const { error, count } = await supabase
+      .from('tracked_links')
+      .delete({ count: 'exact' })
+      .eq('user_id', session.user.id)
+      .in('id', ids.slice(0, 500))
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true, deleted: count ?? ids.length })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'failed'
+    return NextResponse.json({ error: message }, { status: 400 })
+  }
+}

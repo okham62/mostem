@@ -14,6 +14,7 @@ import {
   Search,
   Settings2,
   Store,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react'
@@ -178,6 +179,35 @@ export function LinksClient() {
     })
   }, [])
 
+  const removeLinksLocal = useCallback((ids: string[]) => {
+    const set = new Set(ids)
+    setLinks((prev) => prev.filter((x) => !set.has(x.id)))
+  }, [])
+
+  async function deleteLinks(ids: string[]) {
+    if (!ids.length) return
+    const res = await fetch('/api/links', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || '삭제 실패')
+    removeLinksLocal(ids)
+    setEditing((cur) => (cur && ids.includes(cur.id) ? null : cur))
+  }
+
+  async function deleteAllLinks() {
+    const res = await fetch('/api/links', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || '삭제 실패')
+    setLinks([])
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -275,6 +305,10 @@ export function LinksClient() {
             ping('링크가 만들어졌어요')
           }}
           onEdit={setEditing}
+          onDelete={async (id) => {
+            await deleteLinks([id])
+            ping('링크를 삭제했어요')
+          }}
           onPrefixSave={async (prefix) => {
             await patchSettings({ prefix })
             await load()
@@ -300,6 +334,18 @@ export function LinksClient() {
           copyText={copyText}
           onRefresh={() => void load()}
           onEdit={setEditing}
+          onDeleteOne={async (id) => {
+            await deleteLinks([id])
+            ping('링크를 삭제했어요')
+          }}
+          onDeleteMany={async (ids) => {
+            await deleteLinks(ids)
+            ping(`${ids.length}개 링크를 삭제했어요`)
+          }}
+          onDeleteAll={async () => {
+            await deleteAllLinks()
+            ping('링크를 모두 삭제했어요')
+          }}
         />
       )}
 
@@ -486,6 +532,7 @@ function ConvertPanel({
   links,
   onCreated,
   onEdit,
+  onDelete,
   onPrefixSave,
   copyText,
 }: {
@@ -493,6 +540,7 @@ function ConvertPanel({
   links: TrackedLink[]
   onCreated: (link: TrackedLink) => void
   onEdit: (link: TrackedLink) => void
+  onDelete: (id: string) => Promise<void>
   onPrefixSave: (prefix: string) => Promise<void>
   copyText: (t: string) => void
 }) {
@@ -695,6 +743,19 @@ function ConvertPanel({
                       className="rounded-lg px-2 py-1 text-xs text-white/60 hover:bg-white/10"
                     >
                       복사
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirm('이 링크를 삭제할까요?')) return
+                        void onDelete(l.id).catch((e) =>
+                          alert(e instanceof Error ? e.message : '삭제 실패')
+                        )
+                      }}
+                      className="rounded-lg px-2 py-1 text-xs text-rose-300/80 hover:bg-rose-500/10"
+                      aria-label="삭제"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </li>
@@ -973,14 +1034,22 @@ function MinePanel({
   copyText,
   onRefresh,
   onEdit,
+  onDeleteOne,
+  onDeleteMany,
+  onDeleteAll,
 }: {
   links: TrackedLink[]
   settings: LinkSettings
   copyText: (t: string) => void
   onRefresh: () => void
   onEdit: (link: TrackedLink) => void
+  onDeleteOne: (id: string) => Promise<void>
+  onDeleteMany: (ids: string[]) => Promise<void>
+  onDeleteAll: () => Promise<void>
 }) {
   const [sort, setSort] = useState<MineSort>('clicks')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
   const totalClicks = links.reduce((s, l) => s + (l.click_count || 0), 0)
   const sorted = useMemo(() => {
     const arr = [...links]
@@ -992,6 +1061,50 @@ function MinePanel({
     totalClicks > 0 && sorted[0] ? Math.round((sorted[0].click_count / totalClicks) * 100) : null
   const withClicks = links.filter((l) => l.click_count > 0).length
   const coupangCount = links.filter((l) => l.platform === 'coupang').length
+  const allSelected = sorted.length > 0 && selected.size === sorted.length
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (allSelected) setSelected(new Set())
+    else setSelected(new Set(sorted.map((l) => l.id)))
+  }
+
+  async function runDeleteSelected() {
+    const ids = [...selected]
+    if (!ids.length) return
+    if (!confirm(`선택한 ${ids.length}개 링크를 삭제할까요?`)) return
+    setBusy(true)
+    try {
+      await onDeleteMany(ids)
+      setSelected(new Set())
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제 실패')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function runDeleteAll() {
+    if (!links.length) return
+    if (!confirm(`만든 링크 ${links.length}개를 모두 삭제할까요? 되돌릴 수 없습니다.`)) return
+    setBusy(true)
+    try {
+      await onDeleteAll()
+      setSelected(new Set())
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제 실패')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -1039,12 +1152,55 @@ function MinePanel({
         <span className="text-white/35">쿠팡 ({coupangCount})</span>
       </div>
 
+      {links.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-white/60">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              className="rounded border-white/20 bg-black/40"
+            />
+            전체 선택
+          </label>
+          <span className="text-[11px] text-white/35">선택 {selected.size}개</span>
+          <div className="ml-auto flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              disabled={busy || selected.size === 0}
+              onClick={() => void runDeleteSelected()}
+              className="inline-flex items-center gap-1 rounded-lg bg-rose-500/15 px-2.5 py-1.5 text-xs font-semibold text-rose-300 disabled:opacity-40"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              선택 삭제
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void runDeleteAll()}
+              className="inline-flex items-center gap-1 rounded-lg bg-white/8 px-2.5 py-1.5 text-xs font-semibold text-white/55 hover:bg-white/12 disabled:opacity-40"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              전체 삭제
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <ul className="space-y-2">
         {sorted.map((l) => {
           const pct = totalClicks > 0 ? Math.max(2, Math.round((l.click_count / totalClicks) * 100)) : 0
+          const checked = selected.has(l.id)
           return (
             <li key={l.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
               <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleOne(l.id)}
+                  className="shrink-0 rounded border-white/20 bg-black/40"
+                  aria-label="선택"
+                />
                 {l.og_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={l.og_image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
@@ -1084,6 +1240,26 @@ function MinePanel({
                     className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/60"
                   >
                     복사
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!confirm('이 링크를 삭제할까요?')) return
+                      void onDeleteOne(l.id)
+                        .then(() => {
+                          setSelected((prev) => {
+                            const next = new Set(prev)
+                            next.delete(l.id)
+                            return next
+                          })
+                        })
+                        .catch((e) => alert(e instanceof Error ? e.message : '삭제 실패'))
+                    }}
+                    className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-300 disabled:opacity-40"
+                    aria-label="삭제"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
