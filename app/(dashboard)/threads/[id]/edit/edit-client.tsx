@@ -1398,29 +1398,34 @@ export function EditClient({
               </div>
 
               {replies.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setReplyTiming('now')}
-                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                      replyTiming === 'now'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-white/5 text-white/55 hover:bg-white/10'
-                    }`}
-                  >
-                    타래 바로 올리기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReplyTiming('1h')}
-                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                      replyTiming === '1h'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-white/5 text-white/55 hover:bg-white/10'
-                    }`}
-                  >
-                    타래 1시간 뒤
-                  </button>
+                <div className="rounded-xl border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-3 py-3">
+                  <p className="text-xs font-semibold text-white">타래 업로드 시점</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReplyTiming('now')}
+                      className={`rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition ${
+                        replyTiming === 'now'
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-black/35 text-white/60 ring-1 ring-white/10'
+                      }`}
+                    >
+                      바로 올리기
+                      <span className="mt-0.5 block text-[10px] font-normal opacity-80">본문 직후</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReplyTiming('1h')}
+                      className={`rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition ${
+                        replyTiming === '1h'
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-black/35 text-white/60 ring-1 ring-white/10'
+                      }`}
+                    >
+                      1시간 뒤
+                      <span className="mt-0.5 block text-[10px] font-normal opacity-80">타래만 지연</span>
+                    </button>
+                  </div>
                 </div>
               ) : null}
 
@@ -1629,6 +1634,9 @@ export function EditClient({
           account={selected}
           saving={saving}
           message={message}
+          replyCount={replies.map((r) => r.text.trim()).filter(Boolean).length}
+          replyTiming={replyTiming}
+          onReplyTimingChange={setReplyTiming}
           onClose={() => setPublishOpen(false)}
           onExtensionUpload={() => void publishViaExtension()}
           onDownload={downloadZip}

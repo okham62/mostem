@@ -9,6 +9,9 @@ export function PublishModal({
   account,
   saving,
   message,
+  replyCount = 0,
+  replyTiming = 'now',
+  onReplyTimingChange,
   onClose,
   onExtensionUpload,
   onDownload,
@@ -16,6 +19,9 @@ export function PublishModal({
   account?: ConnectedAccount
   saving: boolean
   message?: string
+  replyCount?: number
+  replyTiming?: 'now' | '1h'
+  onReplyTimingChange?: (value: 'now' | '1h') => void
   onClose: () => void
   onExtensionUpload: () => void
   onDownload: () => void
@@ -56,6 +62,45 @@ export function PublishModal({
           </div>
         </div>
 
+        {replyCount > 0 && onReplyTimingChange ? (
+          <div className="mb-3 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/10 px-3 py-3">
+            <p className="text-xs font-semibold text-white">타래 {replyCount}개 — 언제 올릴까요?</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onReplyTimingChange('now')}
+                className={`rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition ${
+                  replyTiming === 'now'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'bg-black/40 text-white/60 ring-1 ring-white/10 hover:bg-black/55'
+                }`}
+              >
+                바로 올리기
+                <span className="mt-0.5 block text-[10px] font-normal opacity-80">본문 직후 순서대로</span>
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onReplyTimingChange('1h')}
+                className={`rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition ${
+                  replyTiming === '1h'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'bg-black/40 text-white/60 ring-1 ring-white/10 hover:bg-black/55'
+                }`}
+              >
+                1시간 뒤
+                <span className="mt-0.5 block text-[10px] font-normal opacity-80">본문만 먼저, 타래 지연</span>
+              </button>
+            </div>
+            {replyTiming === '1h' ? (
+              <p className="mt-2 text-[10px] leading-snug text-amber-200/90">
+                1시간 뒤에도 PC·Chrome·Mostem 확장·Threads 로그인이 켜져 있어야 타래가 올라가요.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         {!hamiOn && (
           <p className="mb-3 text-xs font-medium text-amber-300">
             발행하려면 확장프로그램이 필요해요 — 설치한 뒤 다시 열어 주세요.
@@ -76,7 +121,9 @@ export function PublishModal({
               </span>
               <span className="mt-1 block text-xs text-white/40">
                 {hamiOn
-                  ? '하미가 스레드 작성창을 열고 자동으로 올립니다.'
+                  ? replyCount > 0 && replyTiming === '1h'
+                    ? '본문은 지금, 타래는 약 1시간 뒤 자동 업로드'
+                    : '하미가 스레드에 자동으로 올립니다.'
                   : '확장프로그램을 켜면 자동으로 올라가요 → chrome://extensions 에서 하미 켜기'}
               </span>
             </span>
