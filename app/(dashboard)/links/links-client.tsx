@@ -1022,15 +1022,24 @@ function ConvertPanel({
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
           <h3 className="mb-3 text-sm font-medium">미리보기</h3>
           <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
-            {ogPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ogPreview} alt="" className="aspect-square w-full object-cover" />
-            ) : (
-              <div className="flex aspect-square flex-col items-center justify-center gap-2 px-4 text-center text-xs text-white/35">
-                <span className="text-2xl opacity-40">🖼️</span>
-                1:1 공유 카드 미리보기
-              </div>
-            )}
+            <div
+              className="relative w-full overflow-hidden bg-black"
+              style={{ aspectRatio: '1 / 1' }}
+            >
+              {ogPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={ogPreview}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-xs text-white/35">
+                  <span className="text-2xl opacity-40">🖼️</span>
+                  1:1 비율로 보여집니다
+                </div>
+              )}
+            </div>
             <div className="border-t border-white/10 px-3 py-2.5">
               <p className="truncate text-sm font-medium text-white/85">{title.trim() || '링크 제목'}</p>
               <p className="mt-0.5 truncate font-mono text-[11px] text-white/35">
