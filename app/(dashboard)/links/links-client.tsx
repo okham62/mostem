@@ -1053,7 +1053,7 @@ function ConvertPanel({
                           alert(e instanceof Error ? e.message : '삭제 실패')
                         )
                       }}
-                      className="rounded-lg px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10"
+                      className="rounded-lg bg-rose-500 px-2 py-1 text-xs font-bold text-white hover:bg-rose-400"
                     >
                       삭제
                     </button>
@@ -1462,37 +1462,43 @@ function MinePanel({
       </div>
 
       {links.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-white/60">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={toggleAll}
-              className="rounded border-white/20 bg-black/40"
-            />
-            전체 선택
-          </label>
-          <span className="text-[11px] text-white/35">선택 {selected.size}개</span>
-          <div className="ml-auto flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              disabled={busy || selected.size === 0}
-              onClick={() => void runDeleteSelected()}
-              className="inline-flex items-center gap-1 rounded-lg bg-rose-500/15 px-2.5 py-1.5 text-xs font-semibold text-rose-300 disabled:opacity-40"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              선택 삭제
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void runDeleteAll()}
-              className="inline-flex items-center gap-1 rounded-lg bg-white/8 px-2.5 py-1.5 text-xs font-semibold text-white/55 hover:bg-white/12 disabled:opacity-40"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              전체 삭제
-            </button>
+        <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-3 py-3">
+          <p className="mb-2 text-xs font-semibold text-rose-200">링크 삭제</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-black/30 px-2.5 py-1.5 text-xs text-white/70">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="rounded border-white/20 bg-black/40"
+              />
+              전체 선택
+            </label>
+            <span className="text-[11px] text-white/40">선택 {selected.size}개</span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy || selected.size === 0}
+                onClick={() => void runDeleteSelected()}
+                className="inline-flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                선택 삭제
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void runDeleteAll()}
+                className="inline-flex items-center gap-1 rounded-xl border border-rose-400/50 bg-black/40 px-3 py-2 text-xs font-bold text-rose-200 disabled:opacity-40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                전체 삭제
+              </button>
+            </div>
           </div>
+          <p className="mt-2 text-[10px] text-white/40">
+            ① 각 행의 「삭제」 ② 체크 후 「선택 삭제」 ③ 「전체 삭제」
+          </p>
         </div>
       ) : null}
 
@@ -1527,7 +1533,7 @@ function MinePanel({
                     <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-1.5">
+                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                   <button
                     type="button"
                     onClick={() => onEdit(l)}
@@ -1565,7 +1571,7 @@ function MinePanel({
                         })
                         .catch((e) => alert(e instanceof Error ? e.message : '삭제 실패'))
                     }}
-                    className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-xs font-medium text-rose-300 disabled:opacity-40"
+                    className="rounded-lg bg-rose-500 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-40"
                   >
                     삭제
                   </button>
