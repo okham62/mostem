@@ -1316,17 +1316,18 @@ function ConvertPanel({
                   <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
-                      onClick={() => onEdit(l)}
-                      className="rounded-lg px-2 py-1 text-xs text-white/60 hover:bg-white/10"
+                      onClick={() => copyText(`${origin()}${shortPath(l.prefix, l.code)}`)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-xs font-semibold text-white hover:brightness-110"
                     >
-                      편집
+                      <Copy className="h-3 w-3" />
+                      복사
                     </button>
                     <button
                       type="button"
-                      onClick={() => copyText(`${origin()}${shortPath(l.prefix, l.code)}`)}
-                      className="rounded-lg px-2 py-1 text-xs text-white/60 hover:bg-white/10"
+                      onClick={() => onEdit(l)}
+                      className="rounded-lg px-2 py-1 text-xs text-white/55 hover:bg-white/10"
                     >
-                      복사
+                      편집
                     </button>
                     <button
                       type="button"
@@ -1336,7 +1337,7 @@ function ConvertPanel({
                           alert(e instanceof Error ? e.message : '삭제 실패')
                         )
                       }}
-                      className="rounded-lg bg-rose-500 px-2 py-1 text-xs font-bold text-white hover:bg-rose-400"
+                      className="rounded-lg bg-rose-500/15 px-2 py-1 text-xs font-medium text-rose-300 hover:bg-rose-500/25"
                     >
                       삭제
                     </button>
@@ -1819,8 +1820,16 @@ function MinePanel({
                 <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                   <button
                     type="button"
+                    onClick={() => copyText(`${origin()}${shortPath(l.prefix, l.code)}`)}
+                    className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-[var(--accent)]/25 hover:brightness-110"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    복사
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onEdit(l)}
-                    className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/60"
+                    className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/55 hover:bg-white/10 hover:text-white/80"
                   >
                     편집
                   </button>
@@ -1828,17 +1837,10 @@ function MinePanel({
                     href={l.destination_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/60"
+                    className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/55 hover:bg-white/10 hover:text-white/80"
                   >
                     원본
                   </a>
-                  <button
-                    type="button"
-                    onClick={() => copyText(`${origin()}${shortPath(l.prefix, l.code)}`)}
-                    className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/60"
-                  >
-                    복사
-                  </button>
                   <button
                     type="button"
                     disabled={busy}
@@ -1854,7 +1856,7 @@ function MinePanel({
                         })
                         .catch((e) => alert(e instanceof Error ? e.message : '삭제 실패'))
                     }}
-                    className="rounded-lg bg-rose-500 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                    className="rounded-lg bg-rose-500/15 px-2.5 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/25 disabled:opacity-40"
                   >
                     삭제
                   </button>
