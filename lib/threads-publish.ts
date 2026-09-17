@@ -1,5 +1,6 @@
 export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.31'
 export const HAMI_SCHEDULE_VERSION = '0.2.31'
+export const HAMI_REPLY_DELAY_VERSION = '0.2.191'
 
 export type PublishMediaItem = {
   url: string
@@ -62,7 +63,20 @@ export function requestHamiPublish(input: {
   text: string
   username?: string
   media?: PublishMediaItem[]
-}): Promise<{ ok: boolean; error?: string }> {
+  replies?: string[]
+  /** 0 = immediate, 3600 = 1 hour later */
+  replyDelaySec?: number
+}): Promise<{
+  ok: boolean
+  error?: string
+  permalink?: string
+  pk?: string
+  replyOk?: boolean
+  replyScheduled?: boolean
+  replyAt?: number
+  replyCount?: number
+  replyError?: string
+}> {
   if (typeof window === 'undefined') {
     return Promise.resolve({ ok: false, error: '브라우저에서만 발행할 수 있습니다.' })
   }
@@ -76,10 +90,22 @@ export function requestHamiPublish(input: {
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const intentUrl = threadsIntentUrl()
   const media = input.media?.filter((item) => item.url) ?? []
-  const timeoutMs = media.length ? 180_000 : 45_000
+  const replies = (input.replies ?? []).map((t) => String(t || '').trim()).filter(Boolean)
+  const replyDelaySec = Math.max(0, Number(input.replyDelaySec) || 0)
+  const timeoutMs = media.length || replies.length ? 240_000 : 45_000
 
   return new Promise((resolve) => {
-    const finish = (result: { ok: boolean; error?: string }) => {
+    const finish = (result: {
+      ok: boolean
+      error?: string
+      permalink?: string
+      pk?: string
+      replyOk?: boolean
+      replyScheduled?: boolean
+      replyAt?: number
+      replyCount?: number
+      replyError?: string
+    }) => {
       window.clearTimeout(timer)
       window.removeEventListener('message', onMessage)
       resolve(result)
@@ -92,6 +118,13 @@ export function requestHamiPublish(input: {
         id?: string
         ok?: boolean
         error?: string
+        permalink?: string
+        pk?: string
+        replyOk?: boolean
+        replyScheduled?: boolean
+        replyAt?: number
+        replyCount?: number
+        replyError?: string
       }
       if (event.source !== window) return
       if (data?.source !== 'hami-extension' || data.type !== 'publish-result') return
@@ -99,6 +132,13 @@ export function requestHamiPublish(input: {
       finish({
         ok: Boolean(data.ok),
         error: data.ok ? undefined : data.error || '스레드 업로드에 실패했습니다.',
+        permalink: data.permalink,
+        pk: data.pk,
+        replyOk: data.replyOk,
+        replyScheduled: data.replyScheduled,
+        replyAt: data.replyAt,
+        replyCount: data.replyCount,
+        replyError: data.replyError,
       })
     }
 
@@ -114,6 +154,8 @@ export function requestHamiPublish(input: {
           intentUrl,
           autoPost: true,
           media,
+          replies,
+          replyDelaySec,
         },
       },
       '*'

@@ -29,6 +29,7 @@ import {
 import type { ShoppingProduct } from '@/lib/shopping'
 import { cn } from '@/lib/utils'
 import { MostemLogo } from '@/components/mostem-logo'
+import { ProfilePanel } from './profile-panel'
 
 type TabId = 'convert' | 'find' | 'mine' | 'channel' | 'profile' | 'hotdeal'
 type FindSub = 'coupang' | 'toss' | 'compare'
@@ -601,10 +602,13 @@ export function LinksClient() {
       {tab === 'profile' && settings && (
         <ProfilePanel
           settings={settings}
+          links={links}
           onSave={async (patch) => {
-            await patchSettings(patch)
+            const next = await patchSettings(patch)
             ping('프로필을 저장했어요')
+            return next
           }}
+          onCopy={(text) => void copyText(text)}
         />
       )}
 
@@ -627,6 +631,11 @@ export function LinksClient() {
             setEditing(null)
             ping('링크를 수정했어요')
           }}
+          onDeleted={async (id) => {
+            await deleteLinks([id])
+            setEditing(null)
+            ping('링크를 삭제했어요')
+          }}
         />
       ) : null}
 
@@ -643,10 +652,12 @@ function EditLinkModal({
   link,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   link: TrackedLink
   onClose: () => void
   onSaved: (link: TrackedLink) => void
+  onDeleted: (id: string) => Promise<void>
 }) {
   const [title, setTitle] = useState(link.title || '')
   const [url, setUrl] = useState(link.destination_url || '')
@@ -693,6 +704,18 @@ function EditLinkModal({
     } catch (e) {
       setErr(e instanceof Error ? e.message : '수정 실패')
     } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    if (!confirm('이 링크를 삭제할까요?')) return
+    setBusy(true)
+    setErr('')
+    try {
+      await onDeleted(link.id)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '삭제 실패')
       setBusy(false)
     }
   }
@@ -763,6 +786,14 @@ function EditLinkModal({
               className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white disabled:opacity-40"
             >
               {busy ? '저장 중…' : '저장'}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void remove()}
+              className="rounded-xl bg-rose-500/15 px-4 py-2.5 text-sm font-medium text-rose-300 disabled:opacity-40"
+            >
+              삭제
             </button>
             <button
               type="button"
@@ -853,6 +884,7 @@ function ConvertPanel({
       setUrl('')
       setTitle('')
       setOgPreview(null)
+      setCropSource(null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '변환 실패')
     } finally {
@@ -952,6 +984,18 @@ function ConvertPanel({
               >
                 <ExternalLink className="h-3.5 w-3.5" /> 원본
               </a>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirm('이 링크를 삭제할까요?')) return
+                  void onDelete(last.id)
+                    .then(() => setLast(null))
+                    .catch((e) => alert(e instanceof Error ? e.message : '삭제 실패'))
+                }}
+                className="inline-flex items-center gap-1 rounded-lg bg-rose-500/15 px-3 py-1.5 text-xs text-rose-300"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> 삭제
+              </button>
             </div>
           </div>
         ) : null}
@@ -1009,10 +1053,9 @@ function ConvertPanel({
                           alert(e instanceof Error ? e.message : '삭제 실패')
                         )
                       }}
-                      className="rounded-lg px-2 py-1 text-xs text-rose-300/80 hover:bg-rose-500/10"
-                      aria-label="삭제"
+                      className="rounded-lg px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      삭제
                     </button>
                   </div>
                 </li>
@@ -1522,10 +1565,9 @@ function MinePanel({
                         })
                         .catch((e) => alert(e instanceof Error ? e.message : '삭제 실패'))
                     }}
-                    className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-300 disabled:opacity-40"
-                    aria-label="삭제"
+                    className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-xs font-medium text-rose-300 disabled:opacity-40"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    삭제
                   </button>
                 </div>
               </div>
@@ -1637,194 +1679,6 @@ function ChannelPanel({
         Mostem 클릭은 실시간입니다. 쿠팡 파트너스 리포트는 하루 이상 지연될 수 있으며, 채널 구분 연동이 되기 전에는 “구분
         불가”로 표시됩니다.
       </p>
-    </div>
-  )
-}
-
-function ProfilePanel({
-  settings,
-  onSave,
-}: {
-  settings: LinkSettings
-  onSave: (patch: Record<string, unknown>) => Promise<void>
-}) {
-  const [slug, setSlug] = useState(settings.profile_slug || '')
-  const [displayName, setDisplayName] = useState(settings.display_name || '')
-  const [blocks, setBlocks] = useState<ProfileBlock[]>(settings.profile_blocks || [])
-  const [draftTitle, setDraftTitle] = useState('')
-  const [draftUrl, setDraftUrl] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const live = blocks.filter((b) => !b.archived)
-
-  useEffect(() => {
-    setSlug(settings.profile_slug || '')
-    setDisplayName(settings.display_name || '')
-    setBlocks(settings.profile_blocks || [])
-  }, [settings])
-
-  async function save(nextBlocks = blocks) {
-    setBusy(true)
-    setErr('')
-    try {
-      await onSave({
-        profileSlug: slug || null,
-        displayName: displayName || null,
-        profileBlocks: nextBlocks,
-      })
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '저장 실패')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function addBlock() {
-    if (!draftUrl.trim()) return
-    const next = [
-      ...blocks,
-      { id: crypto.randomUUID(), title: draftTitle.trim() || draftUrl.trim(), url: draftUrl.trim() },
-    ]
-    setBlocks(next)
-    setDraftTitle('')
-    setDraftUrl('')
-    void save(next)
-  }
-
-  const publicPath = slug ? `/u/${slug}` : null
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">프로필 페이지</h2>
-          <p className="mt-1 text-sm text-white/45">인스타 바이오에 하나만 걸 수 있을 때 쓰는 링크 모음 페이지예요.</p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1.5">
-            <span className="text-xs text-white/50">공개 주소</span>
-            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[var(--input-bg)] px-3">
-              <span className="text-xs text-white/35">/u/</span>
-              <input
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30))}
-                placeholder="okham"
-                className="w-full bg-transparent py-2.5 text-sm outline-none"
-              />
-            </div>
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs text-white/50">표시 이름</span>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
-            />
-          </label>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-medium">블록 리스트</h3>
-            <span className="text-xs text-white/35">리스트 ({live.length})</span>
-          </div>
-
-          {live.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <MostemLogo size={56} rounded="2xl" />
-              <p className="text-sm text-white/55">첫 추천 링크를 채워 보세요</p>
-              <p className="text-xs text-white/35">변환한 링크·SNS·소개 페이지를 넣을 수 있어요</p>
-            </div>
-          ) : (
-            <ul className="mb-4 space-y-2">
-              {live.map((b) => (
-                <li key={b.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm">{b.title}</p>
-                    <p className="truncate text-[11px] text-white/35">{b.url}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = blocks.map((x) => (x.id === b.id ? { ...x, archived: true } : x))
-                      setBlocks(next)
-                      void save(next)
-                    }}
-                    className="text-xs text-white/40 hover:text-rose-300"
-                  >
-                    보관
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="space-y-2 border-t border-white/5 pt-3">
-            <input
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              placeholder="제목"
-              className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2 text-sm outline-none"
-            />
-            <input
-              value={draftUrl}
-              onChange={(e) => setDraftUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2 text-sm outline-none"
-            />
-            <button
-              type="button"
-              onClick={addBlock}
-              className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white"
-            >
-              <Plus className="h-4 w-4" /> {live.length ? '링크 추가' : '첫 링크 추가'}
-            </button>
-          </div>
-        </div>
-
-        {err ? <p className="text-sm text-rose-300">{err}</p> : null}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void save()}
-          className="rounded-xl bg-white/10 px-4 py-2 text-sm font-medium disabled:opacity-40"
-        >
-          {busy ? '저장 중…' : '저장'}
-        </button>
-        {publicPath ? (
-          <a href={publicPath} target="_blank" rel="noreferrer" className="ml-3 text-xs text-[var(--accent)] underline">
-            공개 페이지 열기
-          </a>
-        ) : null}
-      </div>
-
-      <aside className="mx-auto w-full max-w-[260px]">
-        <div className="overflow-hidden rounded-[2rem] border border-white/15 bg-[#121214] shadow-2xl">
-          <div className="bg-[var(--accent)]/80 px-3 py-2 text-center text-[10px] text-white/90">
-            이 포스팅은 쿠팡 파트너스 활동의 수수료를 제공받을 수 있습니다.
-          </div>
-          <div className="flex flex-col items-center gap-3 px-4 py-8">
-            <MostemLogo size={64} rounded="full" />
-            <p className="font-semibold">{displayName || slug || '이름'}</p>
-            {live.length === 0 ? (
-              <p className="text-center text-xs text-white/40">
-                아직 공개된 링크가 없어요
-                <br />곧 새로운 추천을 채워넣을게요
-              </p>
-            ) : (
-              <div className="w-full space-y-2">
-                {live.slice(0, 5).map((b) => (
-                  <div key={b.id} className="rounded-xl bg-white/10 px-3 py-2 text-center text-xs">
-                    {b.title}
-                  </div>
-                ))}
-              </div>
-            )}
-            <MostemLogo size={20} rounded="lg" className="mt-4 opacity-50" />
-          </div>
-        </div>
-      </aside>
     </div>
   )
 }

@@ -7,6 +7,15 @@ export type ProfileBlock = {
   archived?: boolean
 }
 
+export type ProfileLayout = 'profile' | 'cover' | 'cover-profile' | 'full-cover'
+export type ProfileFontSize = 'sm' | 'md' | 'lg'
+
+export type ProfileSnsLink = {
+  id: string
+  label: string
+  url: string
+}
+
 export type LinkSettings = {
   user_id: string
   prefix: string
@@ -14,6 +23,14 @@ export type LinkSettings = {
   channel_id: string
   profile_slug: string | null
   profile_blocks: ProfileBlock[]
+  profile_published: boolean
+  profile_simple_address: boolean
+  profile_avatar_url: string | null
+  profile_cover_url: string | null
+  profile_layout: ProfileLayout | string
+  profile_bio: string | null
+  profile_sns: ProfileSnsLink[]
+  profile_font_size: ProfileFontSize | string
   hotdeal_slug: string | null
   hotdeal_name: string | null
   hotdeal_intro: string | null
@@ -38,6 +55,79 @@ export type TrackedLink = {
   click_count: number
   created_at: string
 }
+
+/** Normalize a link_settings row (handles missing migration columns). */
+export function normalizeLinkSettings(data: Record<string, unknown>): LinkSettings {
+  const snsRaw = data.profile_sns
+  const sns = Array.isArray(snsRaw)
+    ? (snsRaw as ProfileSnsLink[]).filter((s) => s && typeof s.url === 'string')
+    : []
+  return {
+    ...(data as unknown as LinkSettings),
+    profile_blocks: Array.isArray(data.profile_blocks)
+      ? (data.profile_blocks as ProfileBlock[])
+      : [],
+    hotdeal_categories: Array.isArray(data.hotdeal_categories)
+      ? (data.hotdeal_categories as string[])
+      : [],
+    profile_published: Boolean(data.profile_published),
+    profile_simple_address: Boolean(data.profile_simple_address),
+    profile_avatar_url:
+      typeof data.profile_avatar_url === 'string' ? data.profile_avatar_url : null,
+    profile_cover_url:
+      typeof data.profile_cover_url === 'string' ? data.profile_cover_url : null,
+    profile_layout:
+      typeof data.profile_layout === 'string' && data.profile_layout
+        ? data.profile_layout
+        : 'cover',
+    profile_bio: typeof data.profile_bio === 'string' ? data.profile_bio : null,
+    profile_sns: sns,
+    profile_font_size:
+      typeof data.profile_font_size === 'string' && data.profile_font_size
+        ? data.profile_font_size
+        : 'md',
+  }
+}
+
+/** Public path — `/{slug}` when simple address is on, else `/u/{slug}`. */
+export function profilePublicPath(input: {
+  profile_slug: string | null
+  profile_simple_address?: boolean
+}): string | null {
+  const slug = (input.profile_slug || '').trim().toLowerCase()
+  if (!slug) return null
+  return input.profile_simple_address ? `/${slug}` : `/u/${slug}`
+}
+
+/** Paths that must never be treated as vanity profile slugs. */
+export const RESERVED_PROFILE_SLUGS = new Set(
+  [
+    'api',
+    'login',
+    'logout',
+    'signin',
+    'signout',
+    'auth',
+    'dashboard',
+    'links',
+    'threads',
+    'blog',
+    'settings',
+    'admin',
+    'u',
+    's',
+    'l',
+    'hotdeal',
+    'pricing',
+    'docs',
+    'help',
+    'about',
+    'terms',
+    'privacy',
+    'mostem',
+    'hami',
+  ].map((s) => s.toLowerCase()),
+)
 
 const CODE_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
 

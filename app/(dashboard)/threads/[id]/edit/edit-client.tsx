@@ -410,6 +410,8 @@ export function EditClient({
   const [commentFile, setCommentFile] = useState<CommentAttachment | null>(null)
   const [commentDropActive, setCommentDropActive] = useState(false)
   const [replies, setReplies] = useState<ThreadReply[]>([])
+  /** 타래 업로드 타이밍 — 즉시 or 본문 후 1시간 */
+  const [replyTiming, setReplyTiming] = useState<'now' | '1h'>('now')
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [liveAccounts, setLiveAccounts] = useState(accounts)
   const profileRefreshRef = useRef(false)
@@ -768,6 +770,8 @@ export function EditClient({
       text: caption,
       username: selected.username,
       media: mediaForPublish,
+      replies: replies.map((r) => r.text.trim()).filter(Boolean),
+      replyDelaySec: replyTiming === '1h' ? 3600 : 0,
     })
     if (!published.ok) {
       setSaving(false)
@@ -790,7 +794,20 @@ export function EditClient({
       return
     }
     setPublishOpen(false)
-    setMessage(`@${selected.username} 스레드에 올렸습니다.`)
+    const replyCount = replies.map((r) => r.text.trim()).filter(Boolean).length
+    if (replyCount && published.replyScheduled) {
+      setMessage(
+        `@${selected.username} 본문 업로드 완료. 타래 ${replyCount}개는 약 1시간 뒤 자동으로 올라가요. (PC·Chrome·확장 유지)`,
+      )
+    } else if (replyCount && published.replyOk === false) {
+      setMessage(
+        `@${selected.username} 본문은 올렸지만 타래 자동 업로드에 실패했어요. ${published.replyError || ''}`.trim(),
+      )
+    } else if (replyCount) {
+      setMessage(`@${selected.username} 본문 + 타래 ${replyCount}개 올렸습니다.`)
+    } else {
+      setMessage(`@${selected.username} 스레드에 올렸습니다.`)
+    }
     statusLockRef.current = true
     rememberDraft()
     router.refresh()
@@ -1364,7 +1381,11 @@ export function EditClient({
             <div className="mt-3 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/[0.04] px-3 py-2.5">
                 <p className="text-[11px] leading-snug text-white/45">
-                  타래 댓글은 본문이 올라간 직후 순서대로 자동으로 달려요 — 따로 발행하지 않아도 돼요
+                  {replies.length === 0
+                    ? '타래를 추가하면 발행 시 본문 뒤에 자동으로 달려요'
+                    : replyTiming === '1h'
+                      ? '본문은 바로 올리고, 타래만 약 1시간 뒤 자동 업로드돼요 (PC·Chrome·확장 유지)'
+                      : '타래는 본문이 올라간 직후 순서대로 자동으로 달려요'}
                 </p>
                 <button
                   type="button"
@@ -1375,6 +1396,33 @@ export function EditClient({
                   + 타래 추가 ({replies.length}/{MAX_THREAD_REPLIES})
                 </button>
               </div>
+
+              {replies.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReplyTiming('now')}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                      replyTiming === 'now'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-white/5 text-white/55 hover:bg-white/10'
+                    }`}
+                  >
+                    타래 바로 올리기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReplyTiming('1h')}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                      replyTiming === '1h'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-white/5 text-white/55 hover:bg-white/10'
+                    }`}
+                  >
+                    타래 1시간 뒤
+                  </button>
+                </div>
+              ) : null}
 
               {replies.map((item, index) => (
                 <div

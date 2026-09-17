@@ -3,10 +3,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import {
   detectLinkPlatform,
   isValidPrefix,
+  isValidSlug,
   makeLinkCode,
   normalizeDestinationUrl,
+  normalizeLinkSettings,
+  RESERVED_PROFILE_SLUGS,
   type LinkSettings,
   type ProfileBlock,
+  type ProfileSnsLink,
   type TrackedLink,
 } from '@/lib/links'
 import { NextResponse } from 'next/server'
@@ -17,11 +21,7 @@ async function ensureSettings(userId: string): Promise<LinkSettings> {
   const supabase = createAdminClient()
   const { data } = await supabase.from('link_settings').select('*').eq('user_id', userId).maybeSingle()
   if (data) {
-    return {
-      ...(data as LinkSettings),
-      profile_blocks: Array.isArray(data.profile_blocks) ? (data.profile_blocks as ProfileBlock[]) : [],
-      hotdeal_categories: Array.isArray(data.hotdeal_categories) ? data.hotdeal_categories : [],
-    }
+    return normalizeLinkSettings(data as Record<string, unknown>)
   }
 
   let prefix = 'm'
@@ -45,6 +45,14 @@ async function ensureSettings(userId: string): Promise<LinkSettings> {
     channel_id: '기본값',
     profile_slug: null,
     profile_blocks: [],
+    profile_published: false,
+    profile_simple_address: false,
+    profile_avatar_url: null,
+    profile_cover_url: null,
+    profile_layout: 'cover',
+    profile_bio: null,
+    profile_sns: [],
+    profile_font_size: 'md',
     hotdeal_slug: null,
     hotdeal_name: null,
     hotdeal_intro: null,
@@ -56,11 +64,7 @@ async function ensureSettings(userId: string): Promise<LinkSettings> {
 
   const { data: inserted, error } = await supabase.from('link_settings').insert(row).select('*').single()
   if (error) throw new Error(error.message)
-  return {
-    ...(inserted as LinkSettings),
-    profile_blocks: [],
-    hotdeal_categories: [],
-  }
+  return normalizeLinkSettings(inserted as Record<string, unknown>)
 }
 
 export async function GET() {
@@ -159,6 +163,14 @@ export async function PATCH(req: Request) {
       channelId: string
       profileSlug: string | null
       profileBlocks: ProfileBlock[]
+      profilePublished: boolean
+      profileSimpleAddress: boolean
+      profileAvatarUrl: string | null
+      profileCoverUrl: string | null
+      profileLayout: string
+      profileBio: string | null
+      profileSns: ProfileSnsLink[]
+      profileFontSize: string
       hotdealSlug: string | null
       hotdealName: string | null
       hotdealIntro: string | null
@@ -193,9 +205,11 @@ export async function PATCH(req: Request) {
     if (body.profileSlug !== undefined) {
       const slug = body.profileSlug?.trim().toLowerCase() || null
       if (slug) {
-        const { isValidSlug } = await import('@/lib/links')
-        if (!isValidSlug(slug)) {
-          return NextResponse.json({ error: '프로필 주소는 영문 소문자·숫자·하이픈 3~30자' }, { status: 400 })
+        if (!isValidSlug(slug) || RESERVED_PROFILE_SLUGS.has(slug)) {
+          return NextResponse.json(
+            { error: '프로필 주소는 영문 소문자·숫자·하이픈 3~30자 (예약어 불가)' },
+            { status: 400 },
+          )
         }
         const { data: clash } = await supabase
           .from('link_settings')
@@ -211,11 +225,48 @@ export async function PATCH(req: Request) {
     if (body.profileBlocks !== undefined) {
       patch.profile_blocks = Array.isArray(body.profileBlocks) ? body.profileBlocks : []
     }
+    if (body.profilePublished !== undefined) patch.profile_published = !!body.profilePublished
+    if (body.profileSimpleAddress !== undefined) {
+      patch.profile_simple_address = !!body.profileSimpleAddress
+    }
+    if (body.profileAvatarUrl !== undefined) {
+      const v = body.profileAvatarUrl?.trim() || null
+      if (v && v.length > 1_500_000) {
+        return NextResponse.json({ error: '프로필 이미지가 너무 큽니다' }, { status: 400 })
+      }
+      patch.profile_avatar_url = v
+    }
+    if (body.profileCoverUrl !== undefined) {
+      const v = body.profileCoverUrl?.trim() || null
+      if (v && v.length > 1_500_000) {
+        return NextResponse.json({ error: '커버 이미지가 너무 큽니다' }, { status: 400 })
+      }
+      patch.profile_cover_url = v
+    }
+    if (body.profileLayout !== undefined) {
+      const allowed = new Set(['profile', 'cover', 'cover-profile', 'full-cover'])
+      patch.profile_layout = allowed.has(body.profileLayout) ? body.profileLayout : 'cover'
+    }
+    if (body.profileBio !== undefined) patch.profile_bio = body.profileBio?.trim() || null
+    if (body.profileSns !== undefined) {
+      patch.profile_sns = Array.isArray(body.profileSns)
+        ? body.profileSns
+            .filter((s) => s && typeof s.url === 'string' && s.url.trim())
+            .map((s) => ({
+              id: String(s.id || crypto.randomUUID()),
+              label: String(s.label || 'SNS').slice(0, 40),
+              url: String(s.url).trim(),
+            }))
+        : []
+    }
+    if (body.profileFontSize !== undefined) {
+      const allowed = new Set(['sm', 'md', 'lg'])
+      patch.profile_font_size = allowed.has(body.profileFontSize) ? body.profileFontSize : 'md'
+    }
 
     if (body.hotdealSlug !== undefined) {
       const slug = body.hotdealSlug?.trim().toLowerCase() || null
       if (slug) {
-        const { isValidSlug } = await import('@/lib/links')
         if (!isValidSlug(slug)) {
           return NextResponse.json({ error: '핫딜 주소는 영문 소문자·숫자·하이픈 3~30자' }, { status: 400 })
         }
@@ -246,9 +297,19 @@ export async function PATCH(req: Request) {
       .select('*')
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      if (/column .* does not exist/i.test(error.message)) {
+        return NextResponse.json(
+          {
+            error:
+              '프로필 컬럼이 없습니다. Supabase에 supabase/profile_page.sql 을 실행해 주세요.',
+          },
+          { status: 500 },
+        )
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-    // Keep existing short links consistent when prefix changes
     if (typeof patch.prefix === 'string') {
       await supabase
         .from('tracked_links')
@@ -257,11 +318,7 @@ export async function PATCH(req: Request) {
     }
 
     return NextResponse.json({
-      settings: {
-        ...(data as LinkSettings),
-        profile_blocks: Array.isArray(data.profile_blocks) ? data.profile_blocks : [],
-        hotdeal_categories: Array.isArray(data.hotdeal_categories) ? data.hotdeal_categories : [],
-      },
+      settings: normalizeLinkSettings(data as Record<string, unknown>),
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'failed'
