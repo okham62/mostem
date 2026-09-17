@@ -1530,7 +1530,11 @@ function FindPanel({ onUseUrl }: { onUseUrl: (url: string, title: string, image?
               <div className="rounded-2xl border border-dashed border-white/10 p-6 text-sm text-white/40">
                 <p className="font-medium text-white/60">토스</p>
                 <p className="mt-2 text-xs leading-relaxed">
-                  토스 쉐어링크 키가 아직 연결되지 않았어요. 설정에서 연결하면 같은 검색어로 토스 가격이 여기에 표시됩니다.
+                  토스 쉐어링크 키가 아직 연결되지 않았어요.{' '}
+                  <a href="/settings?tab=toss" className="text-[var(--accent)] underline">
+                    설정에서 연결
+                  </a>
+                  하면 같은 검색어로 토스 가격이 여기에 표시됩니다.
                 </p>
               </div>
             </div>
@@ -1915,7 +1919,11 @@ function ChannelPanel({
         <div>
           <h2 className="text-lg font-semibold">채널 실적</h2>
           <p className="mt-1 text-sm text-white/45">
-            Mostem 유입 클릭과 쿠팡 클릭·주문·수익을 채널 ID 기준으로 비교해요. (쿠팡 리포트 연동은 준비 중)
+            Mostem 유입 클릭과 쿠팡 클릭·주문·수익을 채널 ID 기준으로 비교해요.{' '}
+            <a href="/settings?tab=coupang" className="text-[var(--accent)] underline">
+              쿠팡파트너스 API
+            </a>{' '}
+            연동 후 리포트가 연결됩니다.
           </p>
         </div>
         <div className="text-right text-xs text-white/40">

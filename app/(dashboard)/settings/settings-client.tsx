@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Link2, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { AppearanceSettings } from '@/components/appearance-settings'
 import { AccountSettings } from './account-settings'
+import { PartnerApiSettings } from './partner-api-settings'
 import { BrandMark } from '@/components/brand-logos'
+import { PARTNER_PROVIDERS } from '@/lib/partners'
 import {
   formatHandle,
   isPublishPlatform,
@@ -18,11 +20,26 @@ import type { ConnectedAccount } from '@/types'
 
 const TOPIC_OPTIONS = ['리빙', '인테리어', '주방', '욕실', '패션', '뷰티', '음식', '여행', '테크', '일상']
 
+const SETTINGS_TABS = [
+  { id: 'account', label: '계정관리' },
+  ...PARTNER_PROVIDERS.map((p) => ({ id: p.id, label: p.label })),
+] as const
+
+type SettingsTabId = (typeof SETTINGS_TABS)[number]['id']
+
+function isSettingsTab(value: string | null): value is SettingsTabId {
+  return Boolean(value && SETTINGS_TABS.some((t) => t.id === value))
+}
+
 export function SettingsClient() {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const tab = searchParams.get('tab')
+  const rawTab = searchParams.get('tab')
+  const [settingsTab, setSettingsTab] = useState<SettingsTabId>(
+    isSettingsTab(rawTab) ? rawTab : 'account'
+  )
   const [platform, setPlatform] = useState<PublishPlatform>(
-    tab && isPublishPlatform(tab) ? tab : 'threads'
+    rawTab && isPublishPlatform(rawTab) ? rawTab : 'threads'
   )
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -64,6 +81,11 @@ export function SettingsClient() {
   }, [])
 
   useEffect(() => {
+    if (isSettingsTab(rawTab)) setSettingsTab(rawTab)
+    else if (!rawTab || isPublishPlatform(rawTab)) setSettingsTab('account')
+  }, [rawTab])
+
+  useEffect(() => {
     if (!selected) {
       setIntro('')
       setTopics([])
@@ -76,6 +98,16 @@ export function SettingsClient() {
   function ping(message: string) {
     setToast(message)
     window.setTimeout(() => setToast(''), 2000)
+  }
+
+  function switchSettingsTab(next: SettingsTabId) {
+    setSettingsTab(next)
+    setError('')
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === 'account') params.delete('tab')
+    else params.set('tab', next)
+    const q = params.toString()
+    router.replace(q ? `/settings?${q}` : '/settings', { scroll: false })
   }
 
   function switchPlatform(next: PublishPlatform) {
@@ -171,45 +203,73 @@ export function SettingsClient() {
       <div>
         <h1 className="text-xl font-bold text-white md:text-2xl">설정</h1>
         <p className="mt-1 text-sm text-white/45">
-          내 계정과 플랫폼 연결을 관리합니다.
+          계정 · 파트너스 API · 플랫폼 연결을 관리합니다.
         </p>
       </div>
 
-      <AccountSettings onToast={ping} />
-      <AppearanceSettings />
-
-      <div>
-        <h2 className="text-lg font-semibold text-white">플랫폼 계정</h2>
-        <p className="mt-1 text-xs text-white/40">채널별로 아이디를 추가하고 삭제하거나 다시 연결할 수 있습니다.</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {PUBLISH_PLATFORMS.map((id) => {
-          const item = PUBLISH_PLATFORM_META[id]
-          const active = platform === id
+      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-px">
+        {SETTINGS_TABS.map((t) => {
+          const active = settingsTab === t.id
           return (
             <button
-              key={id}
+              key={t.id}
               type="button"
-              onClick={() => switchPlatform(id)}
+              onClick={() => switchSettingsTab(t.id)}
               className={cn(
-                'flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition',
+                'inline-flex items-center gap-1.5 rounded-t-lg px-3 py-2.5 text-sm transition',
                 active
-                  ? 'border-gold/40 bg-gold/10'
-                  : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-white/15 hover:bg-white/5'
+                  ? 'border-b-2 border-[var(--gold)] font-semibold text-[var(--gold)]'
+                  : 'text-white/45 hover:text-white/75'
               )}
             >
-              <BrandMark id={item.brandId} className="h-8 w-8" />
-              <span className="min-w-0">
-                <span className="block text-sm font-bold text-white">{item.label}</span>
-                <span className="block text-xs text-white/45">{counts[id]}개 연결</span>
-              </span>
+              {t.id !== 'account' ? <Link2 className="h-3.5 w-3.5 opacity-70" /> : null}
+              {t.label}
             </button>
           )
         })}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
+      {settingsTab !== 'account' ? (
+        <PartnerApiSettings providerId={settingsTab} onToast={ping} />
+      ) : (
+        <>
+          <AccountSettings onToast={ping} />
+          <AppearanceSettings />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">플랫폼 계정</h2>
+            <p className="mt-1 text-xs text-white/40">
+              채널별로 아이디를 추가하고 삭제하거나 다시 연결할 수 있습니다.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {PUBLISH_PLATFORMS.map((id) => {
+              const item = PUBLISH_PLATFORM_META[id]
+              const active = platform === id
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => switchPlatform(id)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition',
+                    active
+                      ? 'border-gold/40 bg-gold/10'
+                      : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-white/15 hover:bg-white/5'
+                  )}
+                >
+                  <BrandMark id={item.brandId} className="h-8 w-8" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-white">{item.label}</span>
+                    <span className="block text-xs text-white/45">{counts[id]}개 연결</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -393,6 +453,8 @@ export function SettingsClient() {
           )}
         </section>
       </div>
+        </>
+      )}
     </div>
   )
 }
