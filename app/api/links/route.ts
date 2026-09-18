@@ -14,6 +14,7 @@ import {
   type ProfileSnsLink,
   type TrackedLink,
 } from '@/lib/links'
+import { normalizeProfileDesign } from '@/lib/profile-design'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -172,6 +173,7 @@ export async function PATCH(req: Request) {
       profileBio: string | null
       profileSns: ProfileSnsLink[]
       profileFontSize: string
+      profileDesign: Record<string, unknown>
       hotdealSlug: string | null
       hotdealName: string | null
       hotdealIntro: string | null
@@ -264,6 +266,9 @@ export async function PATCH(req: Request) {
       const allowed = new Set(['sm', 'md', 'lg'])
       patch.profile_font_size = allowed.has(body.profileFontSize) ? body.profileFontSize : 'md'
     }
+    if (body.profileDesign !== undefined) {
+      patch.profile_design = normalizeProfileDesign(body.profileDesign)
+    }
 
     if (body.hotdealSlug !== undefined) {
       const slug = body.hotdealSlug?.trim().toLowerCase() || null
@@ -303,7 +308,7 @@ export async function PATCH(req: Request) {
         return NextResponse.json(
           {
             error:
-              '프로필 컬럼이 없습니다. Supabase에 supabase/profile_page.sql 을 실행해 주세요.',
+              '프로필 컬럼이 없습니다. Supabase에 supabase/profile_page.sql 과 supabase/profile_design.sql 을 실행해 주세요.',
           },
           { status: 500 },
         )

@@ -23,8 +23,10 @@ import {
   type ProfileSnsLink,
   type TrackedLink,
 } from '@/lib/links'
+import { normalizeProfileDesign, type ProfileDesign } from '@/lib/profile-design'
 import { cn } from '@/lib/utils'
 import { MostemLogo } from '@/components/mostem-logo'
+import { DesignStudio, ProfilePhonePreview } from './profile-design-studio'
 
 type View = 'main' | 'stats' | 'design'
 type BlockTab = 'list' | 'archive'
@@ -53,15 +55,6 @@ function hostLabel() {
   }
 }
 
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('이미지 읽기 실패'))
-    reader.readAsDataURL(file)
-  })
-}
-
 export function ProfilePanel({
   settings,
   links,
@@ -85,6 +78,9 @@ export function ProfilePanel({
   const [bio, setBio] = useState(settings.profile_bio || '')
   const [sns, setSns] = useState<ProfileSnsLink[]>(settings.profile_sns || [])
   const [fontSize, setFontSize] = useState<ProfileFontSize | string>(settings.profile_font_size || 'md')
+  const [design, setDesign] = useState<ProfileDesign>(() =>
+    normalizeProfileDesign(settings.profile_design),
+  )
 
   const [blockTab, setBlockTab] = useState<BlockTab>('list')
   const [blockQuery, setBlockQuery] = useState('')
@@ -116,6 +112,7 @@ export function ProfilePanel({
     setBio(settings.profile_bio || '')
     setSns(settings.profile_sns || [])
     setFontSize(settings.profile_font_size || 'md')
+    setDesign(normalizeProfileDesign(settings.profile_design))
     setAddressDraft(settings.profile_slug || '')
     setSimpleDraft(!!settings.profile_simple_address)
   }, [settings])
@@ -267,35 +264,42 @@ export function ProfilePanel({
 
   if (view === 'design') {
     return (
-      <DesignView
-        displayName={displayName}
-        bio={bio}
-        layout={layout}
-        fontSize={fontSize}
-        avatarUrl={avatarUrl}
-        coverUrl={coverUrl}
-        sns={sns}
+      <DesignStudio
+        initial={{
+          displayName,
+          bio,
+          layout,
+          fontSize,
+          avatarUrl,
+          coverUrl,
+          sns,
+          design,
+          simpleAddress,
+        }}
         live={live}
-        autosave={autosave}
         busy={busy}
         err={err}
         onBack={() => setView('main')}
-        onChangeName={setDisplayName}
-        onChangeBio={setBio}
-        onChangeLayout={setLayout}
-        onChangeFont={setFontSize}
-        onChangeAvatar={setAvatarUrl}
-        onChangeCover={setCoverUrl}
-        onChangeSns={setSns}
-        onSave={async () => {
+        onPersist={async (snap) => {
+          setDisplayName(snap.displayName)
+          setBio(snap.bio)
+          setLayout(snap.layout)
+          setFontSize(snap.fontSize)
+          setAvatarUrl(snap.avatarUrl)
+          setCoverUrl(snap.coverUrl)
+          setSns(snap.sns)
+          setDesign(snap.design)
+          setSimpleAddress(snap.simpleAddress)
           await save({
-            displayName: displayName || null,
-            profileBio: bio || null,
-            profileLayout: layout,
-            profileFontSize: fontSize,
-            profileAvatarUrl: avatarUrl || null,
-            profileCoverUrl: coverUrl || null,
-            profileSns: sns,
+            displayName: snap.displayName || null,
+            profileBio: snap.bio || null,
+            profileLayout: snap.layout,
+            profileFontSize: snap.fontSize,
+            profileAvatarUrl: snap.avatarUrl || null,
+            profileCoverUrl: snap.coverUrl || null,
+            profileSns: snap.sns,
+            profileDesign: snap.design,
+            profileSimpleAddress: snap.simpleAddress,
           })
         }}
       />
@@ -369,7 +373,7 @@ export function ProfilePanel({
               type="button"
               disabled={!publicUrl}
               onClick={() => setShowShare(true)}
-              className="text-sm text-white/55 hover:text-white disabled:opacity-40"
+              className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-medium text-white/85 hover:bg-white/15 disabled:opacity-40"
             >
               내 페이지 공유
             </button>
@@ -378,7 +382,7 @@ export function ProfilePanel({
                 href={publicUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-white/55 hover:text-white"
+                className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-sm font-medium text-white/85 hover:bg-white/15"
               >
                 내 페이지 <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -521,7 +525,7 @@ export function ProfilePanel({
         {err ? <p className="text-sm text-rose-300">{err}</p> : null}
       </div>
 
-      <PhonePreview
+      <ProfilePhonePreview
         name={displayName || slug || '이름'}
         bio={bio}
         layout={layout}
@@ -530,6 +534,7 @@ export function ProfilePanel({
         coverUrl={coverUrl}
         live={live}
         sns={sns}
+        design={design}
       />
 
       {showAddress ? (
@@ -706,103 +711,6 @@ function Modal({
   )
 }
 
-function PhonePreview({
-  name,
-  bio,
-  layout,
-  fontSize,
-  avatarUrl,
-  coverUrl,
-  live,
-  sns,
-}: {
-  name: string
-  bio: string
-  layout: string
-  fontSize: string
-  avatarUrl: string
-  coverUrl: string
-  live: ProfileBlock[]
-  sns: ProfileSnsLink[]
-}) {
-  const font = fontSize === 'sm' ? 'text-base' : fontSize === 'lg' ? 'text-2xl' : 'text-xl'
-  const coverH = layout === 'full-cover' ? 'h-40' : layout === 'profile' ? 'h-0' : 'h-28'
-
-  return (
-    <aside className="mx-auto w-full max-w-[280px]">
-      <div className="overflow-hidden rounded-[2rem] border border-white/15 bg-[#121214] shadow-2xl">
-        <div className="bg-[#5b3cc4] px-3 py-2 text-[9px] leading-relaxed text-white/90">
-          본 페이지의 일부 링크는 쿠팡 파트너스 활동을 통해 일정액의 수수료를 제공받습니다.
-          <br />
-          본 페이지의 일부 링크는 네이버쇼핑 커넥트 활동을 통해 일정액의 수수료를 제공받습니다.
-        </div>
-        {layout !== 'profile' ? (
-          <div
-            className={`relative ${coverH} bg-gradient-to-br from-amber-700/40 to-amber-900/30`}
-            style={
-              coverUrl
-                ? { backgroundImage: `url(${coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                : undefined
-            }
-          >
-            <div className="absolute inset-x-0 -bottom-8 flex justify-center">
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover ring-4 ring-[#121214]" />
-              ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold)]/20 ring-4 ring-[#121214]">
-                  <MostemLogo size={36} rounded="full" />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center pt-6">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
-            ) : (
-              <MostemLogo size={56} rounded="full" />
-            )}
-          </div>
-        )}
-        <div className={`px-4 pb-6 ${layout !== 'profile' ? 'pt-12' : 'pt-3'} text-center`}>
-          <p className={`font-semibold ${font}`}>{name}</p>
-          {bio ? <p className="mt-1 text-[11px] text-white/45">{bio}</p> : null}
-          {sns.length > 0 ? (
-            <div className="mt-2 flex flex-wrap justify-center gap-1">
-              {sns.map((s) => (
-                <span key={s.id} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
-                  {s.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {live.length === 0 ? (
-            <p className="mt-6 text-xs text-white/40">
-              아직 공개된 링크가 없어요
-              <br />
-              곧 새로운 추천을 채워둘게요.
-            </p>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {live.slice(0, 5).map((b) => (
-                <div key={b.id} className="rounded-xl bg-white/10 px-3 py-2 text-center text-xs">
-                  {b.title}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mt-6 flex items-center justify-center gap-1.5 opacity-50">
-            <MostemLogo size={16} rounded="lg" />
-            <span className="text-[10px]">Mostem</span>
-          </div>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
 function StatsView({
   range,
   onRange,
@@ -918,243 +826,6 @@ function StatsView({
           </ul>
         )}
       </div>
-    </div>
-  )
-}
-
-function DesignView({
-  displayName,
-  bio,
-  layout,
-  fontSize,
-  avatarUrl,
-  coverUrl,
-  sns,
-  live,
-  autosave,
-  busy,
-  err,
-  onBack,
-  onChangeName,
-  onChangeBio,
-  onChangeLayout,
-  onChangeFont,
-  onChangeAvatar,
-  onChangeCover,
-  onChangeSns,
-  onSave,
-}: {
-  displayName: string
-  bio: string
-  layout: string
-  fontSize: string
-  avatarUrl: string
-  coverUrl: string
-  sns: ProfileSnsLink[]
-  live: ProfileBlock[]
-  autosave: string
-  busy: boolean
-  err: string
-  onBack: () => void
-  onChangeName: (v: string) => void
-  onChangeBio: (v: string) => void
-  onChangeLayout: (v: string) => void
-  onChangeFont: (v: string) => void
-  onChangeAvatar: (v: string) => void
-  onChangeCover: (v: string) => void
-  onChangeSns: (v: ProfileSnsLink[]) => void
-  onSave: () => Promise<void>
-}) {
-  const layouts: { id: ProfileLayout; label: string }[] = [
-    { id: 'profile', label: '프로필' },
-    { id: 'cover', label: '커버' },
-    { id: 'cover-profile', label: '커버와 프로필' },
-    { id: 'full-cover', label: '전체 커버' },
-  ]
-
-  async function pickImage(kind: 'avatar' | 'cover') {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      if (!file) return
-      if (file.size > 2_500_000) {
-        alert('이미지는 2.5MB 이하로 올려 주세요')
-        return
-      }
-      const dataUrl = await fileToDataUrl(file)
-      if (kind === 'avatar') onChangeAvatar(dataUrl)
-      else onChangeCover(dataUrl)
-    }
-    input.click()
-  }
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <button type="button" onClick={onBack} className="inline-flex items-center gap-1 text-sm text-white/70">
-            <ArrowLeft className="h-4 w-4" /> 디자인
-          </button>
-          <div className="flex items-center gap-2">
-            {autosave ? <span className="text-xs text-white/40">{autosave}</span> : null}
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void onSave()}
-              className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
-            >
-              {busy ? '저장 중…' : '저장'}
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs text-white/45">레이아웃</p>
-          <div className="grid grid-cols-4 gap-2">
-            {layouts.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onClick={() => onChangeLayout(l.id)}
-                className={cn(
-                  'rounded-xl border px-2 py-3 text-[11px]',
-                  layout === l.id ? 'border-white bg-white/10' : 'border-white/10 text-white/50',
-                )}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => void pickImage('avatar')}
-            className="rounded-xl border border-white/10 py-3 text-xs text-white/70"
-          >
-            프로필 이미지
-          </button>
-          <button
-            type="button"
-            onClick={() => void pickImage('cover')}
-            className="rounded-xl border border-white/10 py-3 text-xs text-white/70"
-          >
-            커버 이미지
-          </button>
-        </div>
-
-        <label className="block space-y-1.5">
-          <span className="text-xs text-white/50">타이틀</span>
-          <input
-            value={displayName}
-            onChange={(e) => onChangeName(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
-          />
-        </label>
-
-        <label className="block space-y-1.5">
-          <span className="text-xs text-white/50">설명</span>
-          <textarea
-            value={bio}
-            onChange={(e) => onChangeBio(e.target.value)}
-            rows={3}
-            placeholder="이곳에 링크를 소개하는 페이지인지 짧게 알려 주세요."
-            className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
-          />
-        </label>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs text-white/50">SNS</span>
-            <button
-              type="button"
-              onClick={() =>
-                onChangeSns([
-                  ...sns,
-                  { id: crypto.randomUUID(), label: 'SNS', url: 'https://' },
-                ])
-              }
-              className="text-xs text-[var(--accent)]"
-            >
-              + 추가
-            </button>
-          </div>
-          <div className="space-y-2">
-            {sns.map((s, idx) => (
-              <div key={s.id} className="flex gap-2">
-                <input
-                  value={s.label}
-                  onChange={(e) => {
-                    const next = [...sns]
-                    next[idx] = { ...s, label: e.target.value }
-                    onChangeSns(next)
-                  }}
-                  placeholder="라벨"
-                  className="w-24 rounded-xl border border-white/10 bg-[var(--input-bg)] px-2 py-2 text-xs outline-none"
-                />
-                <input
-                  value={s.url}
-                  onChange={(e) => {
-                    const next = [...sns]
-                    next[idx] = { ...s, url: e.target.value }
-                    onChangeSns(next)
-                  }}
-                  placeholder="https://"
-                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[var(--input-bg)] px-2 py-2 text-xs outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => onChangeSns(sns.filter((x) => x.id !== s.id))}
-                  className="text-xs text-white/30"
-                >
-                  삭제
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs text-white/50">프로필 글꼴 크기</p>
-          <div className="flex gap-1.5">
-            {(
-              [
-                { id: 'sm', label: '작게' },
-                { id: 'md', label: '보통' },
-                { id: 'lg', label: '크게' },
-              ] as const
-            ).map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => onChangeFont(f.id)}
-                className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs',
-                  fontSize === f.id ? 'bg-[var(--accent)] text-white' : 'bg-white/5 text-white/50',
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {err ? <p className="text-sm text-rose-300">{err}</p> : null}
-      </div>
-
-      <PhonePreview
-        name={displayName || '이름'}
-        bio={bio}
-        layout={layout}
-        fontSize={fontSize}
-        avatarUrl={avatarUrl}
-        coverUrl={coverUrl}
-        live={live}
-        sns={sns}
-      />
     </div>
   )
 }
