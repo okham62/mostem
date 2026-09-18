@@ -1,3 +1,10 @@
+import {
+  normalizeProfileDesign,
+  type ProfileDesign,
+} from '@/lib/profile-design'
+
+export type { ProfileDesign }
+
 export type LinkPlatform = 'coupang' | 'toss' | 'naver' | 'other'
 
 export type ProfileBlock = {
@@ -31,6 +38,7 @@ export type LinkSettings = {
   profile_bio: string | null
   profile_sns: ProfileSnsLink[]
   profile_font_size: ProfileFontSize | string
+  profile_design: ProfileDesign
   hotdeal_slug: string | null
   hotdeal_name: string | null
   hotdeal_intro: string | null
@@ -86,6 +94,7 @@ export function normalizeLinkSettings(data: Record<string, unknown>): LinkSettin
       typeof data.profile_font_size === 'string' && data.profile_font_size
         ? data.profile_font_size
         : 'md',
+    profile_design: normalizeProfileDesign(data.profile_design),
   }
 }
 
@@ -111,7 +120,15 @@ export const RESERVED_PROFILE_SLUGS = new Set(
     'dashboard',
     'links',
     'threads',
+    'instagram',
+    'tiktok',
     'blog',
+    'ai',
+    'keywords',
+    'news',
+    'markets',
+    'trends',
+    'shopping',
     'settings',
     'admin',
     'u',
