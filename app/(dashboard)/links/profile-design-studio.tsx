@@ -229,9 +229,9 @@ export function ProfilePhonePreview({
   const noticeText = d.affiliateNoticeText || DEFAULT_AFFILIATE_NOTICE
 
   return (
-    <aside className="mx-auto w-full max-w-[280px]">
+    <aside className="mx-auto w-full max-w-[260px]">
       <div
-        className="overflow-hidden rounded-[2rem] border border-white/15 shadow-2xl"
+        className="max-h-[min(640px,70vh)] overflow-y-auto rounded-[2rem] border border-white/15 shadow-2xl"
         style={{ background: themeBg, color: themeFg, fontFamily }}
       >
         {d.noticeEnabled && d.noticeText ? (
@@ -517,7 +517,18 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
   const panelTitle = useMemo(() => TABS.find((t) => t.id === tab)?.label ?? '디자인', [tab])
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-[#0b0b0d] text-white">
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-6"
+      onClick={onBack}
+      role="presentation"
+    >
+      <div
+        className="flex h-[min(860px,92vh)] w-full max-w-[1080px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0d] text-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="프로필 디자인"
+      >
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
         <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-white/80 hover:text-white">
           <ArrowLeft className="h-4 w-4" /> 디자인
@@ -553,7 +564,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[80px_minmax(0,380px)_1fr]">
+      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[72px_minmax(0,320px)_minmax(0,1fr)]">
         <nav className="flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-white/10 p-2 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:border-white/10 lg:p-3">
           {TABS.map((t) => {
             const Icon = t.icon
@@ -971,7 +982,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
           {err ? <p className="text-sm text-rose-300">{err}</p> : null}
         </div>
 
-        <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-[#121214] p-6 lg:items-center">
+        <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-[#121214] p-4 lg:items-center lg:p-6">
           <ProfilePhonePreview
             name={snap.displayName || '이름'}
             bio={snap.bio}
@@ -984,6 +995,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
             design={snap.design}
           />
         </div>
+      </div>
       </div>
     </div>
   )
