@@ -39,9 +39,10 @@ export async function testCoupangPartners(accessKey: string, secretKey: string):
       signal: AbortSignal.timeout(12_000),
     })
     const text = await res.text()
-    let data: { rCode?: string; rMessage?: string; message?: string } | null = null
+    type CoupangDeeplinkResponse = { rCode?: string; rMessage?: string; message?: string }
+    let data: CoupangDeeplinkResponse | null = null
     try {
-      data = JSON.parse(text) as typeof data
+      data = JSON.parse(text) as CoupangDeeplinkResponse
     } catch {
       data = null
     }
