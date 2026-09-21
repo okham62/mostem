@@ -662,7 +662,15 @@ export function LinksClient() {
       )}
 
       {tab === 'channel' && settings && (
-        <ChannelPanel links={links} settings={settings} onRefresh={() => void load()} />
+        <ChannelPanel
+          links={links}
+          settings={settings}
+          onRefresh={() => void load()}
+          onSaveChannel={async (channelId) => {
+            await patchSettings({ channelId })
+            ping('채널 ID를 저장했어요')
+          }}
+        />
       )}
 
       {tab === 'profile' && settings && (
@@ -1888,16 +1896,87 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
   )
 }
 
+type ChannelStatsResponse = {
+  connected?: boolean
+  updatedAt?: string
+  range?: { startDate: string; endDate: string } | null
+  totals?: {
+    mostemClicks: number
+    coupangClicks: number | null
+    orders: number | null
+    revenue: number | null
+  }
+  channels?: Array<{
+    id: string
+    links: number
+    mostemClicks: number
+    coupangClicks: number | null
+    orders: number | null
+    revenue: number | null
+    unmatched?: boolean
+  }>
+  error?: string
+}
+
+function formatWon(n: number | null | undefined) {
+  if (n == null) return '—'
+  return `${Math.round(n).toLocaleString('ko-KR')}원`
+}
+
+function formatCount(n: number | null | undefined, suffix = '') {
+  if (n == null) return '—'
+  return `${n.toLocaleString('ko-KR')}${suffix}`
+}
+
 function ChannelPanel({
   links,
   settings,
   onRefresh,
+  onSaveChannel,
 }: {
   links: TrackedLink[]
   settings: LinkSettings
   onRefresh: () => void
+  onSaveChannel: (channelId: string) => Promise<void>
 }) {
-  const byChannel = useMemo(() => {
+  const [stats, setStats] = useState<ChannelStatsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [channelDraft, setChannelDraft] = useState(settings.channel_id || '기본값')
+  const [savingChannel, setSavingChannel] = useState(false)
+
+  useEffect(() => {
+    setChannelDraft(settings.channel_id || '기본값')
+  }, [settings.channel_id])
+
+  const loadStats = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/links/channel-stats', { cache: 'no-store' })
+      const data = (await res.json()) as ChannelStatsResponse
+      if (!res.ok) throw new Error(data.error || '실적 불러오기 실패')
+      setStats(data)
+    } catch (e) {
+      setStats({
+        connected: false,
+        totals: {
+          mostemClicks: links.reduce((s, l) => s + (l.click_count || 0), 0),
+          coupangClicks: null,
+          orders: null,
+          revenue: null,
+        },
+        channels: [],
+        error: e instanceof Error ? e.message : '실적 불러오기 실패',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [links])
+
+  useEffect(() => {
+    void loadStats()
+  }, [loadStats])
+
+  const fallbackByChannel = useMemo(() => {
     const map = new Map<string, { links: number; clicks: number }>()
     for (const l of links) {
       const key = l.channel || settings.channel_id || '기본값'
@@ -1910,13 +1989,57 @@ function ChannelPanel({
     return Array.from(map.entries())
   }, [links, settings.channel_id])
 
-  const totalClicks = links.reduce((s, l) => s + (l.click_count || 0), 0)
-  const updated = new Date().toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const rows =
+    stats?.channels && stats.channels.length
+      ? stats.channels
+      : fallbackByChannel.map(([id, row]) => ({
+          id,
+          links: row.links,
+          mostemClicks: row.clicks,
+          coupangClicks: null as number | null,
+          orders: null as number | null,
+          revenue: null as number | null,
+        }))
+
+  const totals = stats?.totals ?? {
+    mostemClicks: links.reduce((s, l) => s + (l.click_count || 0), 0),
+    coupangClicks: null,
+    orders: null,
+    revenue: null,
+  }
+  const connected = Boolean(stats?.connected)
+  const updated = stats?.updatedAt
+    ? new Date(stats.updatedAt).toLocaleString('ko-KR', {
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : new Date().toLocaleString('ko-KR', {
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+
+  async function refreshAll() {
+    onRefresh()
+    await loadStats()
+  }
+
+  async function saveChannel() {
+    setSavingChannel(true)
+    try {
+      await onSaveChannel(channelDraft.trim() || '기본값')
+    } finally {
+      setSavingChannel(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold">채널 실적</h2>
           <p className="mt-1 text-sm text-white/45">
             Mostem 유입 클릭과 쿠팡 클릭·주문·수익을 채널 ID 기준으로 비교해요.{' '}
@@ -1928,17 +2051,64 @@ function ChannelPanel({
         </div>
         <div className="text-right text-xs text-white/40">
           <p>{updated} 업데이트</p>
-          <button type="button" onClick={onRefresh} className="mt-1 text-[var(--accent)] hover:underline">
-            새로고침
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void refreshAll()}
+            className="mt-1 text-[var(--accent)] hover:underline disabled:opacity-50"
+          >
+            {loading ? '불러오는 중…' : '새로고침'}
           </button>
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
+        <label className="min-w-[160px] flex-1 space-y-1">
+          <span className="text-[11px] text-white/45">기본 채널 ID (쿠팡 subId)</span>
+          <input
+            value={channelDraft}
+            onChange={(e) => setChannelDraft(e.target.value.slice(0, 50))}
+            placeholder="기본값"
+            className="w-full rounded-lg border border-white/10 bg-[var(--input-bg)] px-2.5 py-1.5 text-sm outline-none focus:border-[var(--accent)]/60"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={savingChannel}
+          onClick={() => void saveChannel()}
+          className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/15 disabled:opacity-40"
+        >
+          {savingChannel ? '저장 중…' : '저장'}
+        </button>
+      </div>
+
+      {stats?.error ? (
+        <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+          쿠팡 리포트: {stats.error}
+        </p>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-4">
-        <StatCard label="Mostem 클릭" value={`${totalClicks}`} />
-        <StatCard label="쿠팡 클릭" value="—" hint="구분 불가" />
-        <StatCard label="주문" value="0건" />
-        <StatCard label="수익" value="0원" />
+        <StatCard
+          label="Mostem 클릭"
+          value={formatCount(totals.mostemClicks)}
+          hint="실시간"
+        />
+        <StatCard
+          label="쿠팡 클릭"
+          value={connected ? formatCount(totals.coupangClicks) : '—'}
+          hint={connected ? '쿠팡 리포트 기준 (최근 30일)' : '구분 불가'}
+        />
+        <StatCard
+          label="주문"
+          value={connected ? formatCount(totals.orders, '건') : '—'}
+          hint={connected ? undefined : '구분 불가'}
+        />
+        <StatCard
+          label="수익"
+          value={connected ? formatWon(totals.revenue) : '—'}
+          hint={connected ? '확정 수익 (수수료)' : '구분 불가'}
+        />
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-white/10">
@@ -1954,14 +2124,25 @@ function ChannelPanel({
             </tr>
           </thead>
           <tbody>
-            {byChannel.map(([name, row]) => (
-              <tr key={name} className="border-t border-white/5">
-                <td className="px-4 py-3">{name}</td>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-t border-white/5">
+                <td className="px-4 py-3">
+                  {row.id}
+                  {row.unmatched ? (
+                    <span className="ml-1 text-[10px] text-white/35">미매칭</span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{row.links}개</td>
-                <td className="px-4 py-3">{row.clicks}회</td>
-                <td className="px-4 py-3 text-white/35">구분 불가</td>
-                <td className="px-4 py-3 text-white/35">구분 불가</td>
-                <td className="px-4 py-3 text-white/35">구분 불가</td>
+                <td className="px-4 py-3">{formatCount(row.mostemClicks, '회')}</td>
+                <td className={cn('px-4 py-3', row.coupangClicks == null && 'text-white/35')}>
+                  {row.coupangClicks == null ? '구분 불가' : formatCount(row.coupangClicks, '회')}
+                </td>
+                <td className={cn('px-4 py-3', row.orders == null && 'text-white/35')}>
+                  {row.orders == null ? '구분 불가' : formatCount(row.orders, '건')}
+                </td>
+                <td className={cn('px-4 py-3', row.revenue == null && 'text-white/35')}>
+                  {row.revenue == null ? '구분 불가' : formatWon(row.revenue)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1969,8 +2150,9 @@ function ChannelPanel({
       </div>
 
       <p className="text-[11px] leading-relaxed text-white/30">
-        Mostem 클릭은 실시간입니다. 쿠팡 파트너스 리포트는 하루 이상 지연될 수 있으며, 채널 구분 연동이 되기 전에는 “구분
-        불가”로 표시됩니다.
+        Mostem 클릭은 실시간입니다. 쿠팡 파트너스 리포트는 하루 이상 지연될 수 있습니다. API 연동 후 새로
+        만든 쿠팡 링크는 채널 ID(subId)가 붙어 리포트와 매칭됩니다. 연동 전·미매칭 트래픽은 “기타(미매칭)”
+        또는 “구분 불가”로 보일 수 있습니다.
       </p>
     </div>
   )

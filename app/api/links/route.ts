@@ -14,6 +14,12 @@ import {
   type ProfileSnsLink,
   type TrackedLink,
 } from '@/lib/links'
+import { createCoupangDeeplink } from '@/lib/partners-coupang'
+import {
+  getPartnerDef,
+  isPartnerConnected,
+  parsePartnerApis,
+} from '@/lib/partners'
 import { normalizeProfileDesign } from '@/lib/profile-design'
 import { NextResponse } from 'next/server'
 
@@ -119,6 +125,33 @@ export async function POST(req: Request) {
     const platform = detectLinkPlatform(destination)
     const channel = (body.channel ?? settings.channel_id ?? '기본값').trim() || '기본값'
 
+    let finalDestination = destination
+    if (platform === 'coupang') {
+      try {
+        const { data: settingsRaw } = await supabase
+          .from('link_settings')
+          .select('partner_apis')
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+        const apis = parsePartnerApis(settingsRaw?.partner_apis)
+        const def = getPartnerDef('coupang')
+        const cred = apis.coupang
+        if (def && isPartnerConnected(def, cred) && cred?.accessKey && cred?.secretKey) {
+          const converted = await createCoupangDeeplink(
+            String(cred.accessKey),
+            String(cred.secretKey),
+            destination,
+            channel
+          )
+          if (converted.ok) {
+            finalDestination = converted.shortenUrl
+          }
+        }
+      } catch {
+        // Soft-fail: keep original destination if deeplink conversion fails.
+      }
+    }
+
     let code = makeLinkCode(8)
     for (let i = 0; i < 6; i++) {
       const { data: exists } = await supabase
@@ -137,7 +170,7 @@ export async function POST(req: Request) {
         user_id: session.user.id,
         prefix: settings.prefix,
         code,
-        destination_url: destination,
+        destination_url: finalDestination,
         title,
         og_image_url: ogImageUrl,
         platform,
