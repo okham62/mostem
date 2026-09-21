@@ -56,7 +56,8 @@ export const PARTNER_PROVIDERS: PartnerProviderDef[] = [
     description:
       'Access Key · Secret Key · Publisher ID를 연결하면 토스 상품 검색·쉐어링크 발급에 사용할 수 있어요.',
     docsUrl: 'https://sharelink-docs.toss.im/guide/open-api/auth',
-    adminUrl: 'https://sharelink.toss.im/',
+    adminUrl:
+      'https://business.toss.im/account/sign-in?client_id=ajvm9wq2t0p1ttet13y3qzb3rvjxhacn&redirect_uri=https%3A%2F%2Fsharelink.toss.im%2Fsignup-start',
     fields: [
       {
         key: 'accessKey',

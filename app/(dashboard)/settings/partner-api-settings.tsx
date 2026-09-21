@@ -33,7 +33,8 @@ const GUIDE: Record<
       '키를 입력한 뒤 연결하기를 눌러 주세요.',
     ],
     primaryLabel: '토스에서 키 발급',
-    primaryUrl: 'https://sharelink.toss.im/',
+    primaryUrl:
+      'https://business.toss.im/account/sign-in?client_id=ajvm9wq2t0p1ttet13y3qzb3rvjxhacn&redirect_uri=https%3A%2F%2Fsharelink.toss.im%2Fsignup-start',
     docsLabel: '토스 연동 문서',
     docsUrl: 'https://sharelink-docs.toss.im/guide/open-api/auth',
   },
