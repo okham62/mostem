@@ -200,11 +200,14 @@ export function SettingsClient() {
         </div>
       )}
 
-      <div>
-        <h1 className="text-xl font-bold text-white md:text-2xl">설정</h1>
-        <p className="mt-1 text-sm text-white/45">
-          계정 · 파트너스 API · 플랫폼 연결을 관리합니다.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-white md:text-2xl">설정</h1>
+          <p className="mt-1 text-sm text-white/45">
+            계정 · 파트너스 API · 플랫폼 연결을 관리합니다.
+          </p>
+        </div>
+        {settingsTab === 'account' ? <AppearanceSettings /> : null}
       </div>
 
       <div className="flex flex-wrap gap-1 border-b border-white/10 pb-px">
@@ -234,7 +237,6 @@ export function SettingsClient() {
       ) : (
         <>
           <AccountSettings onToast={ping} />
-          <AppearanceSettings />
 
           <div>
             <h2 className="text-lg font-semibold text-white">플랫폼 계정</h2>

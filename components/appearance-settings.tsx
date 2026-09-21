@@ -1,29 +1,33 @@
 'use client'
 
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Monitor, Moon, PanelLeft, Sun } from 'lucide-react'
 import { useSidebarChrome } from '@/components/layout/app-chrome'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
 import type { ThemeChoice } from '@/lib/theme'
 
-const THEMES: { id: ThemeChoice; label: string; hint: string; icon: typeof Sun }[] = [
-  { id: 'light', label: '화이트톤', hint: '밝은 화면', icon: Sun },
-  { id: 'dark', label: '어두운톤', hint: '어두운 화면', icon: Moon },
-  { id: 'auto', label: '자동', hint: '기기 설정', icon: Monitor },
+const THEMES: { id: ThemeChoice; label: string; icon: typeof Sun }[] = [
+  { id: 'light', label: '화이트톤', icon: Sun },
+  { id: 'dark', label: '어두운톤', icon: Moon },
+  { id: 'auto', label: '자동', icon: Monitor },
 ]
 
-export function AppearanceSettings() {
+export function AppearanceSettings({ className }: { className?: string }) {
   const { choice, setChoice } = useTheme()
   const { hidden, toggle } = useSidebarChrome()
 
   return (
-    <section className="w-full rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 md:p-6">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-white">화면 설정</h2>
-        <p className="mt-1 text-xs text-white/40">원하는 톤과 사이드바 표시를 고를 수 있습니다.</p>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
+    <div
+      className={cn(
+        'inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] p-1',
+        className
+      )}
+    >
+      <div
+        className="flex items-center gap-0.5"
+        role="group"
+        aria-label="화면 톤"
+      >
         {THEMES.map((item) => {
           const Icon = item.icon
           const active = choice === item.id
@@ -31,38 +35,41 @@ export function AppearanceSettings() {
             <button
               key={item.id}
               type="button"
+              title={item.label}
+              aria-label={item.label}
+              aria-pressed={active}
               onClick={() => setChoice(item.id)}
               className={cn(
-                'flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 transition',
+                'inline-flex h-7 w-7 items-center justify-center rounded-md transition',
                 active
-                  ? 'border-gold/40 bg-gold/10 text-white'
-                  : 'border-white/10 bg-black/20 text-white/55 hover:border-white/20 hover:text-white'
+                  ? 'bg-gold/15 text-gold'
+                  : 'text-white/45 hover:bg-white/5 hover:text-white/80'
               )}
             >
-              <Icon className={cn('h-4 w-4', active && 'text-gold')} />
-              <span className="text-xs font-semibold">{item.label}</span>
-              <span className="text-[10px] text-white/35">{item.hint}</span>
+              <Icon className="h-3.5 w-3.5" />
             </button>
           )
         })}
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
-        <div>
-          <p className="text-sm font-medium text-white">사이드바</p>
-          <p className="text-[11px] text-white/40">왼쪽 메뉴를 숨기거나 다시 펼칩니다.</p>
-        </div>
-        <button
-          type="button"
-          onClick={toggle}
-          className={cn(
-            'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-            hidden ? 'bg-white/10 text-white' : 'bg-brand text-white'
-          )}
-        >
-          {hidden ? '숨김' : '표시'}
-        </button>
-      </div>
-    </section>
+      <span className="mx-0.5 hidden h-4 w-px bg-white/10 sm:block" aria-hidden />
+
+      <button
+        type="button"
+        onClick={toggle}
+        title={hidden ? '사이드바 표시' : '사이드바 숨김'}
+        aria-label={hidden ? '사이드바 표시' : '사이드바 숨김'}
+        aria-pressed={!hidden}
+        className={cn(
+          'inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition',
+          hidden
+            ? 'text-white/45 hover:bg-white/5 hover:text-white/80'
+            : 'bg-brand/20 text-white/85 hover:bg-brand/30'
+        )}
+      >
+        <PanelLeft className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">{hidden ? '펼치기' : '숨기기'}</span>
+      </button>
+    </div>
   )
 }
