@@ -19,7 +19,7 @@ const GUIDE: Record<
         '왼쪽 칸에 붙여넣고 연결을 눌러 주세요.',
       ],
       primaryLabel: '쿠팡 파트너스에서 키 발급',
-      primaryUrl: 'https://partners.coupang.com/',
+      primaryUrl: 'https://partners.coupang.com/#affiliate/ws/tools/open-api',
       docsLabel: 'Open API 도움말',
       docsUrl: 'https://partners.coupang.com/',
     },
