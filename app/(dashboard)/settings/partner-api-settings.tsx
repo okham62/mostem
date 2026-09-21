@@ -21,7 +21,7 @@ const GUIDE: Record<
       primaryLabel: '쿠팡 파트너스에서 키 발급',
       primaryUrl: 'https://partners.coupang.com/#affiliate/ws/tools/open-api',
       docsLabel: 'Open API 도움말',
-      docsUrl: 'https://partners.coupang.com/',
+      docsUrl: 'https://partners.coupang.com/#affiliate/ws/tools/open-api',
     },
   toss: {
     title: '키 발급 순서',

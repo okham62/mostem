@@ -1,7 +1,8 @@
 import { createHmac } from 'crypto'
 
 const DOMAIN = 'https://api-gateway.coupang.com'
-const DEEPLINK_PATH = '/v2/providers/affiliate_open_api/apis/openapi/v1/deeplink'
+/** Credential smoke-test via Goldbox (same approach as Coupang Partners Open API clients). */
+const GOLDBOX_PATH = '/v2/providers/affiliate_open_api/apis/openapi/v1/products/goldbox'
 
 function signedDateUtc(): string {
   const d = new Date()
@@ -17,13 +18,29 @@ function hmacAuthorization(method: string, pathWithQuery: string, accessKey: str
   return `CEA algorithm=HmacSHA256, access-key=${accessKey}, signed-date=${signedDate}, signature=${signature}`
 }
 
-/** Smoke-test Coupang Partners credentials via deeplink API. */
+type CoupangEnvelope = {
+  rCode?: string
+  rMessage?: string
+  message?: string
+  code?: string | number
+}
+
+function pickError(data: CoupangEnvelope | null, status: number): string {
+  return (
+    data?.rMessage ||
+    data?.message ||
+    (data?.code != null ? String(data.code) : '') ||
+    `쿠팡 API 오류 (${status})`
+  )
+}
+
+/** Smoke-test Coupang Partners credentials via Goldbox (auth only — no deeplink URL needed). */
 export async function testCoupangPartners(accessKey: string, secretKey: string): Promise<{
   ok: boolean
   error?: string
 }> {
-  const method = 'POST'
-  const path = DEEPLINK_PATH
+  const method = 'GET'
+  const path = GOLDBOX_PATH
   const authorization = hmacAuthorization(method, path, accessKey, secretKey)
   try {
     const res = await fetch(`${DOMAIN}${path}`, {
@@ -32,25 +49,17 @@ export async function testCoupangPartners(accessKey: string, secretKey: string):
         Authorization: authorization,
         'Content-Type': 'application/json;charset=UTF-8',
       },
-      body: JSON.stringify({
-        coupangUrls: ['https://www.coupang.com/np/campaigns/82/components/194176'],
-        subId: 'mostem-test',
-      }),
       signal: AbortSignal.timeout(12_000),
     })
     const text = await res.text()
-    type CoupangDeeplinkResponse = { rCode?: string; rMessage?: string; message?: string }
-    let data: CoupangDeeplinkResponse | null = null
+    let data: CoupangEnvelope | null = null
     try {
-      data = JSON.parse(text) as CoupangDeeplinkResponse
+      data = JSON.parse(text) as CoupangEnvelope
     } catch {
       data = null
     }
     if (!res.ok) {
-      return {
-        ok: false,
-        error: data?.rMessage || data?.message || `쿠팡 API 오류 (${res.status})`,
-      }
+      return { ok: false, error: pickError(data, res.status) }
     }
     if (data?.rCode && data.rCode !== '0') {
       return { ok: false, error: data.rMessage || `쿠팡 API: ${data.rCode}` }
