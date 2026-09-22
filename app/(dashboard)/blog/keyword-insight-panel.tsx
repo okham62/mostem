@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   BarChart3,
   CircleHelp,
@@ -224,7 +224,7 @@ export function KeywordInsightPanel({
 }: {
   naverBlogConnected: boolean
 }) {
-  const [q, setQ] = useState('아반떼')
+  const [q, setQ] = useState('')
   const [device, setDevice] = useState<'pc' | 'mobile'>('pc')
   const [trendTab, setTrendTab] = useState<'youtube' | 'naverHome' | 'googleDiscover'>('youtube')
   const [busy, setBusy] = useState(false)
@@ -253,11 +253,6 @@ export function KeywordInsightPanel({
       setBusy(false)
     }
   }
-
-  useEffect(() => {
-    void analyze('아반떼', 'pc')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const updatedLabel = useMemo(() => {
     if (!insight?.analyzedAt) return ''
