@@ -20,22 +20,36 @@ function formatVolume(n: number) {
 }
 
 function Sparkline({ values }: { values: number[] }) {
+  if (!values.length) return null
   const max = Math.max(...values, 1)
   const min = Math.min(...values, 0)
   const span = Math.max(1, max - min)
+  // Keep stroke inside viewBox — pad top/bottom so line isn't clipped.
+  const padX = 1
+  const padY = 4
+  const innerW = 100 - padX * 2
+  const innerH = 36 - padY * 2
   const points = values
     .map((v, i) => {
-      const x = (i / Math.max(1, values.length - 1)) * 100
-      const y = 100 - ((v - min) / span) * 100
-      return `${x},${y}`
+      const x = padX + (i / Math.max(1, values.length - 1)) * innerW
+      const y = padY + (1 - (v - min) / span) * innerH
+      return `${x.toFixed(2)},${y.toFixed(2)}`
     })
     .join(' ')
   return (
-    <svg viewBox="0 0 100 36" className="h-9 w-full" preserveAspectRatio="none">
+    <svg
+      viewBox="0 0 100 36"
+      className="h-10 w-full overflow-visible"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
       <polyline
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
         points={points}
         className="text-emerald-400"
       />
