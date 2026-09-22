@@ -1999,6 +1999,7 @@ function ChannelPanel({
           coupangClicks: null as number | null,
           orders: null as number | null,
           revenue: null as number | null,
+          unmatched: false as boolean | undefined,
         }))
 
   const totals = stats?.totals ?? {

@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   BarChart3,
   LayoutGrid,
   Loader2,
   Newspaper,
+  Play,
   RefreshCw,
   Search,
   Sparkles,
   TrendingUp,
-  Youtube,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BlogKeywordInsight } from '@/lib/blog-keyword-insight-types'
@@ -50,9 +50,9 @@ function Card({
   action,
 }: {
   title: string
-  children: React.ReactNode
+  children: ReactNode
   className?: string
-  action?: React.ReactNode
+  action?: ReactNode
 }) {
   return (
     <section
@@ -358,7 +358,7 @@ export function KeywordInsightPanel({
             className="xl:col-span-5"
             action={
               trendTab === 'youtube' ? (
-                <Youtube className="h-3.5 w-3.5 text-white/35" />
+                <Play className="h-3.5 w-3.5 text-white/35" />
               ) : (
                 <TrendingUp className="h-3.5 w-3.5 text-white/35" />
               )
