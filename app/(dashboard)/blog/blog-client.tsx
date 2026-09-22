@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   FileText,
   FolderOpen,
+  LayoutDashboard,
   Loader2,
   RefreshCw,
   Send,
@@ -17,6 +18,7 @@ import {
   CalendarClock,
   ShoppingBag,
   Home,
+  PenLine,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
@@ -29,6 +31,7 @@ import type {
 } from '@/lib/blog-types'
 import { BLOG_PROVIDER_STATUS } from '@/lib/blog-providers'
 import { WEEKDAY_LABELS } from '@/lib/blog-schedule'
+import { KeywordInsightPanel } from './keyword-insight-panel'
 
 type AccountRow = {
   id: string
@@ -50,6 +53,15 @@ type Preview = {
 
 type WriteMode = 'seo' | 'home' | 'product'
 type SubTab = 'write' | 'drafts' | 'folders' | 'ops'
+type HubView = 'dashboard' | 'write' | 'drafts' | 'folders' | 'ops'
+
+const HUB_NAV: Array<{ id: HubView; label: string; icon: typeof LayoutDashboard }> = [
+  { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
+  { id: 'write', label: '글 발행', icon: PenLine },
+  { id: 'drafts', label: '초안', icon: FileText },
+  { id: 'folders', label: '폴더', icon: FolderOpen },
+  { id: 'ops', label: '설정', icon: Settings2 },
+]
 
 const MODES: Array<{
   id: WriteMode
@@ -98,6 +110,14 @@ export function BlogClient() {
   const modeParam = searchParams.get('mode')
   const mode: WriteMode | null =
     modeParam === 'seo' || modeParam === 'home' || modeParam === 'product' ? modeParam : null
+  const viewParam = searchParams.get('view')
+  const hubView: HubView =
+    viewParam === 'write' ||
+    viewParam === 'drafts' ||
+    viewParam === 'folders' ||
+    viewParam === 'ops'
+      ? viewParam
+      : 'dashboard'
 
   const [cards, setCards] = useState<BlogTrendCard[]>([])
   const [posts, setPosts] = useState<BlogPostRow[]>([])
@@ -139,7 +159,12 @@ export function BlogClient() {
   const selectMode = (next: WriteMode | null) => {
     setPreview(null)
     setSubTab('write')
-    router.push(next ? `/blog?mode=${next}` : '/blog', { scroll: false })
+    router.push(next ? `/blog?mode=${next}` : '/blog?view=write', { scroll: false })
+  }
+
+  const selectHubView = (next: HubView) => {
+    setPreview(null)
+    router.push(next === 'dashboard' ? '/blog' : `/blog?view=${next}`, { scroll: false })
   }
 
   const loadTrends = useCallback(async (force = false) => {
@@ -498,121 +523,328 @@ export function BlogClient() {
 
   if (!mode) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-white">Blog Hub</h1>
-          <p className="mt-1 text-sm text-white/45">
-            네이버 블로그 계정을 연결한 뒤, 글쓰기 방식을 선택하세요.
-          </p>
-        </div>
-        {error ? (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            {error}
-          </div>
-        ) : null}
-        {toast ? (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-            {toast}
-          </div>
-        ) : null}
+      <div className="flex min-h-[70vh] gap-4">
+        <aside className="hidden w-[72px] shrink-0 flex-col items-center gap-1 rounded-2xl border border-white/10 bg-white/[0.03] py-3 md:flex">
+          {HUB_NAV.map((item) => {
+            const Icon = item.icon
+            const active = hubView === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                title={item.label}
+                onClick={() => selectHubView(item.id)}
+                className={cn(
+                  'flex w-14 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition',
+                  active
+                    ? 'bg-emerald-500/15 text-emerald-300'
+                    : 'text-white/40 hover:bg-white/5 hover:text-white/70'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            )
+          })}
+        </aside>
 
-        <section className="rounded-3xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-white">네이버 블로그 계정</h2>
-              <p className="mt-1 text-xs text-white/45">개수 제한 없음 · blogId마다 추가</p>
-            </div>
-            <div
-              className={cn(
-                'rounded-full px-3 py-1 text-[11px] font-semibold',
-                naverAccounts.length > 0 ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/8 text-white/45'
-              )}
-            >
-              {naverAccounts.length > 0 ? `연결됨 ${naverAccounts.length}개` : '연결 안 됨'}
-            </div>
-          </div>
-          <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <input
-              value={naverBlogId}
-              onChange={(e) => setNaverBlogId(e.target.value)}
-              placeholder="blogId (필수)"
-              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-            />
-            <input
-              value={naverUser}
-              onChange={(e) => setNaverUser(e.target.value)}
-              placeholder="표시 이름 (선택)"
-              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-            />
-            <button
-              type="button"
-              disabled={savingAccount}
-              onClick={() => void saveNaverAccount()}
-              className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/30 disabled:opacity-50"
-            >
-              {savingAccount ? '추가 중…' : '계정 추가'}
-            </button>
-          </div>
-          {naverAccounts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-white/40">
-              아직 연결된 네이버 블로그가 없습니다.
-            </div>
-          ) : (
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {naverAccounts.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-                      <p className="truncate text-sm font-semibold text-white">{a.username}</p>
-                    </div>
-                    <p className="mt-0.5 truncate text-[11px] text-white/40">{a.site_url}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void removeAccount(a.id)}
-                    className="shrink-0 rounded-lg px-2 py-1 text-[11px] text-red-300/80 hover:bg-red-500/15"
-                  >
-                    연결 해제
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <div>
-          <h2 className="mb-3 text-sm font-semibold text-white/70">글쓰기 방식 선택</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            {MODES.map((item) => {
-              const Icon = item.icon
-              const count = posts.filter((p) =>
-                item.id === 'seo' ? p.mode === 'seo' || p.mode === 'folder' : p.mode === item.id
-              ).length
+        <div className="min-w-0 flex-1 space-y-4">
+          <div className="flex gap-1 overflow-x-auto md:hidden">
+            {HUB_NAV.map((item) => {
+              const active = hubView === item.id
               return (
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => selectMode(item.id)}
+                  onClick={() => selectHubView(item.id)}
                   className={cn(
-                    'flex min-h-[200px] flex-col rounded-3xl border bg-gradient-to-br p-5 text-left transition hover:scale-[1.01]',
-                    item.accent
+                    'shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold',
+                    active ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-white/45'
                   )}
                 >
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="text-lg font-bold text-white">{item.title}</h3>
-                  <p className="mt-1 text-xs font-semibold text-white/55">{item.subtitle}</p>
-                  <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">{item.hint}</p>
-                  <p className="mt-4 text-[11px] text-white/40">초안 {count}개 · 시작하기 →</p>
+                  {item.label}
                 </button>
               )
             })}
           </div>
+
+          {error ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              {error}
+            </div>
+          ) : null}
+          {toast ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+              {toast}
+            </div>
+          ) : null}
+
+          {hubView === 'dashboard' ? (
+            <KeywordInsightPanel naverBlogConnected={naverAccounts.length > 0} />
+          ) : null}
+
+          {hubView === 'write' ? (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-xl font-bold text-white">프로젝트 — 글 발행하기</h1>
+                <p className="mt-1 text-sm text-white/45">
+                  각 항목별로 글쓰기 방식을 선택한 뒤 플랫폼·스타일·발행까지 진행합니다.
+                </p>
+              </div>
+
+              <section className="rounded-3xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">네이버 블로그 계정</h2>
+                    <p className="mt-1 text-xs text-white/45">개수 제한 없음 · blogId마다 추가</p>
+                  </div>
+                  <div
+                    className={cn(
+                      'rounded-full px-3 py-1 text-[11px] font-semibold',
+                      naverAccounts.length > 0
+                        ? 'bg-emerald-500/15 text-emerald-300'
+                        : 'bg-white/8 text-white/45'
+                    )}
+                  >
+                    {naverAccounts.length > 0 ? `연결됨 ${naverAccounts.length}개` : '연결 안 됨'}
+                  </div>
+                </div>
+                <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                  <input
+                    value={naverBlogId}
+                    onChange={(e) => setNaverBlogId(e.target.value)}
+                    placeholder="blogId (필수)"
+                    className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={naverUser}
+                    onChange={(e) => setNaverUser(e.target.value)}
+                    placeholder="표시 이름 (선택)"
+                    className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingAccount}
+                    onClick={() => void saveNaverAccount()}
+                    className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/30 disabled:opacity-50"
+                  >
+                    {savingAccount ? '추가 중…' : '계정 추가'}
+                  </button>
+                </div>
+                {naverAccounts.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-white/40">
+                    아직 연결된 네이버 블로그가 없습니다.
+                  </div>
+                ) : (
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {naverAccounts.map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                            <p className="truncate text-sm font-semibold text-white">{a.username}</p>
+                          </div>
+                          <p className="mt-0.5 truncate text-[11px] text-white/40">{a.site_url}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void removeAccount(a.id)}
+                          className="shrink-0 rounded-lg px-2 py-1 text-[11px] text-red-300/80 hover:bg-red-500/15"
+                        >
+                          연결 해제
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <div>
+                <h2 className="mb-3 text-sm font-semibold text-white/70">글감 · 글쓰기 방식</h2>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {MODES.map((item) => {
+                    const Icon = item.icon
+                    const count = posts.filter((p) =>
+                      item.id === 'seo' ? p.mode === 'seo' || p.mode === 'folder' : p.mode === item.id
+                    ).length
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => selectMode(item.id)}
+                        className={cn(
+                          'flex min-h-[180px] flex-col rounded-3xl border bg-gradient-to-br p-5 text-left transition hover:scale-[1.01]',
+                          item.accent
+                        )}
+                      >
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                          <Icon className="h-6 w-6 text-white" />
+                        </div>
+                        <h3 className="text-lg font-bold text-white">{item.title}</h3>
+                        <p className="mt-1 text-xs font-semibold text-white/55">{item.subtitle}</p>
+                        <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">{item.hint}</p>
+                        <p className="mt-4 text-[11px] text-white/40">초안 {count}개 · 시작하기 →</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {hubView === 'drafts' ? (
+            <div className="space-y-4">
+              <h1 className="text-xl font-bold text-white">초안</h1>
+              {posts.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 py-16 text-center text-sm text-white/40">
+                  아직 초안이 없습니다. 글 발행에서 만들어 보세요.
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {posts.slice(0, 40).map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{p.title || p.keyword}</p>
+                        <p className="mt-0.5 text-[11px] text-white/40">
+                          {modeLabel(p.mode)} · {p.status} · {new Date(p.created_at).toLocaleString('ko-KR')}
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        {p.provider === 'wordpress' || p.status === 'draft' ? (
+                          <button
+                            type="button"
+                            onClick={() => void publish(p.id, 'publish')}
+                            className="rounded-lg bg-emerald-500/20 px-2.5 py-1 text-[11px] font-semibold text-emerald-300"
+                          >
+                            발행
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => selectMode(p.mode === 'home' || p.mode === 'product' ? p.mode : 'seo')}
+                          className="rounded-lg bg-white/10 px-2.5 py-1 text-[11px] text-white/70"
+                        >
+                          열기
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+
+          {hubView === 'folders' ? (
+            <div className="space-y-4">
+              <h1 className="text-xl font-bold text-white">폴더 감시</h1>
+              <p className="text-sm text-white/45">
+                폴더 이미지 글쓰기는 글 발행 → 방식 선택 후 「폴더 이미지」 탭에서 등록합니다.
+              </p>
+              {folders.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-white/40">
+                  등록된 폴더가 없습니다.
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {folders.map((f) => (
+                    <li
+                      key={f.id}
+                      className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm"
+                    >
+                      <p className="font-semibold text-white">{f.label || f.local_path}</p>
+                      <p className="mt-1 text-[11px] text-white/40">
+                        {f.local_path} · {f.enabled ? 'ON' : 'OFF'}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => selectHubView('write')}
+                className="rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white/80"
+              >
+                글 발행에서 폴더 등록 →
+              </button>
+            </div>
+          ) : null}
+
+          {hubView === 'ops' ? (
+            <div className="space-y-5">
+              <h1 className="text-xl font-bold text-white">블로그 설정</h1>
+              <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <h2 className="mb-3 text-sm font-semibold">WordPress</h2>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <input
+                    value={wpUrl}
+                    onChange={(e) => setWpUrl(e.target.value)}
+                    placeholder="https://example.com"
+                    className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={wpUser}
+                    onChange={(e) => setWpUser(e.target.value)}
+                    placeholder="username"
+                    className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={wpPass}
+                    onChange={(e) => setWpPass(e.target.value)}
+                    placeholder="Application Password"
+                    type="password"
+                    className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={savingAccount}
+                  onClick={() => void saveWpAccount()}
+                  className="mt-3 rounded-xl bg-emerald-500/20 px-4 py-2 text-xs font-semibold text-emerald-300"
+                >
+                  WordPress 연결
+                </button>
+                <ul className="mt-3 space-y-1">
+                  {accounts
+                    .filter((a) => a.provider === 'wordpress')
+                    .map((a) => (
+                      <li key={a.id} className="flex justify-between text-xs text-white/55">
+                        <span>
+                          {a.username} · {a.site_url}
+                        </span>
+                        <button type="button" onClick={() => void removeAccount(a.id)} className="text-rose-300">
+                          삭제
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </section>
+
+              <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <h2 className="mb-2 text-sm font-semibold">네이버 블로그</h2>
+                <p className="mb-3 text-xs text-white/40">
+                  연결 {naverAccounts.length}개 · 글 발행 탭에서도 추가할 수 있습니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => selectHubView('write')}
+                  className="rounded-lg bg-white/10 px-3 py-1.5 text-xs"
+                >
+                  계정 관리로 이동
+                </button>
+              </section>
+
+              <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white/45">
+                <p>티스토리: {BLOG_PROVIDER_STATUS.tistory.notes}</p>
+                <p className="mt-1">네이버 자동발행: {BLOG_PROVIDER_STATUS.naver.notes}</p>
+              </section>
+            </div>
+          ) : null}
         </div>
       </div>
     )
@@ -627,7 +859,7 @@ export function BlogClient() {
             onClick={() => selectMode(null)}
             className="mb-2 inline-flex items-center gap-1 text-xs text-white/45 hover:text-white"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> 글쓰기 종류 선택
+            <ArrowLeft className="h-3.5 w-3.5" /> 글 발행 홈
           </button>
           <h1 className="text-xl font-bold text-white">{activeMeta?.title}</h1>
           <p className="mt-1 text-sm text-white/45">{activeMeta?.hint}</p>
