@@ -548,7 +548,7 @@ export function BlogClient() {
           })}
         </aside>
 
-        <div className="min-w-0 flex-1 space-y-4">
+        <div className="min-w-0 flex-1 space-y-4 overflow-x-hidden">
           <div className="flex gap-1 overflow-x-auto md:hidden">
             {HUB_NAV.map((item) => {
               const active = hubView === item.id

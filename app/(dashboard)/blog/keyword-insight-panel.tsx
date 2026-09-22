@@ -63,37 +63,44 @@ function SectionOrderPanel({
   sections,
   advice,
   onDeviceChange,
+  className,
 }: {
   keyword: string
   device: 'pc' | 'mobile'
   sections: BlogInsightSection[]
   advice: string
   onDeviceChange: (d: 'pc' | 'mobile') => void
+  className?: string
 }) {
   const top = sections.slice(0, 3).map((s) => sectionMeta(s).label)
   return (
-    <section className="xl:col-span-12 rounded-2xl border border-white/10 bg-[#14181d] p-4 md:p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5">
-          <h3 className="text-sm font-semibold text-white">
+    <section
+      className={cn(
+        'min-w-0 rounded-2xl border border-white/10 bg-[#14181d] p-4 md:p-5',
+        className
+      )}
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h3 className="truncate text-sm font-semibold text-white">
             섹션 배치 순서{' '}
             <span className="font-normal text-white/45">(네이버 검색 결과 상단 기준)</span>
           </h3>
           <span
             title="네이버 통합검색 상단에 노출되는 영역 순서를 분석합니다."
-            className="inline-flex text-white/35"
+            className="inline-flex shrink-0 text-white/35"
           >
             <HelpCircle className="h-3.5 w-3.5" />
           </span>
         </div>
-        <div className="inline-flex rounded-lg bg-white/5 p-0.5">
+        <div className="inline-flex shrink-0 rounded-lg bg-white/5 p-0.5">
           {(['pc', 'mobile'] as const).map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => onDeviceChange(d)}
               className={cn(
-                'rounded-md px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition',
+                'rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition',
                 device === d
                   ? 'bg-[#9ADE44] text-[#1a1f16]'
                   : 'text-white/45 hover:text-white/70'
@@ -105,39 +112,41 @@ function SectionOrderPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap justify-between gap-3 px-1 sm:flex-nowrap sm:gap-2">
+      <div className="flex w-full flex-nowrap items-start justify-between gap-1 overflow-x-auto pb-0.5">
         {sections.slice(0, 8).map((s) => {
           const meta = sectionMeta(s)
           const Icon = meta.Icon
           return (
             <div
               key={`${s.id}-${s.order}`}
-              className="flex min-w-[56px] flex-1 flex-col items-center gap-1.5"
+              className="flex w-0 min-w-[48px] flex-1 flex-col items-center gap-1"
             >
-              <span className="text-[11px] font-medium text-white/40">{s.order}</span>
+              <span className="text-[10px] font-medium text-white/40">{s.order}</span>
               <div
                 className={cn(
-                  'flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-sm',
+                  'flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm sm:h-10 sm:w-10 sm:rounded-2xl',
                   meta.bg
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={2.2} />
+                <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" strokeWidth={2.2} />
               </div>
-              <span className="text-[11px] font-medium text-white/75">{meta.label}</span>
+              <span className="max-w-full truncate text-center text-[10px] font-medium text-white/75 sm:text-[11px]">
+                {meta.label}
+              </span>
             </div>
           )
         })}
       </div>
 
-      <div className="mt-4 flex items-start gap-2 border-t border-white/8 pt-3 text-xs leading-relaxed text-white/55">
+      <div className="mt-3 flex items-start gap-2 border-t border-white/10 pt-3 text-xs leading-relaxed text-white/55">
         <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
-        <p>
+        <p className="min-w-0">
           한눈에 보는 인사이트 ·{' '}
           <span className="font-semibold text-white">&apos;{keyword}&apos;</span> 는{' '}
           {top.length ? (
             <>
               {top.map((label, i) => (
-                <span key={label}>
+                <span key={`${label}-${i}`}>
                   {i > 0 ? ' + ' : ''}
                   <span className="font-semibold text-[#9ADE44]">{label}</span>
                 </span>
@@ -323,8 +332,10 @@ export function KeywordInsightPanel({
       ) : null}
 
       {insight ? (
-        <div className="grid gap-3 xl:grid-cols-12">
+        <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-12">
+          {/* Row 1: 섹션 | 등급 | 검색량 */}
           <SectionOrderPanel
+            className="lg:col-span-6"
             keyword={insight.keyword}
             device={device}
             sections={insight.sections}
@@ -335,12 +346,12 @@ export function KeywordInsightPanel({
             }}
           />
 
-          <Card title="키워드 등급" className="xl:col-span-3">
-            <div className="flex items-center gap-4">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-500/20 text-3xl font-black text-sky-300">
+          <Card title="키워드 등급" className="min-w-0 lg:col-span-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-3xl font-black text-sky-300">
                 {insight.grade}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-white">
                   진입 가능성 {insight.entryScore}/100
                 </p>
@@ -350,11 +361,11 @@ export function KeywordInsightPanel({
             <p className="mt-3 text-xs leading-relaxed text-white/50">{insight.gradeAdvice}</p>
           </Card>
 
-          <Card title="검색량 & 경쟁 강도" className="xl:col-span-5">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
+          <Card title="검색량 & 경쟁 강도" className="min-w-0 lg:col-span-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0">
                 <p className="text-xs text-white/40">월간 검색량(추정)</p>
-                <p className="mt-1 text-2xl font-bold text-white">
+                <p className="mt-1 truncate text-xl font-bold text-white sm:text-2xl">
                   {formatVolume(insight.searchVolume)}
                 </p>
                 <p
@@ -367,9 +378,11 @@ export function KeywordInsightPanel({
                   {insight.volumeChangePct}%
                 </p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-white/40">경쟁 강도</p>
-                <p className="mt-1 text-2xl font-bold text-white">{insight.competitionScore}/100</p>
+                <p className="mt-1 text-xl font-bold text-white sm:text-2xl">
+                  {insight.competitionScore}/100
+                </p>
                 <div className="mt-2 text-emerald-300/90">
                   <Sparkline values={insight.spark} />
                 </div>
@@ -377,7 +390,8 @@ export function KeywordInsightPanel({
             </div>
           </Card>
 
-          <Card title="연관 키워드 분석" className="xl:col-span-4">
+          {/* Row 2: 연관 | 롱테일 | 블로그 */}
+          <Card title="연관 키워드 분석" className="min-w-0 lg:col-span-4">
             <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
               {insight.related.map((r) => (
                 <li
@@ -414,7 +428,7 @@ export function KeywordInsightPanel({
             </ul>
           </Card>
 
-          <Card title="추천 롱테일" className="xl:col-span-4">
+          <Card title="추천 롱테일 키워드" className="min-w-0 lg:col-span-4">
             <ul className="max-h-64 space-y-2 overflow-y-auto">
               {insight.longTail.map((r) => (
                 <li key={r.keyword} className="flex items-center justify-between gap-2 text-sm">
@@ -428,7 +442,7 @@ export function KeywordInsightPanel({
             </ul>
           </Card>
 
-          <Card title="추천 블로그 키워드" className="xl:col-span-4">
+          <Card title="추천 블로그 키워드" className="min-w-0 lg:col-span-4">
             <ul className="max-h-64 space-y-2 overflow-y-auto">
               {insight.blogKeywords.map((r) => (
                 <li
@@ -444,9 +458,10 @@ export function KeywordInsightPanel({
             </ul>
           </Card>
 
+          {/* Row 3: 후킹 | 트렌드 */}
           <Card
-            title="후킹 키워드 / 실시간 이슈"
-            className="xl:col-span-7"
+            title="후킹 키워드"
+            className="min-w-0 lg:col-span-7"
             action={<Newspaper className="h-3.5 w-3.5 text-white/35" />}
           >
             <ul className="max-h-72 space-y-2 overflow-y-auto">
@@ -471,7 +486,7 @@ export function KeywordInsightPanel({
 
           <Card
             title="실시간 트렌드 분석"
-            className="xl:col-span-5"
+            className="min-w-0 lg:col-span-5"
             action={
               trendTab === 'youtube' ? (
                 <Play className="h-3.5 w-3.5 text-white/35" />
@@ -521,7 +536,8 @@ export function KeywordInsightPanel({
             </ul>
           </Card>
 
-          <Card title="주요 출처 분포" className="xl:col-span-4">
+          {/* Row 4: 출처 | 수집 | 내 블로그 | 상태 */}
+          <Card title="주요 출처 분포" className="min-w-0 lg:col-span-3">
             <ul className="space-y-2">
               {insight.sources.map((s) => (
                 <li key={s.label}>
@@ -540,7 +556,7 @@ export function KeywordInsightPanel({
             </ul>
           </Card>
 
-          <Card title="데이터 수집 현황" className="xl:col-span-4">
+          <Card title="데이터 수집 현황" className="min-w-0 lg:col-span-3">
             <div className="space-y-3">
               {(
                 [
@@ -569,7 +585,7 @@ export function KeywordInsightPanel({
 
           <Card
             title="내 블로그 인사이트"
-            className="xl:col-span-4"
+            className="min-w-0 lg:col-span-3"
             action={<BarChart3 className="h-3.5 w-3.5 text-white/35" />}
           >
             {naverBlogConnected ? (
@@ -589,6 +605,14 @@ export function KeywordInsightPanel({
             >
               <RefreshCw className="h-3 w-3" /> 다시 분석
             </button>
+          </Card>
+
+          <Card title="내 블로그 현황 (BETA)" className="min-w-0 lg:col-span-3">
+            <p className="text-xs text-white/40">
+              {naverBlogConnected
+                ? '방문자·글자수 분석을 준비 중입니다.'
+                : 'Blog ID 연동 후 방문자·글자수 현황을 표시합니다.'}
+            </p>
           </Card>
         </div>
       ) : null}
