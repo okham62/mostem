@@ -129,6 +129,7 @@ export function BlogClient() {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
+  const [setupHint, setSetupHint] = useState('')
   const [subTab, setSubTab] = useState<SubTab>('write')
 
   const [wpUrl, setWpUrl] = useState('')
@@ -188,12 +189,10 @@ export function BlogClient() {
     setPosts(data.posts ?? [])
     if (data.error) {
       const msg = String(data.error)
-      if (/blog_posts|schema cache/i.test(msg)) {
-        setError(
-          'Blog Hub DB 테이블이 아직 없습니다. Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 순서로 실행해 주세요.'
+      if (/blog_posts|schema cache|Could not find the table/i.test(msg)) {
+        setSetupHint(
+          '글 발행·초안 저장을 쓰려면 Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 을 실행해 주세요.'
         )
-      } else {
-        setError(msg)
       }
     }
   }, [])
@@ -202,9 +201,9 @@ export function BlogClient() {
     const res = await fetch('/api/blog/accounts', { cache: 'no-store' })
     const data = await res.json()
     setAccounts(data.accounts ?? [])
-    if (data.error && /blog_accounts|schema cache/i.test(String(data.error))) {
-      setError(
-        'Blog Hub DB 테이블이 아직 없습니다. Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 순서로 실행해 주세요.'
+    if (data.error && /blog_accounts|schema cache|Could not find the table/i.test(String(data.error))) {
+      setSetupHint(
+        '글 발행·초안 저장을 쓰려면 Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 을 실행해 주세요.'
       )
     }
   }, [])
@@ -213,6 +212,12 @@ export function BlogClient() {
     const res = await fetch('/api/blog/schedules', { cache: 'no-store' })
     const data = await res.json()
     setSchedules(data.schedules ?? [])
+    if (data.error && /schema cache|Could not find the table|blog_category_schedules/i.test(String(data.error))) {
+      setSetupHint(
+        '글 발행·초안 저장을 쓰려면 Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 을 실행해 주세요.'
+      )
+      return
+    }
     if (data.error) setError(String(data.error))
   }, [])
 
@@ -220,6 +225,12 @@ export function BlogClient() {
     const res = await fetch('/api/blog/folders', { cache: 'no-store' })
     const data = await res.json()
     setFolders(data.folders ?? [])
+    if (data.error && /schema cache|Could not find the table|blog_folder/i.test(String(data.error))) {
+      setSetupHint(
+        '글 발행·초안 저장을 쓰려면 Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 을 실행해 주세요.'
+      )
+      return
+    }
     if (data.error) setError(String(data.error))
   }, [])
 
@@ -571,6 +582,11 @@ export function BlogClient() {
           {error ? (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
               {error}
+            </div>
+          ) : null}
+          {setupHint && hubView !== 'dashboard' ? (
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs text-white/50">
+              {setupHint}
             </div>
           ) : null}
           {toast ? (

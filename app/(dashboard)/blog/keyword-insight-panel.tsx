@@ -325,6 +325,15 @@ export function KeywordInsightPanel({
         </div>
       ) : null}
 
+      {!insight && !busy ? (
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-16 text-center">
+          <p className="text-sm text-white/55">키워드를 입력한 뒤 분석 시작을 눌러 주세요.</p>
+          <p className="mt-2 text-xs text-white/35">
+            섹션 배치 · 등급 · 검색량 · 연관어 · 트렌드가 이 아래에 표시됩니다.
+          </p>
+        </div>
+      ) : null}
+
       {!insight && busy ? (
         <div className="flex items-center justify-center gap-2 py-20 text-sm text-white/45">
           <Loader2 className="h-4 w-4 animate-spin" /> 키워드 분석 중…
