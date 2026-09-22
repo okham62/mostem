@@ -24,7 +24,7 @@ const cache = new Map<string, CacheEntry>()
 const CACHE_MS = 10 * 60_000
 
 const SECTION_LABELS: Record<string, string> = {
-  web: '통합',
+  web: '기타',
   image: '이미지',
   blog: '블로그',
   clip: '클립',
@@ -135,7 +135,7 @@ function detectSections(html: string): BlogInsightSection[] {
 
   found.sort((a, b) => a.idx - b.idx)
   if (!found.length) {
-    return ['web', 'blog', 'image', 'cafe', 'kin', 'shopping'].map((id, order) => ({
+    return ['web', 'image', 'blog', 'clip', 'cafe', 'kin', 'video', 'shopping'].map((id, order) => ({
       id,
       label: SECTION_LABELS[id] || id,
       order: order + 1,

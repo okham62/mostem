@@ -3,20 +3,155 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   BarChart3,
+  CircleHelp,
+  Clapperboard,
+  FileText,
+  HelpCircle,
+  Image as ImageIcon,
   LayoutGrid,
+  Lightbulb,
   Loader2,
+  MessageSquare,
   Newspaper,
   Play,
   RefreshCw,
   Search,
+  ShoppingBag,
   Sparkles,
   TrendingUp,
+  Video,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { BlogKeywordInsight } from '@/lib/blog-keyword-insight-types'
+import type { BlogInsightSection, BlogKeywordInsight } from '@/lib/blog-keyword-insight-types'
 
 function formatVolume(n: number) {
   return n.toLocaleString('ko-KR')
+}
+
+const SECTION_UI: Record<
+  string,
+  { label: string; bg: string; Icon: typeof LayoutGrid }
+> = {
+  web: { label: '기타', bg: 'bg-[#5c6570]', Icon: LayoutGrid },
+  misc: { label: '기타', bg: 'bg-[#5c6570]', Icon: LayoutGrid },
+  image: { label: '이미지', bg: 'bg-[#7c5cff]', Icon: ImageIcon },
+  blog: { label: '블로그', bg: 'bg-[#2f9e44]', Icon: FileText },
+  clip: { label: '클립', bg: 'bg-[#e64980]', Icon: Clapperboard },
+  cafe: { label: '카페', bg: 'bg-[#c27803]', Icon: MessageSquare },
+  kin: { label: '지식iN', bg: 'bg-[#0ca678]', Icon: CircleHelp },
+  video: { label: '동영상', bg: 'bg-[#e03131]', Icon: Video },
+  shopping: { label: '쇼핑', bg: 'bg-[#7950f2]', Icon: ShoppingBag },
+  news: { label: '뉴스', bg: 'bg-[#1971c2]', Icon: Newspaper },
+  influence: { label: '인플', bg: 'bg-[#ae3ec9]', Icon: Sparkles },
+  book: { label: '책', bg: 'bg-[#868e96]', Icon: FileText },
+  local: { label: '지역', bg: 'bg-[#7048e8]', Icon: LayoutGrid },
+}
+
+function sectionMeta(section: BlogInsightSection) {
+  return (
+    SECTION_UI[section.id] || {
+      label: section.label === '통합' ? '기타' : section.label,
+      bg: 'bg-[#5c6570]',
+      Icon: LayoutGrid,
+    }
+  )
+}
+
+function SectionOrderPanel({
+  keyword,
+  device,
+  sections,
+  advice,
+  onDeviceChange,
+}: {
+  keyword: string
+  device: 'pc' | 'mobile'
+  sections: BlogInsightSection[]
+  advice: string
+  onDeviceChange: (d: 'pc' | 'mobile') => void
+}) {
+  const top = sections.slice(0, 3).map((s) => sectionMeta(s).label)
+  return (
+    <section className="xl:col-span-12 rounded-2xl border border-white/10 bg-[#14181d] p-4 md:p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-sm font-semibold text-white">
+            섹션 배치 순서{' '}
+            <span className="font-normal text-white/45">(네이버 검색 결과 상단 기준)</span>
+          </h3>
+          <span
+            title="네이버 통합검색 상단에 노출되는 영역 순서를 분석합니다."
+            className="inline-flex text-white/35"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+          </span>
+        </div>
+        <div className="inline-flex rounded-lg bg-white/5 p-0.5">
+          {(['pc', 'mobile'] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => onDeviceChange(d)}
+              className={cn(
+                'rounded-md px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition',
+                device === d
+                  ? 'bg-[#9ADE44] text-[#1a1f16]'
+                  : 'text-white/45 hover:text-white/70'
+              )}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap justify-between gap-3 px-1 sm:flex-nowrap sm:gap-2">
+        {sections.slice(0, 8).map((s) => {
+          const meta = sectionMeta(s)
+          const Icon = meta.Icon
+          return (
+            <div
+              key={`${s.id}-${s.order}`}
+              className="flex min-w-[56px] flex-1 flex-col items-center gap-1.5"
+            >
+              <span className="text-[11px] font-medium text-white/40">{s.order}</span>
+              <div
+                className={cn(
+                  'flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-sm',
+                  meta.bg
+                )}
+              >
+                <Icon className="h-5 w-5" strokeWidth={2.2} />
+              </div>
+              <span className="text-[11px] font-medium text-white/75">{meta.label}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 flex items-start gap-2 border-t border-white/8 pt-3 text-xs leading-relaxed text-white/55">
+        <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+        <p>
+          한눈에 보는 인사이트 ·{' '}
+          <span className="font-semibold text-white">&apos;{keyword}&apos;</span> 는{' '}
+          {top.length ? (
+            <>
+              {top.map((label, i) => (
+                <span key={label}>
+                  {i > 0 ? ' + ' : ''}
+                  <span className="font-semibold text-[#9ADE44]">{label}</span>
+                </span>
+              ))}{' '}
+              콘텐츠가 유리합니다.
+            </>
+          ) : (
+            <span>{advice}</span>
+          )}{' '}
+          · <span className="text-white/40">추천</span>
+        </p>
+      </div>
+    </section>
+  )
 }
 
 function Sparkline({ values }: { values: number[] }) {
@@ -194,44 +329,16 @@ export function KeywordInsightPanel({
 
       {insight ? (
         <div className="grid gap-3 xl:grid-cols-12">
-          <Card
-            title="섹션 배치 순서"
-            className="xl:col-span-4"
-            action={
-              <div className="flex gap-1">
-                {(['pc', 'mobile'] as const).map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => {
-                      setDevice(d)
-                      void analyze(insight.keyword, d)
-                    }}
-                    className={cn(
-                      'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase',
-                      device === d ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-white/40'
-                    )}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            }
-          >
-            <div className="flex flex-wrap gap-2">
-              {insight.sections.map((s) => (
-                <div
-                  key={`${s.id}-${s.order}`}
-                  className="flex h-16 w-14 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/25"
-                >
-                  <span className="text-[10px] text-white/35">{s.order}</span>
-                  <LayoutGrid className="my-0.5 h-3.5 w-3.5 text-emerald-300/80" />
-                  <span className="text-[10px] font-medium text-white/75">{s.label}</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-white/50">{insight.sectionAdvice}</p>
-          </Card>
+          <SectionOrderPanel
+            keyword={insight.keyword}
+            device={device}
+            sections={insight.sections}
+            advice={insight.sectionAdvice}
+            onDeviceChange={(d) => {
+              setDevice(d)
+              void analyze(insight.keyword, d)
+            }}
+          />
 
           <Card title="키워드 등급" className="xl:col-span-3">
             <div className="flex items-center gap-4">
