@@ -176,8 +176,8 @@ export default function HotdealGuidePage() {
             ))}
           </ol>
           <p className="mt-3 rounded-2xl bg-white/[0.04] px-4 py-3 text-sm text-white/50">
-            ⚠️ 토스 연결이 안 되는 경우 대부분은 출발지 IP를 등록하지 않아서예요. 쿠팡은 키만 넣으면
-            바로 확인할 수 있어요.
+            ⚠️ 1~2단계는 토스 어드민에서 하는 일이에요. 연결이 안 되는 경우 대부분은 출발지 IP를
+            등록하지 않아서예요.
           </p>
         </section>
 
