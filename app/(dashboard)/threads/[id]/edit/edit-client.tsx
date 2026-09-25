@@ -986,6 +986,7 @@ export function EditClient({
         instruction,
         guide: selectedGuide?.content || '',
         guideName: selectedGuide?.name || '',
+        guideId: selectedGuide?.id || '',
         persona: selected?.intro || selected?.username,
         model: modelId,
         webSearch,
@@ -1026,6 +1027,9 @@ export function EditClient({
     if (typeof data.mediaCount === 'number' && data.mediaCount > 0) parts.push(`미디어 ${data.mediaCount}`)
     if (typeof data.commentsCount === 'number' && data.commentsCount > 0) {
       parts.push(`댓글 ${data.commentsCount}`)
+    }
+    if (typeof data.guideFileCount === 'number' && data.guideFileCount > 0) {
+      parts.push(`지침서 파일 ${data.guideFileCount}`)
     }
     setMessage(parts.length ? `초안이 생성되었습니다. (${parts.join(' · ')} 반영)` : '초안이 생성되었습니다.')
   }

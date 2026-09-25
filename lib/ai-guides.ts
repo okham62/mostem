@@ -1,9 +1,21 @@
+export const MAX_GUIDE_FILES = 30
+
+export type AiGuideFile = {
+  id: string
+  name: string
+  mime: string
+  size: number
+  updatedAt: string
+  text?: string
+}
+
 export type AiGuide = {
   id: string
   name: string
   content: string
   isDefault: boolean
   builtin?: boolean
+  files?: AiGuideFile[]
 }
 
 export const DEFAULT_AI_GUIDES: AiGuide[] = [

@@ -6,6 +6,8 @@ import { generateDrafts } from '@/lib/ai-generate'
 import { scrubSecrets } from '@/lib/ai-keys'
 import { loadGeminiMediaParts, type RewriteMediaInput } from '@/lib/ai-media'
 import { parseCommentAttachmentBase64 } from '@/lib/comment-file'
+import { getAiGuide } from '@/lib/ai-guides-store'
+import { filesDigest } from '@/lib/guide-files'
 
 export const maxDuration = 60
 
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
     persona,
     guide,
     guideName,
+    guideId,
     model,
     webSearch,
     media: rawMedia,
@@ -76,12 +79,17 @@ export async function POST(req: Request) {
 
   const chosen = findAiModel(typeof model === 'string' ? model : '')
   const mediaParts = await loadGeminiMediaParts(normalizeMedia(rawMedia))
+  const stored = typeof guideId === 'string' && guideId ? await getAiGuide(guideId) : null
+  const guideText = stored?.content || (typeof guide === 'string' ? guide : '')
+  const guideLabel = stored?.name || (typeof guideName === 'string' ? guideName : '')
+  const guideFiles = filesDigest(stored?.files)
   const prompt = rewritePrompt({
     caption,
     instruction: typeof instruction === 'string' ? instruction : '',
     persona: typeof persona === 'string' ? persona : '',
-    guide: typeof guide === 'string' ? guide : '',
-    guideName: typeof guideName === 'string' ? guideName : '',
+    guide: guideText,
+    guideName: guideLabel,
+    guideFiles,
     hasMedia: mediaParts.length > 0,
     commentsDigest,
     commentsCount,
@@ -107,6 +115,7 @@ export async function POST(req: Request) {
         webSearch: Boolean(webSearch),
         mediaCount: mediaParts.length,
         commentsCount,
+        guideFileCount: stored?.files?.length || 0,
         drafts,
       },
       req
@@ -116,6 +125,7 @@ export async function POST(req: Request) {
       model: chosen.id,
       mediaCount: mediaParts.length,
       commentsCount,
+      guideFileCount: stored?.files?.length || 0,
     })
   } catch (error) {
     return NextResponse.json(

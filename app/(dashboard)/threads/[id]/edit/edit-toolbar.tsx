@@ -152,7 +152,10 @@ export function EditToolbar({
               )}
             >
               <span className="truncate">{item.name}</span>
-              {item.isDefault ? <span className="text-[10px] text-white/35">기본</span> : null}
+              <span className="ml-2 flex shrink-0 items-center gap-1 text-[10px] text-white/35">
+                {item.files?.length ? `파일 ${item.files.length}` : null}
+                {item.isDefault ? <span>기본</span> : null}
+              </span>
             </button>
           ))}
           {isAdmin ? (

@@ -1,18 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { BookOpen, Plus, Trash2 } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { BookOpen, Paperclip, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import type { AiGuide } from '@/lib/ai-guides'
+import { MAX_GUIDE_FILES, type AiGuide } from '@/lib/ai-guides'
 
 export function GuidesClient({ initial }: { initial: AiGuide[] }) {
   const [guides, setGuides] = useState(initial)
   const [selectedId, setSelectedId] = useState(initial[0]?.id ?? '')
-  const selected = guides.find((item) => item.id === selectedId) ?? guides[0]
+  const selected = guides.find((item) => item.id === selectedId)
   const [name, setName] = useState(selected?.name ?? '')
   const [content, setContent] = useState(selected?.content ?? '')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const fileInput = useRef<HTMLInputElement>(null)
 
   function openGuide(guide: AiGuide) {
     setSelectedId(guide.id)
@@ -116,6 +117,57 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
     setMessage('')
   }
 
+  async function uploadFiles(list: FileList | null) {
+    if (!selected || selected.builtin) {
+      setMessage('먼저 지침서를 저장한 뒤 파일을 올리세요.')
+      return
+    }
+    const files = [...(list ?? [])]
+    if (!files.length) return
+    setSaving(true)
+    setMessage('')
+    try {
+      let latest = guides
+      for (const file of files) {
+        const body = new FormData()
+        body.append('file', file)
+        const res = await fetch(`/api/ai-guides/${selected.id}/files`, { method: 'POST', body })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setMessage(data.error || `${file.name}을 올리지 못했습니다.`)
+          return
+        }
+        if (Array.isArray(data.guides)) {
+          latest = data.guides
+          setGuides(data.guides)
+        }
+      }
+      setGuides(latest)
+      setMessage(`파일을 올렸습니다. 글 쓸 때 지침서와 함께 참고합니다. (${Math.min((selected.files?.length || 0) + files.length, MAX_GUIDE_FILES)}/${MAX_GUIDE_FILES})`)
+    } finally {
+      setSaving(false)
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
+
+  async function removeFile(fileId: string) {
+    if (!selected || selected.builtin) return
+    setSaving(true)
+    const res = await fetch(`/api/ai-guides/${selected.id}/files`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setSaving(false)
+    if (!res.ok) {
+      setMessage(data.error || '파일을 삭제하지 못했습니다.')
+      return
+    }
+    if (Array.isArray(data.guides)) setGuides(data.guides)
+    setMessage('파일을 뺐습니다.')
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -152,11 +204,18 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
                 }`}
               >
                 <span className="truncate">{guide.name}</span>
-                {guide.isDefault ? (
-                  <span className="ml-2 shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
-                    기본
-                  </span>
-                ) : null}
+                <span className="ml-2 flex shrink-0 items-center gap-1">
+                  {guide.files?.length ? (
+                    <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
+                      파일 {guide.files.length}
+                    </span>
+                  ) : null}
+                  {guide.isDefault ? (
+                    <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
+                      기본
+                    </span>
+                  ) : null}
+                </span>
               </button>
             ))}
           </div>
@@ -176,6 +235,60 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
             placeholder="AI가 글을 쓸 때 따를 규칙을 적어 주세요."
             className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm leading-6 text-white outline-none focus:border-brand"
           />
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Paperclip className="h-4 w-4 text-brand" />
+                참고 파일 {(selected?.files?.length || 0)}/{MAX_GUIDE_FILES}
+              </p>
+              <button
+                type="button"
+                disabled={saving || !selected || selected.builtin}
+                onClick={() => fileInput.current?.click()}
+                className="rounded-lg bg-white/8 px-2.5 py-1 text-[11px] text-white/80 disabled:opacity-40"
+              >
+                파일 올리기
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] leading-5 text-white/40">
+              엑셀, 워드, PPT, PDF를 올리면 한 번만 저장되고, 이후 글 쓸 때 지침서와 파일 내용을 함께 봅니다.
+              같은 이름 파일을 다시 올리면 그 파일만 새 내용으로 바뀝니다.
+            </p>
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              accept=".xlsx,.xls,.docx,.doc,.pptx,.ppt,.pdf,.txt,.md,.csv,.json"
+              className="hidden"
+              onChange={(event) => void uploadFiles(event.target.files)}
+            />
+            {selected?.files?.length ? (
+              <ul className="mt-2 space-y-1">
+                {selected.files.map((file) => (
+                  <li
+                    key={file.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80"
+                  >
+                    <span className="min-w-0 truncate">{file.name}</span>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void removeFile(file.id)}
+                      className="shrink-0 text-white/40 hover:text-red-300"
+                    >
+                      빼기
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-[11px] text-white/35">
+                {selected && !selected.builtin
+                  ? '아직 올린 파일이 없습니다. 파일이 없으면 지침서만으로 글을 씁니다.'
+                  : '지침서를 먼저 저장하면 파일을 올릴 수 있습니다.'}
+              </p>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

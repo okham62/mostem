@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { DEFAULT_AI_GUIDES, type AiGuide } from '@/lib/ai-guides'
+import { DEFAULT_AI_GUIDES, type AiGuide, type AiGuideFile } from '@/lib/ai-guides'
+import { decodeGuideBody, encodeGuideBody, publicGuideFiles } from '@/lib/guide-files'
 
 const GUIDE_TAG = 'ai_guide'
 const DEFAULT_TAG = 'ai_guide_default'
@@ -11,13 +12,15 @@ type TemplateRow = {
   default_tags: string[] | null
 }
 
-function fromRow(row: TemplateRow): AiGuide {
+function fromRow(row: TemplateRow, withText = false): AiGuide {
   const tags = row.default_tags ?? []
+  const decoded = decodeGuideBody(row.description_format ?? '')
   return {
     id: row.id,
     name: row.name,
-    content: row.description_format ?? '',
+    content: decoded.content,
     isDefault: tags.includes(DEFAULT_TAG),
+    files: withText ? decoded.files : publicGuideFiles(decoded.files),
   }
 }
 
@@ -25,7 +28,7 @@ function tagsFor(isDefault: boolean) {
   return isDefault ? [GUIDE_TAG, DEFAULT_TAG] : [GUIDE_TAG]
 }
 
-async function readStoredGuides(): Promise<AiGuide[] | null> {
+async function readStoredGuides(withText = false): Promise<AiGuide[] | null> {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('templates')
@@ -34,19 +37,24 @@ async function readStoredGuides(): Promise<AiGuide[] | null> {
   if (error) return null
   const guides = (data as TemplateRow[])
     .filter((row) => (row.default_tags ?? []).includes(GUIDE_TAG))
-    .map(fromRow)
+    .map((row) => fromRow(row, withText))
   if (guides.length && !guides.some((item) => item.isDefault)) guides[0].isDefault = true
   return guides
 }
 
 export async function listAiGuides(): Promise<AiGuide[]> {
-  const stored = await readStoredGuides()
+  const stored = await readStoredGuides(false)
   if (!stored?.length) return DEFAULT_AI_GUIDES
   return stored
 }
 
+export async function getAiGuide(id: string): Promise<AiGuide | null> {
+  const stored = await readStoredGuides(true)
+  return stored?.find((item) => item.id === id) ?? DEFAULT_AI_GUIDES.find((item) => item.id === id) ?? null
+}
+
 export async function seedAiGuides(userId: string) {
-  const stored = await readStoredGuides()
+  const stored = await readStoredGuides(false)
   if (stored === null) return DEFAULT_AI_GUIDES
   if (stored.length) return stored
 
@@ -62,7 +70,7 @@ export async function seedAiGuides(userId: string) {
     .insert(rows)
     .select('id, name, description_format, default_tags')
   if (error || !data?.length) return DEFAULT_AI_GUIDES
-  return (data as TemplateRow[]).map(fromRow)
+  return (data as TemplateRow[]).map((row) => fromRow(row, false))
 }
 
 export async function createAiGuide(userId: string, name: string, content: string) {
@@ -74,13 +82,13 @@ export async function createAiGuide(userId: string, name: string, content: strin
     .insert({
       user_id: userId,
       name,
-      description_format: content,
+      description_format: encodeGuideBody(content, []),
       default_tags: tagsFor(makeDefault),
     })
     .select('id, name, description_format, default_tags')
     .single()
   if (error || !data) throw new Error(error?.message || '지침서를 저장하지 못했습니다.')
-  return fromRow(data as TemplateRow)
+  return fromRow(data as TemplateRow, false)
 }
 
 export async function updateAiGuide(id: string, patch: { name?: string; content?: string; isDefault?: boolean }) {
@@ -95,14 +103,29 @@ export async function updateAiGuide(id: string, patch: { name?: string; content?
         .eq('id', guide.id)
     }
   }
+  const current = await getAiGuide(id)
   const next: Record<string, unknown> = {}
   if (patch.name != null) next.name = patch.name
-  if (patch.content != null) next.description_format = patch.content
+  if (patch.content != null) {
+    next.description_format = encodeGuideBody(patch.content, current?.files ?? [])
+  }
   if (patch.isDefault) next.default_tags = tagsFor(true)
   if (Object.keys(next).length) {
     const { error } = await supabase.from('templates').update(next).eq('id', id)
     if (error) throw new Error(error.message)
   }
+  return listAiGuides()
+}
+
+export async function saveAiGuideFiles(id: string, files: AiGuideFile[]) {
+  const current = await getAiGuide(id)
+  if (!current || current.builtin) throw new Error('저장된 지침서에만 파일을 올릴 수 있어요.')
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('templates')
+    .update({ description_format: encodeGuideBody(current.content, files) })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
   return listAiGuides()
 }
 
