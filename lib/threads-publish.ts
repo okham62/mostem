@@ -1,6 +1,7 @@
 export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.31'
 export const HAMI_SCHEDULE_VERSION = '0.2.31'
 export const HAMI_REPLY_DELAY_VERSION = '0.2.191'
+export const HAMI_COUPANG_SEARCH_VERSION = '0.2.207'
 
 export type PublishMediaItem = {
   url: string
@@ -73,6 +74,69 @@ export function requestHamiLinkPreview(pageUrl: string): Promise<{
   })
 }
 
+export type HamiCoupangProduct = {
+  rank: number
+  productId: string
+  title: string
+  image: string
+  price: number | null
+  priceText: string
+  url: string
+  reviewCount?: string
+}
+
+/** Ask hami to open coupang.com search in the user's browser (same ranking as the website). */
+export function requestHamiCoupangSearch(query: string): Promise<{
+  ok: boolean
+  products?: HamiCoupangProduct[]
+  searchUrl?: string
+  error?: string
+}> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve({ ok: false, error: '브라우저에서만 가능해요' })
+  }
+  if (!isHamiOnline()) {
+    return Promise.resolve({ ok: false, error: '하미 확장이 필요해요' })
+  }
+
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      window.removeEventListener('message', onMessage)
+      resolve({ ok: false, error: '쿠팡 검색 시간 초과' })
+    }, 28_000)
+
+    function onMessage(event: MessageEvent) {
+      const data = event.data as {
+        source?: string
+        type?: string
+        id?: string
+        ok?: boolean
+        error?: string
+        products?: HamiCoupangProduct[]
+        searchUrl?: string
+      }
+      if (event.source !== window) return
+      if (data?.source !== 'hami-extension' || data.type !== 'coupang-search-result') return
+      if (data.id !== requestId) return
+      window.clearTimeout(timer)
+      window.removeEventListener('message', onMessage)
+      resolve({
+        ok: Boolean(data.ok) && Boolean(data.products?.length),
+        products: data.products ?? [],
+        searchUrl: data.searchUrl,
+        error: data.ok ? undefined : data.error || '쿠팡 검색 결과를 가져오지 못했어요',
+      })
+    }
+
+    window.addEventListener('message', onMessage)
+    window.postMessage(
+      { source: 'mostem', type: 'coupang-search', id: requestId, payload: { query } },
+      '*'
+    )
+  })
+}
+
 function parseVersion(value: string) {
   return value.split('.').map((part) => Number(part.replace(/\D/g, '')) || 0)
 }
@@ -83,6 +147,17 @@ export function hamiSupportsMediaPublish() {
   if (!version) return false
   const [major = 0, minor = 0, patch = 0] = parseVersion(version)
   const [needMajor, needMinor, needPatch] = parseVersion(HAMI_MEDIA_PUBLISH_VERSION)
+  if (major !== needMajor) return major > needMajor
+  if (minor !== needMinor) return minor > needMinor
+  return patch >= needPatch
+}
+
+export function hamiSupportsCoupangSearch() {
+  if (typeof document === 'undefined') return false
+  const version = document.documentElement.getAttribute('data-hami-version') || ''
+  if (!version) return false
+  const [major = 0, minor = 0, patch = 0] = parseVersion(version)
+  const [needMajor, needMinor, needPatch] = parseVersion(HAMI_COUPANG_SEARCH_VERSION)
   if (major !== needMajor) return major > needMajor
   if (minor !== needMinor) return minor > needMinor
   return patch >= needPatch

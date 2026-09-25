@@ -25,7 +25,13 @@ import {
   type TrackedLink,
 } from '@/lib/links'
 import type { ShoppingProduct } from '@/lib/shopping'
-import { isHamiOnline, requestHamiLinkPreview } from '@/lib/threads-publish'
+import {
+  hamiSupportsCoupangSearch,
+  isHamiOnline,
+  requestHamiCoupangSearch,
+  requestHamiLinkPreview,
+  type HamiCoupangProduct,
+} from '@/lib/threads-publish'
 import { cn } from '@/lib/utils'
 import { ProfilePanel } from './profile-panel'
 
@@ -1420,7 +1426,25 @@ function ConvertPanel({
   )
 }
 
-type FindProduct = ShoppingProduct & { affiliateUrl?: string }
+type FindProduct = ShoppingProduct & { affiliateUrl?: string; productId?: string }
+
+function fromHamiCoupang(row: HamiCoupangProduct): FindProduct {
+  return {
+    rank: row.rank,
+    title: row.title,
+    image: row.image,
+    price: row.price,
+    priceText: row.priceText,
+    listPrice: null,
+    discountRate: null,
+    mall: '쿠팡',
+    reviewScore: '',
+    reviewCount: row.reviewCount || '',
+    url: row.url,
+    affiliateUrl: '',
+    productId: row.productId,
+  }
+}
 
 function FindPanel({
   onUseUrl,
@@ -1438,11 +1462,29 @@ function FindPanel({
   const [compareCoupang, setCompareCoupang] = useState<FindProduct[]>([])
   const [compareNote, setCompareNote] = useState('')
 
+  async function searchCoupangFromSite() {
+    if (!isHamiOnline() || !hamiSupportsCoupangSearch()) return null
+    const hami = await requestHamiCoupangSearch(q)
+    if (!hami.ok || !hami.products?.length) return null
+    return {
+      products: hami.products.map(fromHamiCoupang),
+      searchUrl: hami.searchUrl || `https://www.coupang.com/np/search?q=${encodeURIComponent(q)}&channel=user`,
+    }
+  }
+
   async function runSearch(source: 'coupang' | 'toss') {
     setBusy(true)
     setNote('')
     setSearchUrl('')
     try {
+      if (source === 'coupang') {
+        const live = await searchCoupangFromSite()
+        if (live) {
+          setProducts(live.products)
+          setSearchUrl(live.searchUrl)
+          return
+        }
+      }
       const res = await fetch(`/api/links/search?q=${encodeURIComponent(q)}&source=${source}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '검색 실패')
@@ -1461,6 +1503,12 @@ function FindPanel({
     setBusy(true)
     setCompareNote('')
     try {
+      const live = await searchCoupangFromSite()
+      if (live) {
+        setCompareCoupang(live.products)
+        setCompareNote('토스 쪽은 쉐어링크 키 연동 전까지 쿠팡 결과만 보여 드려요.')
+        return
+      }
       const res = await fetch(`/api/links/search?q=${encodeURIComponent(q)}&source=coupang`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '비교 실패')
@@ -1481,7 +1529,9 @@ function FindPanel({
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">상품찾기</h2>
-        <p className="mt-1 text-sm text-white/45">홍보할 상품을 찾고, 바로 링크 변환으로 넘길 수 있어요.</p>
+        <p className="mt-1 text-sm text-white/45">
+          쿠팡 사이트와 같은 검색 결과예요. 하미가 켜져 있으면 웹에서 보는 상품·순서가 그대로 나와요.
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">

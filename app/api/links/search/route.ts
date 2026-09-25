@@ -75,6 +75,20 @@ export async function GET(req: Request) {
   const { cred, channel, connected } = await loadCoupangCreds(session.user.id)
   const searchUrl = `https://www.coupang.com/np/search?q=${encodeURIComponent(q)}&channel=user`
 
+  try {
+    const scraped = await scrapeCoupangSearch(q)
+    if (scraped.length) {
+      return NextResponse.json({
+        products: scraped.map(toFindProduct),
+        query: q,
+        source: 'coupang',
+        searchUrl,
+      })
+    }
+  } catch {
+    /* Coupang blocks datacenter IPs — fall through */
+  }
+
   if (connected && cred?.accessKey && cred?.secretKey) {
     const searched = await searchCoupangProducts(
       String(cred.accessKey),
@@ -88,52 +102,19 @@ export async function GET(req: Request) {
         query: q,
         source: 'coupang',
         searchUrl: searched.landingUrl || searchUrl,
+        note: '파트너스 검색이라 쿠팡 사이트와 상품·순서가 다를 수 있어요. 하미를 켜면 쿠팡과 같은 결과가 나와요.',
       })
     }
     if (!searched.ok) {
-      // Fall through to page scrape before failing hard.
-      try {
-        const scraped = await scrapeCoupangSearch(q)
-        if (scraped.length) {
-          return NextResponse.json({
-            products: scraped.map(toFindProduct),
-            query: q,
-            source: 'coupang',
-            searchUrl,
-            note: '쿠팡 API 검색이 잠시 실패해서 쿠팡 검색 페이지 결과를 보여 드려요.',
-          })
-        }
-      } catch {
-        /* ignore scrape, surface API error */
-      }
       return NextResponse.json({ error: searched.error || '쿠팡 검색 실패' }, { status: 400 })
     }
-  }
-
-  try {
-    const scraped = await scrapeCoupangSearch(q)
-    if (scraped.length) {
-      return NextResponse.json({
-        products: scraped.map(toFindProduct),
-        query: q,
-        source: 'coupang',
-        searchUrl,
-        note: connected
-          ? undefined
-          : '쿠팡파트너스 API를 연결하면 제휴링크가 바로 복사됩니다.',
-      })
-    }
-  } catch {
-    /* ignore */
   }
 
   return NextResponse.json({
     products: [] as FindProduct[],
     query: q,
     source: 'coupang',
-    note: connected
-      ? '검색 결과가 없어요. 다른 키워드로 다시 시도해 보세요.'
-      : '쿠팡 검색을 쓰려면 설정에서 쿠팡파트너스 API를 연결해 주세요.',
+    note: '쿠팡 사이트와 같은 검색을 쓰려면 하미를 켜 주세요. 파트너스 API만으로는 사이트 순위와 다릅니다.',
     searchUrl,
   })
 }
