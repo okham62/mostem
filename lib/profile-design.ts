@@ -26,6 +26,7 @@ export type ProfileDesign = {
   brandLogoUrl: string | null
   snsPosition: SnsPosition
   snsAlign: BlockAlign
+  profileAlign: BlockAlign
   noticeEnabled: boolean
   noticeText: string
   noticeMarquee: boolean
@@ -57,6 +58,7 @@ export const DEFAULT_PROFILE_DESIGN: ProfileDesign = {
   brandLogoUrl: null,
   snsPosition: 'links',
   snsAlign: 'center',
+  profileAlign: 'center',
   noticeEnabled: false,
   noticeText: '',
   noticeMarquee: true,
@@ -98,6 +100,7 @@ export function normalizeProfileDesign(raw: unknown): ProfileDesign {
     brandLogoUrl: typeof o.brandLogoUrl === 'string' ? o.brandLogoUrl : null,
     snsPosition: pick('snsPosition', ['profile', 'links'] as const),
     snsAlign: pick('snsAlign', ['left', 'center'] as const),
+    profileAlign: pick('profileAlign', ['left', 'center'] as const),
     noticeEnabled: Boolean(o.noticeEnabled),
     noticeText: typeof o.noticeText === 'string' ? o.noticeText : '',
     noticeMarquee: o.noticeMarquee === undefined ? true : Boolean(o.noticeMarquee),

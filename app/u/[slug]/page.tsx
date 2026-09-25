@@ -114,6 +114,7 @@ export default async function PublicProfilePage({
   const affiliateFg = d.affiliateTextColor || '#ffffff'
   const noticeText = d.affiliateNoticeText || DEFAULT_AFFILIATE_NOTICE
   const pageBg = d.theme === 'light' ? '#e4e4e7' : '#0b0b0d'
+  const profileLeft = (d.profileAlign || 'center') === 'left'
   const snsIcons =
     sns.length > 0 ? (
       <ProfileSnsIcons sns={sns} align={d.snsAlign || 'center'} />
@@ -179,7 +180,7 @@ export default async function PublicProfilePage({
             }
           >
             {showAvatarOnCover ? (
-              <div className="absolute inset-x-0 -bottom-10 flex justify-center">
+              <div className={`absolute inset-x-0 -bottom-10 flex px-5 ${profileLeft ? 'justify-start' : 'justify-center'}`}>
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -200,7 +201,7 @@ export default async function PublicProfilePage({
             ) : null}
           </div>
         ) : (
-          <div className="flex justify-center pt-8">
+          <div className={`flex px-5 pt-8 ${profileLeft ? 'justify-start' : 'justify-center'}`}>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="h-20 w-20 rounded-full object-cover" />
@@ -211,7 +212,7 @@ export default async function PublicProfilePage({
         )}
 
         <div
-          className={`px-5 pb-8 text-center ${
+          className={`px-5 pb-8 ${profileLeft ? 'text-left' : 'text-center'} ${
             showCover && showAvatarOnCover ? 'pt-14' : showCover ? 'pt-5' : 'pt-4'
           }`}
         >

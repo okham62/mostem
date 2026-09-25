@@ -325,6 +325,7 @@ export function ProfilePhonePreview({
   const affiliateBg = d.affiliateBgColor || '#5b3cc4'
   const affiliateFg = d.affiliateTextColor || '#ffffff'
   const noticeText = d.affiliateNoticeText || DEFAULT_AFFILIATE_NOTICE
+  const profileLeft = (d.profileAlign || 'center') === 'left'
   const snsIcons =
     sns.length > 0 ? (
       <ProfileSnsIcons sns={sns} size="sm" align={d.snsAlign || 'center'} />
@@ -397,7 +398,7 @@ export function ProfilePhonePreview({
             }
           >
             {showAvatarOnCover ? (
-              <div className="absolute inset-x-0 -bottom-8 flex justify-center">
+              <div className={cn('absolute inset-x-0 -bottom-8 flex px-4', profileLeft ? 'justify-start' : 'justify-center')}>
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -421,7 +422,7 @@ export function ProfilePhonePreview({
             ) : null}
           </div>
         ) : (
-          <div className="flex justify-center pt-6">
+          <div className={cn('flex px-4 pt-6', profileLeft ? 'justify-start' : 'justify-center')}>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
@@ -433,7 +434,8 @@ export function ProfilePhonePreview({
 
         <div
           className={cn(
-            'px-4 pb-6 text-center',
+            'px-4 pb-6',
+            profileLeft ? 'text-left' : 'text-center',
             showCover && showAvatarOnCover ? 'pt-12' : showCover ? 'pt-4' : 'pt-3',
           )}
         >
@@ -824,6 +826,19 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
               </div>
 
               <div>
+                <p className="mb-2 text-xs text-white/50">프로필 정렬</p>
+                <Segmented<'left' | 'center'>
+                  value={snap.design.profileAlign || 'center'}
+                  onChange={(v) => patchDesign({ profileAlign: v })}
+                  cols={2}
+                  options={[
+                    { id: 'left', label: '왼쪽' },
+                    { id: 'center', label: '가운데' },
+                  ]}
+                />
+              </div>
+
+              <div>
                 <p className="mb-2 text-xs text-white/50">SNS 표시 위치</p>
                 <Segmented<'profile' | 'links'>
                   value={snap.design.snsPosition || 'links'}
@@ -837,7 +852,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
               </div>
 
               <div>
-                <p className="mb-2 text-xs text-white/50">정렬</p>
+                <p className="mb-2 text-xs text-white/50">SNS 정렬</p>
                 <Segmented<'left' | 'center'>
                   value={snap.design.snsAlign || 'center'}
                   onChange={(v) => patchDesign({ snsAlign: v })}
