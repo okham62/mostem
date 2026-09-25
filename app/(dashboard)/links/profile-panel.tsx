@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -153,14 +153,14 @@ export function ProfilePanel({
   const [editing, setEditing] = useState<ProfileBlock | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
-  const hydratedRef = useRef(false)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const [showAddress, setShowAddress] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [addressDraft, setAddressDraft] = useState(settings.profile_slug || '')
   const [simpleDraft, setSimpleDraft] = useState(!!settings.profile_simple_address)
   const [busy, setBusy] = useState(false)
-  const [autosave, setAutosave] = useState('')
+  const [savedLabel, setSavedLabel] = useState('')
+  const [dirty, setDirty] = useState(false)
   const [err, setErr] = useState('')
 
   const [statsRange, setStatsRange] = useState<StatsRange>('7d')
@@ -168,6 +168,7 @@ export function ProfilePanel({
   const [statsLoading, setStatsLoading] = useState(false)
 
   useEffect(() => {
+    if (dirty) return
     setSlug(settings.profile_slug || '')
     setDisplayName(settings.display_name || '')
     setBlocks(settings.profile_blocks || [])
@@ -182,7 +183,7 @@ export function ProfilePanel({
     setDesign(normalizeProfileDesign(settings.profile_design))
     setAddressDraft(settings.profile_slug || '')
     setSimpleDraft(!!settings.profile_simple_address)
-  }, [settings])
+  }, [settings, dirty])
 
   const live = useMemo(() => blocks.filter((b) => !b.archived), [blocks])
   const archived = useMemo(() => blocks.filter((b) => b.archived), [blocks])
@@ -211,8 +212,9 @@ export function ProfilePanel({
       setErr('')
       try {
         await onSave(patch)
-        setAutosave('자동 저장 완료')
-        window.setTimeout(() => setAutosave(''), 1800)
+        setSavedLabel('저장 완료')
+        setDirty(false)
+        window.setTimeout(() => setSavedLabel(''), 1800)
       } catch (e) {
         setErr(e instanceof Error ? e.message : '저장 실패')
         throw e
@@ -223,37 +225,32 @@ export function ProfilePanel({
     [onSave],
   )
 
-  const persistBlocks = async (next: ProfileBlock[]) => {
+  const persistBlocks = (next: ProfileBlock[]) => {
+    setDirty(true)
     setBlocks(next)
-    await save({ profileBlocks: next })
   }
-
-  useEffect(() => {
-    if (hydratedRef.current || !links.length) return
-    const current = settings.profile_blocks || []
-    const next = current.map((b) => {
-      if (String(b.image || '').trim()) return b
-      const image = profileBlockImage(b, links)
-      return image ? { ...b, image } : b
-    })
-    if (next.every((b, i) => b.image === current[i]?.image)) {
-      hydratedRef.current = true
-      return
-    }
-    hydratedRef.current = true
-    setBlocks(next)
-    void save({ profileBlocks: next })
-  }, [links, save, settings.profile_blocks])
 
   function insertIntoLive(block: ProfileBlock, at: number | null) {
     const nextLive = [...live]
     const idx = at == null ? nextLive.length : Math.max(0, Math.min(at, nextLive.length))
     nextLive.splice(idx, 0, block)
-    return persistBlocks([...nextLive, ...archived])
+    persistBlocks([...nextLive, ...archived])
   }
 
   function patchBlock(id: string, patch: Partial<ProfileBlock>) {
-    return persistBlocks(blocks.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+    persistBlocks(blocks.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+  }
+
+  async function saveProfile() {
+    const next = blocks.map((b) => {
+      const image = profileBlockImage(b, links)
+      return image && !String(b.image || '').trim() ? { ...b, image } : b
+    })
+    if (next !== blocks) setBlocks(next)
+    await save({
+      profileBlocks: next,
+      profilePublished: published,
+    })
   }
 
   function openAdd(at: number | null = null) {
@@ -275,13 +272,12 @@ export function ProfilePanel({
     const oldIndex = live.findIndex((b) => b.id === active.id)
     const newIndex = live.findIndex((b) => b.id === over.id)
     if (oldIndex < 0 || newIndex < 0) return
-    void persistBlocks([...arrayMove(live, oldIndex, newIndex), ...archived])
+    persistBlocks([...arrayMove(live, oldIndex, newIndex), ...archived])
   }
 
-  async function togglePublished() {
-    const next = !published
-    setPublished(next)
-    await save({ profilePublished: next })
+  function togglePublished() {
+    setDirty(true)
+    setPublished((v) => !v)
   }
 
   async function saveAddress() {
@@ -300,8 +296,8 @@ export function ProfilePanel({
       setSlug(nextSlug)
       setSimpleAddress(simpleDraft)
       setShowAddress(false)
-      setAutosave('주소 저장 완료')
-      window.setTimeout(() => setAutosave(''), 1800)
+      setSavedLabel('주소 저장 완료')
+      window.setTimeout(() => setSavedLabel(''), 1800)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '주소 저장 실패')
     } finally {
@@ -323,7 +319,7 @@ export function ProfilePanel({
     setDraftUrl('')
     setDraftImage('')
     setShowAdd(false)
-    await insertIntoLive(block, insertAt)
+    insertIntoLive(block, insertAt)
     setInsertAt(null)
   }
 
@@ -338,15 +334,15 @@ export function ProfilePanel({
       pinned: false,
     }
     setShowConnect(false)
-    await insertIntoLive(block, insertAt)
+    insertIntoLive(block, insertAt)
     setInsertAt(null)
   }
 
-  async function saveEdit() {
+  function saveEdit() {
     if (!editing) return
     const next = { ...editing, title: editing.title.trim() || editing.url }
     setEditing(null)
-    await persistBlocks(blocks.map((x) => (x.id === next.id ? next : x)))
+    persistBlocks(blocks.map((x) => (x.id === next.id ? next : x)))
   }
 
   async function loadStats(range: StatsRange) {
@@ -386,9 +382,11 @@ export function ProfilePanel({
         stats={stats}
         loading={statsLoading}
         blocks={blocks}
-        autosave={autosave}
+        savedLabel={savedLabel}
+        dirty={dirty}
+        busy={busy}
         onBack={() => setView('main')}
-        onSave={() => void save({})}
+        onSave={() => void saveProfile()}
       />
     )
   }
@@ -440,9 +438,14 @@ export function ProfilePanel({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">링크</h2>
-          {autosave ? <span className="text-xs text-white/40">{autosave}</span> : null}
+          <SaveButton
+            dirty={dirty}
+            busy={busy}
+            label={savedLabel}
+            onClick={() => void saveProfile()}
+          />
         </div>
 
         {/* Profile card */}
@@ -1078,8 +1081,18 @@ function Modal({
   children: React.ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#16161a] p-5 shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#16161a] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base font-semibold">{title}</h3>
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-white/40 hover:bg-white/10">
@@ -1092,13 +1105,42 @@ function Modal({
   )
 }
 
+function SaveButton({
+  dirty,
+  busy,
+  label,
+  onClick,
+}: {
+  dirty: boolean
+  busy: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {label ? <span className="text-xs text-white/40">{label}</span> : null}
+      {dirty && !label ? <span className="text-xs text-amber-300/80">저장되지 않음</span> : null}
+      <button
+        type="button"
+        disabled={busy || !dirty}
+        onClick={onClick}
+        className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+      >
+        {busy ? '저장 중…' : '저장'}
+      </button>
+    </div>
+  )
+}
+
 function StatsView({
   range,
   onRange,
   stats,
   loading,
   blocks,
-  autosave,
+  savedLabel,
+  dirty,
+  busy,
   onBack,
   onSave,
 }: {
@@ -1107,7 +1149,9 @@ function StatsView({
   stats: StatsPayload | null
   loading: boolean
   blocks: ProfileBlock[]
-  autosave: string
+  savedLabel: string
+  dirty: boolean
+  busy: boolean
   onBack: () => void
   onSave: () => void
 }) {
@@ -1126,16 +1170,7 @@ function StatsView({
         <button type="button" onClick={onBack} className="inline-flex items-center gap-1 text-sm text-white/70">
           <ArrowLeft className="h-4 w-4" /> 통계
         </button>
-        <div className="flex items-center gap-2">
-          {autosave ? <span className="text-xs text-white/40">{autosave}</span> : null}
-          <button
-            type="button"
-            onClick={onSave}
-            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            저장
-          </button>
-        </div>
+        <SaveButton dirty={dirty} busy={busy} label={savedLabel} onClick={onSave} />
       </div>
 
       <div className="flex flex-wrap gap-1.5">

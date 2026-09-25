@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -427,10 +427,8 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
   const [snap, setSnap] = useState(() => cloneSnap(initial))
   const [past, setPast] = useState<DesignSnapshot[]>([])
   const [future, setFuture] = useState<DesignSnapshot[]>([])
-  const [autosave, setAutosave] = useState('')
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const [savedLabel, setSavedLabel] = useState('')
   const skipHistory = useRef(false)
-  const readyRef = useRef(false)
 
   const pushHistory = useCallback((prev: DesignSnapshot) => {
     if (skipHistory.current) return
@@ -458,23 +456,9 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
 
   const saveNow = useCallback(async () => {
     await onPersist(snap)
-    setAutosave('자동 저장')
-    window.setTimeout(() => setAutosave(''), 1600)
+    setSavedLabel('저장 완료')
+    window.setTimeout(() => setSavedLabel(''), 1600)
   }, [onPersist, snap])
-
-  useEffect(() => {
-    if (!readyRef.current) {
-      readyRef.current = true
-      return
-    }
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      void saveNow().catch(() => undefined)
-    }, 900)
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [snap, saveNow])
 
   function undo() {
     setPast((p) => {
@@ -547,7 +531,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
           <ArrowLeft className="h-4 w-4" /> 디자인
         </button>
         <div className="flex items-center gap-1.5">
-          {autosave ? <span className="mr-1 text-xs text-white/40">{autosave}</span> : null}
+          {savedLabel ? <span className="mr-1 text-xs text-white/40">{savedLabel}</span> : null}
           <button
             type="button"
             onClick={undo}
