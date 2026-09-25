@@ -119,7 +119,7 @@ export default async function PublicProfilePage({
       ...b,
       image,
       url: parsed
-        ? `/u/${slug}/go/${encodeURIComponent(parsed.prefix)}/${encodeURIComponent(parsed.code)}`
+        ? `/l/${encodeURIComponent(parsed.prefix)}/${encodeURIComponent(parsed.code)}`
         : `/u/${slug}/go/${encodeURIComponent(b.id)}`,
     }
   })
