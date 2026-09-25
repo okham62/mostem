@@ -616,6 +616,7 @@ export function ProfilePanel({
                         void patchBlock(b.id, { enabled: b.enabled === false })
                       }
                       onSettings={() => setEditing({ ...b })}
+                      onDelete={() => persistBlocks(blocks.filter((x) => x.id !== b.id))}
                     />
                   ))}
                 </ul>
@@ -1027,6 +1028,7 @@ function SortableBlockCard({
   onTogglePin,
   onToggleEnabled,
   onSettings,
+  onDelete,
 }: {
   block: ProfileBlock
   image: string
@@ -1035,6 +1037,7 @@ function SortableBlockCard({
   onTogglePin: () => void
   onToggleEnabled: () => void
   onSettings: () => void
+  onDelete: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.id,
@@ -1100,6 +1103,15 @@ function SortableBlockCard({
           >
             <Settings2 className="mr-0.5 inline h-3 w-3" />
             설정
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center gap-0.5 rounded-lg px-2 py-1 text-[11px] text-white/40 hover:bg-rose-500/15 hover:text-rose-300"
+            title="삭제"
+          >
+            <X className="h-3.5 w-3.5" />
+            삭제
           </button>
         </div>
         <button
