@@ -10,6 +10,7 @@ import {
   normalizeLinkSettings,
   RESERVED_PROFILE_SLUGS,
   slimProfileBlocks,
+  profileBlockFromTrackedLink,
   type LinkSettings,
   type ProfileBlock,
   type ProfileSnsLink,
@@ -22,6 +23,7 @@ import {
   parsePartnerApis,
 } from '@/lib/partners'
 import { normalizeProfileDesign } from '@/lib/profile-design'
+import { syncProfileBlocksFromLinks } from '@/lib/profile-sync'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -82,7 +84,7 @@ export async function GET() {
 
   try {
     const supabase = createAdminClient()
-    const settings = await ensureSettings(session.user.id)
+    await ensureSettings(session.user.id)
     const { data: links, error } = await supabase
       .from('tracked_links')
       .select('*')
@@ -91,8 +93,15 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    const origin = 'https://www.mostem.kr'
+    const synced = await syncProfileBlocksFromLinks(
+      session.user.id,
+      (links ?? []) as TrackedLink[],
+      origin,
+    )
+
     return NextResponse.json({
-      settings,
+      settings: synced.settings,
       links: (links ?? []) as TrackedLink[],
     })
   } catch (e) {
@@ -181,7 +190,27 @@ export async function POST(req: Request) {
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ link: link as TrackedLink, settings })
+
+    const nextBlocks = slimProfileBlocks([
+      ...settings.profile_blocks,
+      profileBlockFromTrackedLink(link as TrackedLink, 'https://www.mostem.kr'),
+    ])
+    const { data: updated } = await supabase
+      .from('link_settings')
+      .update({
+        profile_blocks: nextBlocks,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', session.user.id)
+      .select('*')
+      .maybeSingle()
+
+    return NextResponse.json({
+      link: link as TrackedLink,
+      settings: updated
+        ? normalizeLinkSettings(updated as Record<string, unknown>)
+        : { ...settings, profile_blocks: nextBlocks },
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'failed'
     return NextResponse.json({ error: message }, { status: 400 })

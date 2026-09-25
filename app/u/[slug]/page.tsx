@@ -8,7 +8,10 @@ import {
   sortProfileBlocks,
   type ProfileBlock,
   type ProfileSnsLink,
+  type TrackedLink,
 } from '@/lib/links'
+import { syncProfileBlocksFromLinks } from '@/lib/profile-sync'
+import { headers } from 'next/headers'
 import {
   blockRadiusClass,
   blockShadowClass,
@@ -80,13 +83,24 @@ export default async function PublicProfilePage({
   if (!settings.profile_published) notFound()
   if (viaSimple && !settings.profile_simple_address) notFound()
 
-  const { data: linkRefs } = await supabase
+  const { data: tracked } = await supabase
     .from('tracked_links')
-    .select('prefix, code, destination_url')
+    .select('id, prefix, code, destination_url, title, created_at')
     .eq('user_id', settings.user_id)
+    .order('created_at', { ascending: true })
+
+  const h = headers()
+  const origin = `${h.get('x-forwarded-proto') || 'https'}://${h.get('x-forwarded-host') || h.get('host') || 'www.mostem.kr'}`
+  const synced = await syncProfileBlocksFromLinks(
+    settings.user_id,
+    (tracked ?? []) as TrackedLink[],
+    origin,
+  )
+  const allBlocks = synced.blocks.length ? synced.blocks : settings.profile_blocks
+  const linkRefs = tracked ?? []
 
   const blocks = sortProfileBlocks(
-    settings.profile_blocks.filter((b) => b.url && isProfileBlockOn(b)),
+    allBlocks.filter((b) => b.url && isProfileBlockOn(b)),
   ).map((b) => {
     const httpImage = persistableBlockImage(b.image)
     const hasThumb =

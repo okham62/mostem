@@ -61,6 +61,30 @@ export function profileBlockImage(block: ProfileBlock, links: TrackedLink[] = []
   return String(findTrackedLinkForBlock(block, links)?.og_image_url || '').trim()
 }
 
+export function profileBlockFromTrackedLink(link: TrackedLink, origin?: string): ProfileBlock {
+  return {
+    id: crypto.randomUUID(),
+    title: String(link.title || '상품').slice(0, 240),
+    url: origin
+      ? absoluteShortUrl(origin, link.prefix, link.code)
+      : shortPath(link.prefix, link.code),
+    image: persistableBlockImage(link.og_image_url),
+    enabled: true,
+    pinned: false,
+  }
+}
+
+export function missingProfileBlocksFromLinks(
+  blocks: ProfileBlock[],
+  links: TrackedLink[],
+  origin?: string,
+): ProfileBlock[] {
+  return [...links]
+    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+    .filter((link) => !blocks.some((b) => Boolean(findTrackedLinkForBlock(b, [link]))))
+    .map((link) => profileBlockFromTrackedLink(link, origin))
+}
+
 export function isProfileBlockOn(block: ProfileBlock) {
   return !block.archived && block.enabled !== false
 }
