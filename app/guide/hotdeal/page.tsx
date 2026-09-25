@@ -5,9 +5,9 @@ import { MostemLogo } from '@/components/mostem-logo'
 import { GuideFaq } from './guide-faq'
 
 export const metadata: Metadata = {
-  title: '핫딜 사이트 — 내 주소로 여는 쇼핑 큐레이션 | Mostem',
+  title: '핫딜 사이트 — 내 주소로 여는 토스 쇼핑 큐레이션 | Mostem',
   description:
-    '쿠팡을 한 번 연결하면 mostem.kr/s/내이름 주소로 내 핫딜 사이트가 열려요. 상품은 매일 자동으로 채워지고, 방문자가 사고 나면 수수료가 내 계정에 쌓여요.',
+    '토스 키를 한 번 연결하면 mostem.kr/s/내이름 주소로 내 핫딜 사이트가 열려요. 상품은 매일 자동으로 채워지고, 방문자가 사고 나면 수수료가 내 토스 계정에 쌓여요.',
 }
 
 const STEPS = [
@@ -17,41 +17,44 @@ const STEPS = [
   },
   {
     title: '마음에 드는 상품을 눌러요',
-    body: '그 순간 내 쿠팡 파트너스 이름으로 구매 링크가 연결돼요. 미리 만들어 두지 않아도 돼요.',
+    body: '그 순간 내 토스 계정 이름으로 구매 링크가 만들어져요. 미리 만들어 두지 않아도 돼요.',
   },
   {
-    title: '쿠팡에서 구매해요',
-    body: '방문자는 평소처럼 쿠팡에서 사면 돼요. 더 비싸지지 않아요.',
+    title: '토스쇼핑에서 구매해요',
+    body: '방문자는 평소처럼 토스에서 사면 돼요. 더 비싸지지 않아요.',
   },
   {
     title: '수수료가 나에게 쌓여요',
-    body: '쿠팡이 정한 비율대로 내 파트너스 계정에 적립돼요. 모스템이 가져가는 몫은 없어요.',
+    body: '토스가 정한 비율대로 내 토스 계정에 적립돼요. 모스템이 가져가는 몫은 없어요.',
   },
 ]
 
-const START = [
+const START: {
+  title: string
+  body: string
+  href?: string
+  action?: string
+  external?: boolean
+}[] = [
   {
-    title: '쿠팡 파트너스에서 API 키를 발급받아요',
-    body: '쿠팡 파트너스 → Tools → 파트너스 API에서 Access Key · Secret Key를 발급받아요. 키는 그 자리에서 복사해 두세요.',
-    href: 'https://partners.coupang.com/#affiliate/ws/tools/open-api',
-    action: '쿠팡에서 키 발급',
-    external: true,
+    title: '토스에서 API 키를 발급받아요',
+    body: '토스 어드민 → 연동 → API 키 발급에서 "Key 발급하기"를 누르면 Access Key · Secret Key · 회원 연동 ID가 한 번에 나와요. 키는 발급 직후 딱 한 번만 보이니 그 자리에서 복사해 두세요.',
   },
   {
-    title: '토스도 쓸 거면 출발지 IP를 등록해요',
-    body: '이걸 빼먹으면 토스 연결이 안 돼요. 모스템 설정 화면에 등록할 IP가 적혀 있으니 복사해서 토스 어드민에 넣고 저장하면 돼요.',
+    title: '같은 화면에서 출발지 IP를 등록해요',
+    body: '이걸 빼먹으면 연결이 안 돼요. 모스템 설정 화면에 등록할 IP가 적혀 있으니 복사해서 토스 어드민에 넣고 저장하면 돼요.',
     href: '/settings?tab=toss',
     action: '설정에서 IP 확인하기',
   },
   {
-    title: '모스템에 키를 붙여넣어요',
-    body: '연결을 누르면 모스템이 실제로 한 번 물어보고, 성공했을 때만 "연결됨"으로 바뀌어요. 화면에 연결됐다고 뜨면 진짜 되는 상태예요.',
+    title: '모스템에 키 세 개를 붙여넣어요',
+    body: '연결을 누르면 모스템이 실제로 토스에 한 번 물어보고, 성공했을 때만 "연결됨"으로 바뀌어요. 화면에 연결됐다고 뜨면 진짜 되는 상태예요.',
     href: '/settings?tab=toss',
     action: '토스 연결하기',
   },
   {
     title: '사이트 주소와 카테고리를 정하고 발행해요',
-    body: '주소(/s/내이름)와 이름을 정하고, 팔로워 성격에 맞는 카테고리를 2~3개 고르세요. 발행을 누르면 첫 화면이 채워져요.',
+    body: '주소(/s/내이름)와 이름을 정하고, 팔로워 성격에 맞는 카테고리를 2~3개 고르세요. 발행을 누르면 6초 안에 첫 화면이 채워져요.',
     href: '/links',
     action: '핫딜 사이트 만들기',
   },
@@ -64,27 +67,27 @@ const FAQ = [
   },
   {
     q: '사이트를 처음 만들면 언제 상품이 보여요?',
-    a: '저장 버튼을 누르면 곧 첫 화면이 채워져요. 화면에 "상품을 불러오는 중이에요…"가 떴다가 "다 불러왔어요"로 바뀌어요. 키를 새로 연결했을 때, 카테고리를 바꿨을 때도 똑같아요.',
+    a: '저장 버튼을 누르면 6초쯤 뒤 첫 화면이 채워져요. 화면에 "상품을 불러오는 중이에요…"가 떴다가 "다 불러왔어요"로 바뀌어요. 토스 키를 새로 연결했을 때, 카테고리를 바꿨을 때도 똑같아요.',
   },
   {
     q: '아침 8시에는 무슨 일이 있어요?',
-    a: '하루특가를 새 상품으로 갈아끼우는 시간이에요. 그 시각에 맞춰 정각에 새 특가로 바뀌고, 어제 특가는 그 자리에서 사라져요.',
+    a: '토스가 하루특가를 새 상품으로 갈아끼우는 시간이에요. 그 시각에 맞춰 정각에 새 특가로 바뀌고, 어제 특가는 그 자리에서 사라져요.',
   },
   {
     q: '품절된 상품이 계속 보이면 어떡해요?',
-    a: '새로고침될 때 자동으로 정리돼요. 인기 상품·하루특가는 30분 안에 정리되고, 카테고리 상품은 한 바퀴 도는 데 더 걸릴 수 있어요(고른 카테고리가 적을수록 빨라져요). 다만 화면 정리가 늦어도, 방문자가 실제로 눌렀을 때 품절이면 그 자리에서 걸러지니 방문자가 품절 상품을 사게 되진 않아요.',
+    a: '새로고침될 때 자동으로 정리돼요. 인기 상품·하루특가는 30분 안에 정리되고, 카테고리 상품은 한 바퀴 도는 데 몇 주가 걸릴 수 있어요(고른 카테고리가 적을수록 빨라져요). 다만 화면 정리가 늦어도, 방문자가 실제로 눌렀을 때 품절이면 그 자리에서 걸러지니 방문자가 품절 상품을 사게 되진 않아요.',
   },
   {
     q: '상품이 안 채워지고 "수집 준비 중"만 떠요',
-    a: '하루에 받아올 수 있는 상품 양을 다 쓴 경우예요. 그날은 쉬고 밤 12시가 지나면 자동으로 다시 시작해요. 하루가 지나도 그대로면 편집기에 연결이 끊긴 것 같다는 안내가 뜨니, 그때는 설정에서 키를 다시 등록해 주세요.',
+    a: '토스에서 하루에 받아올 수 있는 상품 양을 다 쓴 경우예요. 그날은 쉬고 밤 12시가 지나면 자동으로 다시 시작해요. 하루가 지나도 그대로면 편집기에 "토스 연결이 끊긴 것 같아요" 안내가 뜨니, 그때는 설정에서 키를 다시 등록해 주세요.',
   },
   {
     q: '수수료는 어디서 확인해요?',
-    a: '적립과 정산은 쿠팡 파트너스가 해요. 모스템에서는 어떤 상품이 얼마나 눌렸는지 볼 수 있고, 실제 금액은 쿠팡 파트너스 리포트에서 확인하시면 돼요.',
+    a: '적립과 정산은 토스가 해요. 모스템에서는 어떤 상품이 얼마나 눌렸는지 볼 수 있고, 실제 금액은 토스 어드민에서 확인하시면 돼요.',
   },
   {
     q: '방문자가 더 비싸게 사게 되나요?',
-    a: '아니요. 가격은 쿠팡 그대로예요. 수수료는 쿠팡이 판매자에게서 정산하는 몫이라 방문자 부담이 아니에요.',
+    a: '아니요. 가격은 토스쇼핑 그대로예요. 수수료는 토스가 판매자에게서 정산하는 몫이라 방문자 부담이 아니에요.',
   },
 ]
 
@@ -106,7 +109,7 @@ function Circle({ n, muted }: { n: number; muted?: boolean }) {
 export default function HotdealGuidePage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#0b0b0d] text-white">
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-10 px-4 py-10 sm:px-5 sm:py-14">
+      <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-10 px-4 py-10 sm:px-5 sm:py-14">
         <header className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <MostemLogo size={24} rounded="lg" />
@@ -114,17 +117,17 @@ export default function HotdealGuidePage() {
               핫딜 사이트 안내
             </span>
           </div>
-          <h1 className="text-2xl font-black tracking-[-0.02em] sm:text-3xl">내 주소로 여는 쇼핑 큐레이션</h1>
+          <h1 className="text-2xl font-black tracking-[-0.02em] sm:text-3xl">내 주소로 여는 토스 쇼핑 큐레이션</h1>
           <p className="text-sm leading-6 text-white/50 sm:text-base">
-            쿠팡을 한 번 연결하면 <span className="font-bold text-white">mostem.kr/s/내이름</span> 주소로
+            토스 키를 한 번 연결하면 <span className="font-bold text-white">mostem.kr/s/내이름</span> 주소로
             내 핫딜 사이트가 열려요. 상품은 매일 자동으로 채워지고, 방문자가 사고 나면 수수료가 내
-            계정에 쌓여요.
+            토스 계정에 쌓여요.
           </p>
           <dl className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
-              ['준비하는 데', '5분이면 충분해요', 'text-amber-200'],
+              ['준비하는 데', '10분이면 충분해요', 'text-amber-200'],
               ['상품 채우기', '전부 자동이에요', 'text-[var(--accent)]'],
-              ['수수료는', '내 계정으로', ''],
+              ['수수료는', '내 토스 계정으로', ''],
             ].map(([k, v, tone]) => (
               <div key={k} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
                 <dt className="text-xs text-white/40">{k}</dt>
@@ -154,7 +157,7 @@ export default function HotdealGuidePage() {
             ))}
           </ol>
           <p className="rounded-xl border border-dashed border-white/15 px-4 py-3 text-sm text-white/55">
-            💡 링크는 내 쿠팡 파트너스 계정 이름으로 만들어져요. 모스템은 사이트를 만들고 상품을
+            💡 링크는 내 토스 계정 이름으로 만들어져요. 모스템은 사이트를 만들고 상품을
             채워주는 역할만 하고, 수수료는 전부 내 것이에요.
           </p>
         </section>
@@ -170,7 +173,7 @@ export default function HotdealGuidePage() {
                   <div className="flex min-w-0 flex-col gap-2">
                     <p className="text-sm font-bold">{step.title}</p>
                     <p className="text-sm leading-6 text-white/45">{step.body}</p>
-                    {step.action ? (
+                    {step.action && step.href ? (
                       <Link
                         href={step.href}
                         target={step.external ? '_blank' : undefined}
@@ -224,7 +227,7 @@ export default function HotdealGuidePage() {
                   [
                     '하루특가',
                     '30분마다 + 아침 8시',
-                    '특가를 갈아끼우는 시각에 맞춰 따로 한 번 더 새로고침해요.',
+                    '토스가 특가를 갈아끼우는 시각에 맞춰 따로 한 번 더 새로고침해요.',
                   ],
                   [
                     '내가 고른 카테고리 상품',
@@ -264,7 +267,7 @@ export default function HotdealGuidePage() {
               하루에 받아올 수 있는 양
             </h2>
             <p className="mt-1 text-sm text-white/45">
-              내 키로는 하루에 상품 정보를 1만 개까지 받아올 수 있어요. 이걸 이렇게 나눠 써요.
+              내 토스 키로는 하루에 상품 정보를 1만 개까지 받아올 수 있어요. 이걸 이렇게 나눠 써요.
             </p>
           </div>
           <div className="overflow-x-auto">
