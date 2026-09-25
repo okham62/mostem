@@ -1689,7 +1689,9 @@ function ProductColumn({
   if (!products.length) return null
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-white/50">{title}</p>
+      <p className="text-xs font-medium text-white/50">
+        {title} · {products.length}개
+      </p>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {products.map((p) => {
           const key = `${p.rank}-${p.title}`

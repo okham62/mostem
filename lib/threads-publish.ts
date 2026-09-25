@@ -1,7 +1,7 @@
 export const HAMI_MEDIA_PUBLISH_VERSION = '0.2.31'
 export const HAMI_SCHEDULE_VERSION = '0.2.31'
 export const HAMI_REPLY_DELAY_VERSION = '0.2.191'
-export const HAMI_COUPANG_SEARCH_VERSION = '0.2.207'
+export const HAMI_COUPANG_SEARCH_VERSION = '0.2.208'
 
 export type PublishMediaItem = {
   url: string
@@ -104,7 +104,7 @@ export function requestHamiCoupangSearch(query: string): Promise<{
     const timer = window.setTimeout(() => {
       window.removeEventListener('message', onMessage)
       resolve({ ok: false, error: '쿠팡 검색 시간 초과' })
-    }, 28_000)
+    }, 45_000)
 
     function onMessage(event: MessageEvent) {
       const data = event.data as {
