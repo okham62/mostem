@@ -66,6 +66,51 @@ function openSiteSearch(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
+const LINKS_TAB_KEY = 'mostem-links-tab'
+const FIND_STATE_KEY = 'mostem-find-panel'
+const FIND_HISTORY_KEY = 'mostem-find-history'
+const FIND_HISTORY_LIMIT = 20
+
+function readStore<T>(key: string, kind: 'session' | 'local' = 'session'): T | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = (kind === 'local' ? localStorage : sessionStorage).getItem(key)
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch {
+    return null
+  }
+}
+
+function writeStore(key: string, value: unknown, kind: 'session' | 'local' = 'session') {
+  if (typeof window === 'undefined') return
+  try {
+    ;(kind === 'local' ? localStorage : sessionStorage).setItem(key, JSON.stringify(value))
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function readFindHistory(): string[] {
+  const rows = readStore<string[]>(FIND_HISTORY_KEY, 'local')
+  if (!Array.isArray(rows)) return []
+  return rows.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+}
+
+function writeFindHistory(items: string[]) {
+  writeStore(FIND_HISTORY_KEY, items.slice(0, FIND_HISTORY_LIMIT), 'local')
+  return items.slice(0, FIND_HISTORY_LIMIT)
+}
+
+type FindPersist = {
+  sub: FindSub
+  q: string
+  products: FindProduct[]
+  note: string
+  searchUrl: string
+  compareCoupang: FindProduct[]
+  compareNote: string
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -488,13 +533,20 @@ function ImageDropZone({
 }
 
 export function LinksClient() {
-  const [tab, setTab] = useState<TabId>('convert')
+  const [tab, setTab] = useState<TabId>(() => {
+    const saved = readStore<TabId>(LINKS_TAB_KEY)
+    return TABS.some((t) => t.id === saved) ? (saved as TabId) : 'convert'
+  })
   const [settings, setSettings] = useState<LinkSettings | null>(null)
   const [links, setLinks] = useState<TrackedLink[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [editing, setEditing] = useState<TrackedLink | null>(null)
+
+  useEffect(() => {
+    writeStore(LINKS_TAB_KEY, tab)
+  }, [tab])
 
   const ping = useCallback((msg: string) => {
     setToast(msg)
@@ -647,7 +699,7 @@ export function LinksClient() {
         />
       )}
 
-      {tab === 'find' && (
+      <div className={tab === 'find' ? '' : 'hidden'}>
         <FindPanel
           copyText={copyText}
           onUseUrl={(url, title, image) => {
@@ -657,7 +709,7 @@ export function LinksClient() {
             )
           }}
         />
-      )}
+      </div>
 
       {tab === 'mine' && settings && (
         <MinePanel
@@ -1441,6 +1493,100 @@ function ConvertPanel({
 
 type FindProduct = ShoppingProduct & { affiliateUrl?: string; productId?: string }
 
+function FindSearchBox({
+  value,
+  onChange,
+  onSubmit,
+  placeholder,
+  history,
+  onPick,
+  onRemove,
+  onClear,
+}: {
+  value: string
+  onChange: (value: string) => void
+  onSubmit: () => void
+  placeholder: string
+  history: string[]
+  onPick: (keyword: string) => void
+  onRemove: (keyword: string) => void
+  onClear: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const needle = value.trim()
+  const shown = needle ? history.filter((item) => item.includes(needle)) : history
+
+  useEffect(() => {
+    function onDoc(event: MouseEvent) {
+      if (!boxRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  return (
+    <div ref={boxRef} className="relative min-w-0 flex-1">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            setOpen(false)
+            onSubmit()
+          }
+          if (e.key === 'Escape') setOpen(false)
+        }}
+        placeholder={placeholder}
+        autoComplete="off"
+        className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
+      />
+      {open && (shown.length || history.length) ? (
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-[#1a1a20] shadow-xl">
+          <div className="flex items-center justify-between px-3 py-2 text-[11px] text-white/40">
+            <span>최근 검색</span>
+            {history.length ? (
+              <button type="button" onClick={onClear} className="text-white/45 hover:text-white/80">
+                전체 삭제
+              </button>
+            ) : null}
+          </div>
+          {shown.length ? (
+            <ul className="max-h-64 overflow-y-auto py-1">
+              {shown.map((item) => (
+                <li key={item} className="flex items-center gap-1 px-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      onPick(item)
+                    }}
+                    className="min-w-0 flex-1 truncate rounded-lg px-2 py-1.5 text-left text-sm text-white/80 hover:bg-white/10"
+                  >
+                    {item}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(item)}
+                    className="rounded-md p-1.5 text-white/30 hover:bg-white/10 hover:text-white/70"
+                    aria-label={`${item} 삭제`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-3 pb-2.5 text-xs text-white/35">일치하는 기록이 없어요</p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function fromHamiCoupang(row: HamiCoupangProduct): FindProduct {
   return {
     rank: row.rank,
@@ -1466,39 +1612,68 @@ function FindPanel({
   onUseUrl: (url: string, title: string, image?: string) => void
   copyText: (t: string) => void
 }) {
-  const [sub, setSub] = useState<FindSub>('coupang')
-  const [q, setQ] = useState('')
+  const saved = readStore<FindPersist>(FIND_STATE_KEY)
+  const [sub, setSub] = useState<FindSub>(saved?.sub === 'toss' || saved?.sub === 'compare' ? saved.sub : 'coupang')
+  const [q, setQ] = useState(saved?.q ?? '')
   const [busy, setBusy] = useState(false)
-  const [products, setProducts] = useState<FindProduct[]>([])
-  const [note, setNote] = useState('')
-  const [searchUrl, setSearchUrl] = useState('')
-  const [compareCoupang, setCompareCoupang] = useState<FindProduct[]>([])
-  const [compareNote, setCompareNote] = useState('')
+  const [products, setProducts] = useState<FindProduct[]>(saved?.products ?? [])
+  const [note, setNote] = useState(saved?.note ?? '')
+  const [searchUrl, setSearchUrl] = useState(saved?.searchUrl ?? '')
+  const [compareCoupang, setCompareCoupang] = useState<FindProduct[]>(saved?.compareCoupang ?? [])
+  const [compareNote, setCompareNote] = useState(saved?.compareNote ?? '')
+  const [history, setHistory] = useState<string[]>(() => {
+    const rows = readFindHistory()
+    const current = saved?.q?.trim()
+    if (current && !rows.includes(current)) return writeFindHistory([current, ...rows])
+    return rows
+  })
 
-  async function searchCoupangFromSite() {
+  useEffect(() => {
+    writeStore(FIND_STATE_KEY, {
+      sub,
+      q,
+      products,
+      note,
+      searchUrl,
+      compareCoupang,
+      compareNote,
+    } satisfies FindPersist)
+  }, [sub, q, products, note, searchUrl, compareCoupang, compareNote])
+
+  function rememberQuery(keyword: string) {
+    const next = keyword.trim()
+    if (!next) return
+    setHistory((prev) => writeFindHistory([next, ...prev.filter((item) => item !== next)]))
+  }
+
+  async function searchCoupangFromSite(keyword: string) {
     if (!isHamiOnline() || !hamiSupportsCoupangSearch()) return null
-    const hami = await requestHamiCoupangSearch(q)
+    const hami = await requestHamiCoupangSearch(keyword)
     if (!hami.ok || !hami.products?.length) return null
     return {
       products: hami.products.map(fromHamiCoupang),
-      searchUrl: hami.searchUrl || `https://www.coupang.com/np/search?q=${encodeURIComponent(q)}&channel=user`,
+      searchUrl: hami.searchUrl || `https://www.coupang.com/np/search?q=${encodeURIComponent(keyword)}&channel=user`,
     }
   }
 
-  async function runSearch(source: 'coupang' | 'toss') {
+  async function runSearch(source: 'coupang' | 'toss', keyword = q) {
+    const query = keyword.trim()
+    if (!query) return
+    setQ(query)
+    rememberQuery(query)
     setBusy(true)
     setNote('')
     setSearchUrl('')
     try {
       if (source === 'coupang') {
-        const live = await searchCoupangFromSite()
+        const live = await searchCoupangFromSite(query)
         if (live) {
           setProducts(live.products)
           setSearchUrl(live.searchUrl)
           return
         }
       }
-      const res = await fetch(`/api/links/search?q=${encodeURIComponent(q)}&source=${source}`)
+      const res = await fetch(`/api/links/search?q=${encodeURIComponent(query)}&source=${source}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '검색 실패')
       setProducts(data.products ?? [])
@@ -1512,17 +1687,21 @@ function FindPanel({
     }
   }
 
-  async function runCompare() {
+  async function runCompare(keyword = q) {
+    const query = keyword.trim()
+    if (!query) return
+    setQ(query)
+    rememberQuery(query)
     setBusy(true)
     setCompareNote('')
     try {
-      const live = await searchCoupangFromSite()
+      const live = await searchCoupangFromSite(query)
       if (live) {
         setCompareCoupang(live.products)
         setCompareNote('토스 쪽은 쉐어링크 키 연동 전까지 쿠팡 결과만 보여 드려요.')
         return
       }
-      const res = await fetch(`/api/links/search?q=${encodeURIComponent(q)}&source=coupang`)
+      const res = await fetch(`/api/links/search?q=${encodeURIComponent(query)}&source=coupang`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '비교 실패')
       setCompareCoupang(data.products ?? [])
@@ -1578,12 +1757,17 @@ function FindPanel({
             <p className="mt-1 text-sm text-white/45">같은 검색어로 쿠팡·토스 가격을 나란히 비교해요.</p>
           </div>
           <div className="flex gap-2">
-            <input
+            <FindSearchBox
               value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void runCompare()}
+              onChange={setQ}
+              onSubmit={() => void runCompare()}
               placeholder="예: 무선청소기"
-              className="flex-1 rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
+              history={history}
+              onPick={(keyword) => void runCompare(keyword)}
+              onRemove={(keyword) =>
+                setHistory((prev) => writeFindHistory(prev.filter((item) => item !== keyword)))
+              }
+              onClear={() => setHistory(writeFindHistory([]))}
             />
             <button
               type="button"
@@ -1596,7 +1780,10 @@ function FindPanel({
             <button
               type="button"
               disabled={!q.trim()}
-              onClick={() => openSiteSearch(coupangSearchUrl(q))}
+              onClick={() => {
+                rememberQuery(q)
+                openSiteSearch(coupangSearchUrl(q))
+              }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 text-sm font-semibold text-white/85 hover:bg-white/10 disabled:opacity-40"
             >
               <ExternalLink className="h-3.5 w-3.5" /> 쿠팡에서 검색
@@ -1604,7 +1791,10 @@ function FindPanel({
             <button
               type="button"
               disabled={!q.trim()}
-              onClick={() => openSiteSearch(tossSearchUrl(q))}
+              onClick={() => {
+                rememberQuery(q)
+                openSiteSearch(tossSearchUrl(q))
+              }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 text-sm font-semibold text-white/85 hover:bg-white/10 disabled:opacity-40"
             >
               <ExternalLink className="h-3.5 w-3.5" /> 토스에서 검색
@@ -1640,12 +1830,17 @@ function FindPanel({
       ) : (
         <div className="space-y-4">
           <div className="flex gap-2">
-            <input
+            <FindSearchBox
               value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void runSearch(sub)}
+              onChange={setQ}
+              onSubmit={() => void runSearch(sub)}
               placeholder={sub === 'coupang' ? '쿠팡 상품 검색' : '토스 상품 검색'}
-              className="flex-1 rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
+              history={history}
+              onPick={(keyword) => void runSearch(sub, keyword)}
+              onRemove={(keyword) =>
+                setHistory((prev) => writeFindHistory(prev.filter((item) => item !== keyword)))
+              }
+              onClear={() => setHistory(writeFindHistory([]))}
             />
             <button
               type="button"
@@ -1658,9 +1853,10 @@ function FindPanel({
             <button
               type="button"
               disabled={!q.trim()}
-              onClick={() =>
+              onClick={() => {
+                rememberQuery(q)
                 openSiteSearch(sub === 'toss' ? tossSearchUrl(q) : coupangSearchUrl(q))
-              }
+              }}
               className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/15 bg-white/5 px-3.5 text-sm font-semibold text-white/85 hover:bg-white/10 disabled:opacity-40"
             >
               <ExternalLink className="h-3.5 w-3.5" />
