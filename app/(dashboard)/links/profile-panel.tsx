@@ -929,6 +929,17 @@ function BlockFields({
   onUrl: (v: string) => void
   onImage: (v: string) => void
 }) {
+  const [dragOver, setDragOver] = useState(false)
+
+  async function takeImage(file?: File | null) {
+    if (!file || !file.type.startsWith('image/')) return
+    if (file.size > 4_000_000) {
+      alert('이미지는 4MB 이하로 올려 주세요')
+      return
+    }
+    onImage(await fileToDataUrl(file))
+  }
+
   return (
     <div className="space-y-2">
       <input
@@ -943,36 +954,65 @@ function BlockFields({
         placeholder="https://..."
         className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
       />
-      <div className="flex items-center gap-2">
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
-        ) : (
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white/10">
-            <ImageIcon className="h-6 w-6 text-white/30" />
-          </div>
+      <div
+        onDragEnter={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(true)
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(true)
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return
+          setDragOver(false)
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(false)
+          void takeImage(e.dataTransfer.files?.[0])
+        }}
+        className={cn(
+          'flex items-center gap-3 rounded-2xl border border-dashed p-2 transition',
+          dragOver
+            ? 'border-[var(--accent)] bg-[var(--accent)]/15'
+            : 'border-white/15 bg-white/[0.02]',
         )}
+      >
+        <label className="relative h-20 w-20 shrink-0 cursor-pointer overflow-hidden rounded-xl bg-white/10">
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center">
+              <ImageIcon className="h-6 w-6 text-white/30" />
+            </span>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              await takeImage(e.target.files?.[0])
+              e.target.value = ''
+            }}
+          />
+        </label>
         <div className="min-w-0 flex-1 space-y-1.5">
           <input
-            value={image}
+            value={image.startsWith('data:') ? '' : image}
             onChange={(e) => onImage(e.target.value)}
             placeholder="이미지 URL"
             className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2 text-sm outline-none"
           />
-          <label className="inline-flex cursor-pointer items-center gap-1 text-xs text-white/50 hover:text-white">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                onImage(await fileToDataUrl(file))
-                e.target.value = ''
-              }}
-            />
-            이미지 업로드
-          </label>
+          <p className="text-xs text-white/45">
+            {dragOver ? '여기에 놓으세요' : '이미지를 드래그하거나 왼쪽을 눌러 업로드'}
+          </p>
         </div>
       </div>
     </div>
