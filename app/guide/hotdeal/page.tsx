@@ -270,18 +270,35 @@ export default function HotdealGuidePage() {
               내 토스 키로는 하루에 상품 정보를 1만 개까지 받아올 수 있어요. 이걸 이렇게 나눠 써요.
             </p>
           </div>
-          <div className="overflow-x-auto">
-            <div className="flex overflow-hidden rounded-xl">
-              <div className="flex w-[90%] items-center justify-center bg-[var(--accent)] px-2 py-3 text-xs font-black text-white">
-                약 9,000개 — 인기 상품·하루특가 새로고침
-              </div>
-              <div className="flex w-[8%] items-center justify-center bg-white/10 px-2 py-3 text-xs font-black text-white/60">
-                800개
-              </div>
-              <div className="flex w-[2%] items-center justify-center bg-amber-200 px-2 py-3 text-xs font-black text-[#3b2a08]">
-                약 200개
-              </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex h-3 overflow-hidden rounded-full" aria-hidden="true">
+              <div className="w-[90%] bg-[var(--accent)]" />
+              <div className="w-[8%] bg-white/20" />
+              <div className="w-[2%] bg-amber-200" />
             </div>
+            <ul className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 size-2.5 shrink-0 rounded-full bg-[var(--accent)]" />
+                <span>
+                  <span className="font-bold text-white">약 9,000개</span>
+                  <span className="mt-0.5 block text-white/45">인기 상품·하루특가 새로고침</span>
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 size-2.5 shrink-0 rounded-full bg-white/30" />
+                <span>
+                  <span className="font-bold text-white">800개</span>
+                  <span className="mt-0.5 block text-white/45">카테고리 상품 점검</span>
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 size-2.5 shrink-0 rounded-full bg-amber-200" />
+                <span>
+                  <span className="font-bold text-white">약 200개</span>
+                  <span className="mt-0.5 block text-white/45">오늘 처음 눌린 상품 확인</span>
+                </span>
+              </li>
+            </ul>
           </div>
           <p className="text-xs leading-5 text-white/45">
             가운데 800개는 <span className="font-bold text-white">카테고리 상품을 매일 조금씩 점검하는 몫</span>
