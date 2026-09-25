@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -89,6 +90,7 @@ function cloneSnap(s: DesignSnapshot): DesignSnapshot {
 function ImageEditRow({
   label,
   image,
+  fallback,
   round,
   onPick,
   onFile,
@@ -96,12 +98,14 @@ function ImageEditRow({
 }: {
   label: string
   image: string
+  fallback?: string
   round?: boolean
   onPick: () => void
   onFile: (file: File) => void
   onClear: () => void
 }) {
   const [dragOver, setDragOver] = useState(false)
+  const shown = image || fallback || ''
 
   return (
     <div
@@ -140,32 +144,36 @@ function ImageEditRow({
           'h-11 w-11 shrink-0 overflow-hidden bg-white/10',
           round ? 'rounded-full' : 'rounded-lg',
         )}
-        title={`${label} 변경`}
+        title={`${label} 수정`}
       >
-        {image ? (
+        {shown ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" className="h-full w-full object-cover" />
+          <img src={shown} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="flex h-full w-full items-center justify-center">
             {round ? <MostemLogo size={28} rounded="full" /> : <ImageIcon className="h-4 w-4 text-white/35" />}
           </span>
         )}
       </button>
-      <button type="button" onClick={onPick} className="min-w-0 flex-1 text-left text-sm text-white/80">
+      <button type="button" onClick={onPick} className="min-w-0 flex-1 text-left text-sm text-white/85">
         {label}
+      </button>
+      <button
+        type="button"
+        onClick={onPick}
+        className="shrink-0 text-xs text-white/50 hover:text-white"
+      >
+        수정
       </button>
       {image ? (
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex items-center gap-0.5 text-xs text-white/40 hover:text-rose-300"
+          className="shrink-0 text-xs text-white/40 hover:text-rose-300"
         >
-          <X className="h-3.5 w-3.5" />
           삭제
         </button>
-      ) : (
-        <span className="text-xs text-white/35">변경</span>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -503,6 +511,8 @@ export function ProfilePhonePreview({
 }
 
 export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Props) {
+  const { data: session } = useSession()
+  const accountImage = session?.user?.image || ''
   const [tab, setTab] = useState<DesignTab>('profile')
   const [snap, setSnap] = useState(() => cloneSnap(initial))
   const [past, setPast] = useState<DesignSnapshot[]>([])
@@ -710,6 +720,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
                 <ImageEditRow
                   label="프로필 이미지"
                   image={snap.avatarUrl}
+                  fallback={accountImage}
                   round
                   onPick={() => pickImage('avatar')}
                   onFile={(file) => void applyImage('avatar', file)}
@@ -1101,7 +1112,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
             bio={snap.bio}
             layout={snap.layout}
             fontSize={snap.fontSize}
-            avatarUrl={snap.avatarUrl}
+            avatarUrl={snap.avatarUrl || accountImage}
             coverUrl={snap.coverUrl}
             live={live}
             sns={snap.sns}
