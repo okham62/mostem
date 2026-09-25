@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type DragEvent } from 'react'
 import { BookOpen, Paperclip, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { MAX_GUIDE_FILES, type AiGuide } from '@/lib/ai-guides'
@@ -13,6 +13,7 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
   const [content, setContent] = useState(selected?.content ?? '')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [dragging, setDragging] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   function openGuide(guide: AiGuide) {
@@ -117,13 +118,31 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
     setMessage('')
   }
 
-  async function uploadFiles(list: FileList | null) {
+  async function uploadFiles(list: FileList | File[] | null) {
     if (!selected || selected.builtin) {
       setMessage('먼저 지침서를 저장한 뒤 파일을 올리세요.')
       return
     }
-    const files = [...(list ?? [])]
-    if (!files.length) return
+    const incoming = [...(list ?? [])]
+    if (!incoming.length) return
+
+    const existing = new Set((selected.files ?? []).map((item) => item.name))
+    const dupes = incoming.filter((file) => existing.has(file.name))
+    const unique = incoming.filter((file) => !existing.has(file.name))
+    let files = unique
+    if (dupes.length) {
+      const names = dupes.map((file) => `「${file.name}」`).join(', ')
+      const replace = window.confirm(
+        `${names} 같은 이름 파일이 이미 있습니다.\n이 파일로 바꿀까요?`,
+      )
+      if (replace) files = [...unique, ...dupes]
+      else if (!unique.length) {
+        setMessage('같은 이름이라 올리지 않았습니다.')
+        if (fileInput.current) fileInput.current.value = ''
+        return
+      }
+    }
+
     setSaving(true)
     setMessage('')
     try {
@@ -143,11 +162,38 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
         }
       }
       setGuides(latest)
-      setMessage(`파일을 올렸습니다. 글 쓸 때 지침서와 함께 참고합니다. (${Math.min((selected.files?.length || 0) + files.length, MAX_GUIDE_FILES)}/${MAX_GUIDE_FILES})`)
+      const nextCount = latest.find((item) => item.id === selected.id)?.files?.length
+      setMessage(`파일을 올렸습니다. 글 쓸 때 지침서와 함께 참고합니다. (${nextCount ?? files.length}/${MAX_GUIDE_FILES})`)
     } finally {
       setSaving(false)
       if (fileInput.current) fileInput.current.value = ''
     }
+  }
+
+  function canDropFiles() {
+    return Boolean(selected && !selected.builtin && !saving)
+  }
+
+  function onDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    if (!canDropFiles()) return
+    event.dataTransfer.dropEffect = 'copy'
+    setDragging(true)
+  }
+
+  function onDragLeave(event: DragEvent<HTMLDivElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node)) return
+    setDragging(false)
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setDragging(false)
+    if (!canDropFiles()) {
+      setMessage('먼저 지침서를 저장한 뒤 파일을 올리세요.')
+      return
+    }
+    void uploadFiles(event.dataTransfer.files)
   }
 
   async function removeFile(fileId: string) {
@@ -235,7 +281,15 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
             placeholder="AI가 글을 쓸 때 따를 규칙을 적어 주세요."
             className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm leading-6 text-white outline-none focus:border-brand"
           />
-          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <div
+            className={`rounded-xl border bg-black/20 p-3 transition-colors ${
+              dragging ? 'border-brand bg-brand/10' : 'border-white/10'
+            }`}
+            onDragEnter={onDragOver}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-sm font-semibold text-white">
                 <Paperclip className="h-4 w-4 text-brand" />
@@ -251,9 +305,16 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
               </button>
             </div>
             <p className="mt-1 text-[11px] leading-5 text-white/40">
-              엑셀, 워드, PPT, PDF를 올리면 한 번만 저장되고, 이후 글 쓸 때 지침서와 파일 내용을 함께 봅니다.
-              같은 이름 파일을 다시 올리면 그 파일만 새 내용으로 바뀝니다.
+              엑셀, 워드, PPT, PDF를 여기로 끌어다 놓거나 파일 올리기로 첨부하세요.
+              같은 이름 파일이 있으면 경고가 뜹니다.
             </p>
+            <div
+              className={`mt-2 rounded-lg border border-dashed px-3 py-4 text-center text-[11px] ${
+                dragging ? 'border-brand text-brand' : 'border-white/15 text-white/35'
+              }`}
+            >
+              {dragging ? '여기에 놓으면 올라갑니다' : '이 칸으로 파일을 드래그해서 올리기'}
+            </div>
             <input
               ref={fileInput}
               type="file"
