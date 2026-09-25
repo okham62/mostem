@@ -37,7 +37,13 @@ export function decodeGuideBody(raw: string): { content: string; files: AiGuideF
 }
 
 export function publicGuideFiles(files: AiGuideFile[] = []): AiGuideFile[] {
-  return files.map(({ text: _text, ...file }) => file)
+  return files.map((file) => ({
+    id: file.id,
+    name: file.name,
+    mime: file.mime,
+    size: file.size,
+    updatedAt: file.updatedAt,
+  }))
 }
 
 export function filesDigest(files: AiGuideFile[] = []) {
