@@ -65,13 +65,6 @@ export default async function PublicProfilePage({
   const viaSimple = searchParams?.via === 'simple'
   const rawQuery = String(searchParams?.q || '')
   const searchQuery = rawQuery.trim().toLowerCase()
-  const visibleBlocks = searchQuery
-    ? blocks.filter((b) => {
-        const title = (b.title || '').toLowerCase()
-        const url = (b.url || '').toLowerCase()
-        return title.includes(searchQuery) || url.includes(searchQuery)
-      })
-    : blocks
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('link_settings')
@@ -88,6 +81,13 @@ export default async function PublicProfilePage({
   const blocks = sortProfileBlocks(
     settings.profile_blocks.filter((b) => b.url && isProfileBlockOn(b)),
   )
+  const visibleBlocks = searchQuery
+    ? blocks.filter((b) => {
+        const title = (b.title || '').toLowerCase()
+        const url = (b.url || '').toLowerCase()
+        return title.includes(searchQuery) || url.includes(searchQuery)
+      })
+    : blocks
   const name = settings.display_name || settings.profile_slug || 'Mostem'
   const bio = settings.profile_bio || ''
   const layout = settings.profile_layout || 'cover'
@@ -246,7 +246,7 @@ export default async function PublicProfilePage({
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                 <input
                   name="q"
-                  defaultValue={searchQuery}
+                  defaultValue={rawQuery}
                   placeholder="검색어를 입력해주세요."
                   className="h-11 w-full rounded-full border-0 bg-white pl-10 pr-4 text-sm text-zinc-800 shadow-sm outline-none placeholder:text-zinc-400"
                 />
