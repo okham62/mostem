@@ -377,7 +377,7 @@ export function ProfilePhonePreview({
                 <div
                   key={b.id}
                   className={cn(
-                    'flex items-center gap-2 px-2.5 py-2 text-xs font-medium',
+                    'flex items-stretch overflow-hidden p-0 text-xs font-medium',
                     blockRadius,
                     blockShadow,
                     blockAlign,
@@ -396,10 +396,10 @@ export function ProfilePhonePreview({
                     <img
                       src={b.image}
                       alt=""
-                      className="h-8 w-8 shrink-0 rounded-md object-cover"
+                      className="h-14 w-14 shrink-0 object-cover"
                     />
                   ) : null}
-                  <span className="min-w-0 flex-1 truncate">{b.title}</span>
+                  <span className="min-w-0 flex-1 truncate px-2.5 py-2">{b.title}</span>
                 </div>
               ))}
             </div>

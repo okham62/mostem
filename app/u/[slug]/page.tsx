@@ -213,7 +213,7 @@ export default async function PublicProfilePage({
                 <a
                   key={b.id}
                   href={`/u/${slug}/go/${encodeURIComponent(b.id)}`}
-                  className={`${blockRadius} ${blockShadow} ${blockAlign} flex items-center gap-3 px-3 py-3 text-sm font-medium transition hover:opacity-90`}
+                  className={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
                   style={{
                     background: d.blockStyle === 'outline' ? 'transparent' : blockBg,
                     color: blockFg,
@@ -225,10 +225,10 @@ export default async function PublicProfilePage({
                     <img
                       src={b.image}
                       alt=""
-                      className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                      className="h-[72px] w-[72px] shrink-0 object-cover"
                     />
                   ) : null}
-                  <span className="min-w-0 flex-1 truncate">{b.title || b.url}</span>
+                  <span className="min-w-0 flex-1 truncate px-4 py-3">{b.title || b.url}</span>
                 </a>
               ))}
             </div>

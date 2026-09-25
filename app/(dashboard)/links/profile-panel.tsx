@@ -628,17 +628,17 @@ export function ProfilePanel({
                   key={b.id}
                   className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-3 py-2"
                 >
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-3">
                     {profileBlockImage(b, links) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={profileBlockImage(b, links)}
                         alt=""
-                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                        className="h-16 w-16 shrink-0 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                        <ImageIcon className="h-4 w-4 text-white/30" />
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                        <ImageIcon className="h-6 w-6 text-white/30" />
                       </div>
                     )}
                     <div className="min-w-0">
@@ -946,10 +946,10 @@ function BlockFields({
       <div className="flex items-center gap-2">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+          <img src={image} alt="" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
         ) : (
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/10">
-            <ImageIcon className="h-4 w-4 text-white/30" />
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white/10">
+            <ImageIcon className="h-6 w-6 text-white/30" />
           </div>
         )}
         <div className="min-w-0 flex-1 space-y-1.5">
@@ -1009,7 +1009,7 @@ function SortableBlockCard({
         transition,
         opacity: isDragging ? 0.45 : on ? 1 : 0.55,
       }}
-      className="flex overflow-hidden rounded-2xl border border-white/10 bg-[#111113]"
+      className="flex min-h-[92px] overflow-hidden rounded-2xl border border-white/10 bg-[#111113]"
     >
       <button
         type="button"
@@ -1020,6 +1020,16 @@ function SortableBlockCard({
       >
         <GripVertical className="h-5 w-5" />
       </button>
+      <div className="w-[92px] shrink-0 self-stretch bg-white/[0.04]">
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <ImageIcon className="h-7 w-7 text-white/25" />
+          </div>
+        )}
+      </div>
       <div className="min-w-0 flex-1">
         <button
           type="button"
@@ -1030,14 +1040,6 @@ function SortableBlockCard({
           <Plus className="h-3.5 w-3.5" />
         </button>
         <div className="flex items-center gap-2 px-2.5 py-1.5">
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={image} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
-          ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
-              <ImageIcon className="h-4 w-4 text-white/30" />
-            </div>
-          )}
           <p className="min-w-0 flex-1 truncate text-sm font-medium">{block.title}</p>
           <button
             type="button"
