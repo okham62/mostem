@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { Session } from 'next-auth'
+import { InstantNavProvider } from '@/components/layout/instant-nav'
 import { Sidebar } from '@/components/layout/sidebar'
 import { SIDEBAR_STORAGE_KEY } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -45,6 +46,7 @@ export function AppChrome({
   const value = useMemo(() => ({ hidden, toggle }), [hidden, toggle])
 
   return (
+    <InstantNavProvider>
     <SidebarChromeContext.Provider value={value}>
       <div className="flex h-full overflow-hidden bg-background">
         <div
@@ -73,6 +75,7 @@ export function AppChrome({
         {children}
       </div>
     </SidebarChromeContext.Provider>
+    </InstantNavProvider>
   )
 }
 

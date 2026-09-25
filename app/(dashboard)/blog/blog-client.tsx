@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -107,17 +107,28 @@ function modeLabel(mode: string) {
 export function BlogClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [, startView] = useTransition()
   const modeParam = searchParams.get('mode')
-  const mode: WriteMode | null =
+  const urlMode: WriteMode | null =
     modeParam === 'seo' || modeParam === 'home' || modeParam === 'product' ? modeParam : null
   const viewParam = searchParams.get('view')
-  const hubView: HubView =
+  const urlView: HubView =
     viewParam === 'write' ||
     viewParam === 'drafts' ||
     viewParam === 'folders' ||
     viewParam === 'ops'
       ? viewParam
       : 'dashboard'
+  const [hubView, setHubView] = useState<HubView>(urlView)
+  const [mode, setMode] = useState<WriteMode | null>(urlMode)
+
+  useEffect(() => {
+    setHubView(urlView)
+  }, [urlView])
+
+  useEffect(() => {
+    setMode(urlMode)
+  }, [urlMode])
 
   const [cards, setCards] = useState<BlogTrendCard[]>([])
   const [posts, setPosts] = useState<BlogPostRow[]>([])
@@ -160,12 +171,20 @@ export function BlogClient() {
   const selectMode = (next: WriteMode | null) => {
     setPreview(null)
     setSubTab('write')
-    router.push(next ? `/blog?mode=${next}` : '/blog?view=write', { scroll: false })
+    setMode(next)
+    setHubView('write')
+    startView(() => {
+      router.push(next ? `/blog?mode=${next}` : '/blog?view=write', { scroll: false })
+    })
   }
 
   const selectHubView = (next: HubView) => {
     setPreview(null)
-    router.push(next === 'dashboard' ? '/blog' : `/blog?view=${next}`, { scroll: false })
+    setHubView(next)
+    if (next !== 'write') setMode(null)
+    startView(() => {
+      router.push(next === 'dashboard' ? '/blog' : `/blog?view=${next}`, { scroll: false })
+    })
   }
 
   const loadTrends = useCallback(async (force = false) => {

@@ -255,7 +255,7 @@ export function ThreadsBoard({
   function selectStatus(next: StatusFilter) {
     setStatusFilter(next)
     const href = next === 'all' ? '/threads' : `/threads?status=${next}`
-    router.push(href, { scroll: false })
+    window.history.replaceState(null, '', href)
   }
 
   const [sort, setSort] = useState<SortMode>('newest')

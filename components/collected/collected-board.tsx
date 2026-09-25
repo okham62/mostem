@@ -131,7 +131,7 @@ export function CollectedBoard({
   function selectStatus(next: StatusFilter) {
     setStatusFilter(next)
     const href = next === 'all' ? basePath : `${basePath}?status=${next}`
-    router.push(href, { scroll: false })
+    window.history.replaceState(null, '', href)
   }
 
   const counts = useMemo(

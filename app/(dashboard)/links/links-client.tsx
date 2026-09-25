@@ -628,26 +628,32 @@ export function LinksClient() {
 
   async function deleteLinks(ids: string[]) {
     if (!ids.length) return
+    removeLinksLocal(ids)
+    setEditing((cur) => (cur && ids.includes(cur.id) ? null : cur))
     const res = await fetch('/api/links', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data.error || '삭제 실패')
-    removeLinksLocal(ids)
-    setEditing((cur) => (cur && ids.includes(cur.id) ? null : cur))
+    if (!res.ok) {
+      await load()
+      throw new Error(data.error || '삭제 실패')
+    }
   }
 
   async function deleteAllLinks() {
+    setLinks([])
     const res = await fetch('/api/links', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ all: true }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data.error || '삭제 실패')
-    setLinks([])
+    if (!res.ok) {
+      await load()
+      throw new Error(data.error || '삭제 실패')
+    }
   }
 
   const load = useCallback(async () => {
@@ -689,10 +695,6 @@ export function LinksClient() {
     } catch {
       ping('복사 실패')
     }
-  }
-
-  if (loading && !settings) {
-    return <div className="py-16 text-center text-sm text-white/40">불러오는 중…</div>
   }
 
   if (error && !settings) {
@@ -737,6 +739,10 @@ export function LinksClient() {
           )
         })}
       </div>
+
+      {loading && !settings ? (
+        <div className="py-10 text-center text-sm text-white/40">불러오는 중…</div>
+      ) : null}
 
       {tab === 'convert' && settings && (
         <ConvertPanel

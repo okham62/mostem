@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
   BookOpen,
@@ -24,6 +24,7 @@ import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
 import { warmTrendCache } from '@/lib/trend-cache'
 import { previewHideMarketTicker } from '@/components/layout/market-ticker'
+import { isNavActive, pathOf, useInstantNav } from '@/components/layout/instant-nav'
 import type { Session } from 'next-auth'
 
 export const explore = [
@@ -67,13 +68,12 @@ interface SidebarProps {
 function NavGroup({
   title,
   items,
-  pathname,
 }: {
   title: string
   items: { href: string; label: string; icon: React.ElementType }[]
-  pathname: string
 }) {
   const router = useRouter()
+  const { activePath, mark } = useInstantNav()
   return (
     <div className="mb-5">
       <div className="mb-2 flex items-center gap-2 px-3">
@@ -84,35 +84,30 @@ function NavGroup({
       <ul className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon
-          const itemPath = item.href.split('?')[0]
-          const isThreads = itemPath === '/threads'
-          const isActive =
-            itemPath === '/admin'
-              ? pathname === '/admin' || pathname.startsWith('/admin/users')
-              : pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+          const itemPath = pathOf(item.href)
+          const isActive = isNavActive(activePath, item.href)
           return (
             <li key={item.href}>
               <Link
                 href={item.href}
-                onClick={(event) => {
+                prefetch
+                onClick={() => {
+                  mark(item.href)
                   previewHideMarketTicker(itemPath === '/markets')
                   if (itemPath === '/keywords' || itemPath === '/news') warmRealtimeCache()
                   if (itemPath === '/shopping') warmShoppingCache()
                   if (itemPath === '/markets') warmMarketCharts()
                   if (itemPath === '/trends') warmTrendCache()
-                  // Open Threads on 「수집」, but keep SPA history (no hard assign).
-                  if (isThreads) {
-                    event.preventDefault()
-                    router.push('/threads?status=collected')
-                  }
                 }}
                 onMouseEnter={() => {
+                  router.prefetch(item.href)
                   if (itemPath === '/keywords' || itemPath === '/news') warmRealtimeCache()
                   if (itemPath === '/shopping') warmShoppingCache()
                   if (itemPath === '/markets') warmMarketCharts()
                   if (itemPath === '/trends') warmTrendCache()
                 }}
                 onFocus={() => {
+                  router.prefetch(item.href)
                   if (itemPath === '/keywords' || itemPath === '/news') warmRealtimeCache()
                   if (itemPath === '/shopping') warmShoppingCache()
                   if (itemPath === '/markets') warmMarketCharts()
@@ -137,7 +132,7 @@ function NavGroup({
 }
 
 export function Sidebar({ session, onHide }: SidebarProps) {
-  const pathname = usePathname()
+  const { activePath, mark } = useInstantNav()
   const { data: liveSession } = useSession()
   const user = liveSession?.user ?? session?.user
   const isAdmin = user?.role === 'admin'
@@ -165,9 +160,9 @@ export function Sidebar({ session, onHide }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 pt-1 scrollbar-thin">
-        <NavGroup title="탐색" items={explore} pathname={pathname} />
-        <NavGroup title="발행" items={publish} pathname={pathname} />
-        <NavGroup title="도구" items={tools} pathname={pathname} />
+        <NavGroup title="탐색" items={explore} />
+        <NavGroup title="발행" items={publish} />
+        <NavGroup title="도구" items={tools} />
         {isAdmin && (
           <NavGroup
             title="관리"
@@ -175,7 +170,6 @@ export function Sidebar({ session, onHide }: SidebarProps) {
               { href: '/admin', label: '회원 관리', icon: Users },
               { href: '/admin/guides', label: 'AI 지침서', icon: BookOpen },
             ]}
-            pathname={pathname}
           />
         )}
       </nav>
@@ -184,9 +178,11 @@ export function Sidebar({ session, onHide }: SidebarProps) {
         {user && (
           <Link
             href="/settings"
+            prefetch
+            onClick={() => mark('/settings')}
             className={cn(
               'mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2',
-              pathname.startsWith('/settings')
+              isNavActive(activePath, '/settings')
                 ? 'bg-brand/20'
                 : 'hover:bg-white/5'
             )}

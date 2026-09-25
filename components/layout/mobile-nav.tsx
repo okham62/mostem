@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { isNavActive, pathOf, useInstantNav } from '@/components/layout/instant-nav'
 import { signOut } from 'next-auth/react'
 import {
   BookOpen,
@@ -32,11 +33,6 @@ const PRIMARY = [
   { href: '/ai', label: 'AI', icon: Sparkles },
 ] as const
 
-function isActivePath(pathname: string, href: string) {
-  if (href === '/admin') return pathname === '/admin' || pathname.startsWith('/admin/users')
-  return pathname === href || pathname.startsWith(href + '/')
-}
-
 function warmPath(href: string) {
   if (href === '/keywords' || href === '/news') warmRealtimeCache()
   if (href === '/shopping') warmShoppingCache()
@@ -46,9 +42,10 @@ function warmPath(href: string) {
 
 export function MobileNav({ session }: { session: Session | null }) {
   const pathname = usePathname()
+  const { activePath, mark } = useInstantNav()
   const isAdmin = session?.user?.role === 'admin'
   const [moreOpen, setMoreOpen] = useState(false)
-  const primaryActive = PRIMARY.some((item) => isActivePath(pathname, item.href))
+  const primaryActive = PRIMARY.some((item) => isNavActive(activePath, item.href))
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -135,14 +132,16 @@ export function MobileNav({ session }: { session: Session | null }) {
                   <ul className="grid grid-cols-2 gap-1.5">
                     {group.items.map((item) => {
                       const Icon = item.icon
-                      const active = isActivePath(pathname, item.href)
+                      const active = isNavActive(activePath, item.href)
                       return (
                         <li key={item.href}>
                           <Link
                             href={item.href}
+                            prefetch
                             onClick={() => {
-                              previewHideMarketTicker(item.href === '/markets')
-                              warmPath(item.href)
+                              mark(item.href)
+                              previewHideMarketTicker(pathOf(item.href) === '/markets')
+                              warmPath(pathOf(item.href))
                             }}
                             className={cn(
                               'flex min-h-12 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium',
@@ -160,9 +159,11 @@ export function MobileNav({ session }: { session: Session | null }) {
               ))}
               <Link
                 href="/settings"
+                prefetch
+                onClick={() => mark('/settings')}
                 className={cn(
                   'mb-2 flex min-h-12 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium',
-                  isActivePath(pathname, '/settings') ? 'bg-brand/20 text-brand' : 'bg-white/4 text-white/70'
+                  isNavActive(activePath, '/settings') ? 'bg-brand/20 text-brand' : 'bg-white/4 text-white/70'
                 )}
               >
                 <Settings className="h-4 w-4" />
@@ -193,13 +194,17 @@ export function MobileNav({ session }: { session: Session | null }) {
         >
           {PRIMARY.map((item) => {
             const Icon = item.icon
-            const active = isActivePath(pathname, item.href)
+            const active = isNavActive(activePath, item.href)
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch
                 onTouchStart={() => warmPath(item.href)}
-                onClick={() => previewHideMarketTicker(item.href === '/markets')}
+                onClick={() => {
+                  mark(item.href)
+                  previewHideMarketTicker(item.href === '/markets')
+                }}
                 className={cn(
                   'flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold',
                   active ? 'text-brand' : 'text-white/40'

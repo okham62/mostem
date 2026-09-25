@@ -17,6 +17,16 @@ export default auth((req) => {
       return NextResponse.rewrite(url)
     }
   }
+
+  const onDashboard = authConfig.callbacks?.authorized?.({
+    auth: req.auth,
+    request: { nextUrl: req.nextUrl },
+  } as never)
+  if (onDashboard === false) {
+    const url = new URL('/login', req.nextUrl)
+    url.searchParams.set('callbackUrl', pathname)
+    return NextResponse.redirect(url)
+  }
 })
 
 export const config = {
