@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { ProfileBlock } from '@/lib/links'
+import { isProfileBlockOn, type ProfileBlock } from '@/lib/links'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +21,7 @@ export async function GET(
   }
 
   const blocks = (Array.isArray(data.profile_blocks) ? data.profile_blocks : []) as ProfileBlock[]
-  const block = blocks.find((b) => b.id === params.blockId && b.url && !b.archived)
+  const block = blocks.find((b) => b.id === params.blockId && b.url && isProfileBlockOn(b))
   if (!block?.url) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

@@ -11,7 +11,31 @@ export type ProfileBlock = {
   id: string
   title: string
   url: string
+  image?: string | null
   archived?: boolean
+  pinned?: boolean
+  enabled?: boolean
+}
+
+export function profileBlockImage(block: ProfileBlock, links: TrackedLink[] = []): string {
+  const stored = String(block.image || '').trim()
+  if (stored) return stored
+  const hit = links.find((link) => {
+    const path = `/${link.prefix}/${link.code}`
+    return (
+      block.url.includes(path) ||
+      Boolean(link.destination_url && block.url.includes(link.destination_url))
+    )
+  })
+  return String(hit?.og_image_url || '').trim()
+}
+
+export function isProfileBlockOn(block: ProfileBlock) {
+  return !block.archived && block.enabled !== false
+}
+
+export function sortProfileBlocks(blocks: ProfileBlock[]) {
+  return [...blocks].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
 }
 
 export type ProfileLayout = 'profile' | 'cover' | 'cover-profile' | 'full-cover'

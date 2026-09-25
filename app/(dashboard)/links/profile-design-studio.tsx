@@ -20,7 +20,12 @@ import {
   normalizeProfileDesign,
   type ProfileDesign,
 } from '@/lib/profile-design'
-import type { ProfileBlock, ProfileFontSize, ProfileLayout, ProfileSnsLink } from '@/lib/links'
+import {
+  type ProfileBlock,
+  type ProfileFontSize,
+  type ProfileLayout,
+  type ProfileSnsLink,
+} from '@/lib/links'
 import { cn } from '@/lib/utils'
 import { MostemLogo } from '@/components/mostem-logo'
 
@@ -368,11 +373,11 @@ export function ProfilePhonePreview({
             </div>
           ) : (
             <div className={cn('mt-4 space-y-2', d.blockAlign === 'center' && 'mx-auto')}>
-              {live.slice(0, 5).map((b) => (
+              {live.map((b) => (
                 <div
                   key={b.id}
                   className={cn(
-                    'px-3 py-2.5 text-xs font-medium',
+                    'flex items-center gap-2 px-2.5 py-2 text-xs font-medium',
                     blockRadius,
                     blockShadow,
                     blockAlign,
@@ -386,7 +391,15 @@ export function ProfilePhonePreview({
                     border: blockBorder,
                   }}
                 >
-                  {b.title}
+                  {b.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={b.image}
+                      alt=""
+                      className="h-8 w-8 shrink-0 rounded-md object-cover"
+                    />
+                  ) : null}
+                  <span className="min-w-0 flex-1 truncate">{b.title}</span>
                 </div>
               ))}
             </div>

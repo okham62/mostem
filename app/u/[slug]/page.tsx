@@ -1,7 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { MostemLogo } from '@/components/mostem-logo'
 import {
+  isProfileBlockOn,
   normalizeLinkSettings,
+  sortProfileBlocks,
   type ProfileBlock,
   type ProfileSnsLink,
 } from '@/lib/links'
@@ -39,7 +41,9 @@ export default async function PublicProfilePage({
   if (!settings.profile_published) notFound()
   if (viaSimple && !settings.profile_simple_address) notFound()
 
-  const blocks = settings.profile_blocks.filter((b) => b.url && !b.archived)
+  const blocks = sortProfileBlocks(
+    settings.profile_blocks.filter((b) => b.url && isProfileBlockOn(b)),
+  )
   const name = settings.display_name || settings.profile_slug || 'Mostem'
   const bio = settings.profile_bio || ''
   const layout = settings.profile_layout || 'cover'
@@ -209,14 +213,22 @@ export default async function PublicProfilePage({
                 <a
                   key={b.id}
                   href={`/u/${slug}/go/${encodeURIComponent(b.id)}`}
-                  className={`${blockRadius} ${blockShadow} ${blockAlign} px-4 py-3.5 text-sm font-medium transition hover:opacity-90`}
+                  className={`${blockRadius} ${blockShadow} ${blockAlign} flex items-center gap-3 px-3 py-3 text-sm font-medium transition hover:opacity-90`}
                   style={{
                     background: d.blockStyle === 'outline' ? 'transparent' : blockBg,
                     color: blockFg,
                     border: blockBorder,
                   }}
                 >
-                  {b.title || b.url}
+                  {b.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={b.image}
+                      alt=""
+                      className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : null}
+                  <span className="min-w-0 flex-1 truncate">{b.title || b.url}</span>
                 </a>
               ))}
             </div>

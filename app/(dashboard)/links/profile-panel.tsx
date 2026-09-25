@@ -1,21 +1,44 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   ArrowLeft,
   BarChart3,
+  ChevronDown,
   Copy,
   ExternalLink,
+  GripVertical,
+  Image as ImageIcon,
   Link2,
   Palette,
+  Pin,
   Plus,
+  Settings2,
   Share2,
   X,
 } from 'lucide-react'
 import {
+  isProfileBlockOn,
   isValidSlug,
+  profileBlockImage,
   profilePublicPath,
   shortPath,
+  sortProfileBlocks,
   type LinkSettings,
   type ProfileBlock,
   type ProfileFontSize,
@@ -55,6 +78,45 @@ function hostLabel() {
   }
 }
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('이미지를 읽지 못했어요'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function Switch({
+  on,
+  onClick,
+  disabled,
+}: {
+  on: boolean
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'relative h-5 w-9 shrink-0 rounded-full transition',
+        on ? 'bg-[var(--accent)]' : 'bg-white/20',
+        disabled && 'opacity-40',
+      )}
+    >
+      <span
+        className={cn(
+          'absolute top-0.5 h-4 w-4 rounded-full bg-white transition',
+          on ? 'left-4' : 'left-0.5',
+        )}
+      />
+    </button>
+  )
+}
+
 export function ProfilePanel({
   settings,
   links,
@@ -86,8 +148,13 @@ export function ProfilePanel({
   const [blockQuery, setBlockQuery] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [draftUrl, setDraftUrl] = useState('')
+  const [draftImage, setDraftImage] = useState('')
+  const [insertAt, setInsertAt] = useState<number | null>(null)
+  const [editing, setEditing] = useState<ProfileBlock | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
+  const hydratedRef = useRef(false)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const [showAddress, setShowAddress] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [addressDraft, setAddressDraft] = useState(settings.profile_slug || '')
@@ -119,6 +186,10 @@ export function ProfilePanel({
 
   const live = useMemo(() => blocks.filter((b) => !b.archived), [blocks])
   const archived = useMemo(() => blocks.filter((b) => b.archived), [blocks])
+  const previewBlocks = useMemo(
+    () => sortProfileBlocks(live.filter((b) => isProfileBlockOn(b))),
+    [live],
+  )
   const visibleBlocks = (blockTab === 'list' ? live : archived).filter((b) => {
     if (!blockQuery.trim()) return true
     const q = blockQuery.trim().toLowerCase()
@@ -157,6 +228,56 @@ export function ProfilePanel({
     await save({ profileBlocks: next })
   }
 
+  useEffect(() => {
+    if (hydratedRef.current || !links.length) return
+    const current = settings.profile_blocks || []
+    const next = current.map((b) => {
+      if (String(b.image || '').trim()) return b
+      const image = profileBlockImage(b, links)
+      return image ? { ...b, image } : b
+    })
+    if (next.every((b, i) => b.image === current[i]?.image)) {
+      hydratedRef.current = true
+      return
+    }
+    hydratedRef.current = true
+    setBlocks(next)
+    void save({ profileBlocks: next })
+  }, [links, save, settings.profile_blocks])
+
+  function insertIntoLive(block: ProfileBlock, at: number | null) {
+    const nextLive = [...live]
+    const idx = at == null ? nextLive.length : Math.max(0, Math.min(at, nextLive.length))
+    nextLive.splice(idx, 0, block)
+    return persistBlocks([...nextLive, ...archived])
+  }
+
+  function patchBlock(id: string, patch: Partial<ProfileBlock>) {
+    return persistBlocks(blocks.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+  }
+
+  function openAdd(at: number | null = null) {
+    setInsertAt(at)
+    setDraftTitle('')
+    setDraftUrl('')
+    setDraftImage('')
+    setShowAdd(true)
+  }
+
+  function openConnect(at: number | null = null) {
+    setInsertAt(at)
+    setShowConnect(true)
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = live.findIndex((b) => b.id === active.id)
+    const newIndex = live.findIndex((b) => b.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    void persistBlocks([...arrayMove(live, oldIndex, newIndex), ...archived])
+  }
+
   async function togglePublished() {
     const next = !published
     setPublished(next)
@@ -190,32 +311,42 @@ export function ProfilePanel({
 
   async function addBlock() {
     if (!draftUrl.trim()) return
-    const next = [
-      ...blocks,
-      {
-        id: crypto.randomUUID(),
-        title: draftTitle.trim() || draftUrl.trim(),
-        url: draftUrl.trim(),
-      },
-    ]
+    const block: ProfileBlock = {
+      id: crypto.randomUUID(),
+      title: draftTitle.trim() || draftUrl.trim(),
+      url: draftUrl.trim(),
+      image: draftImage.trim() || null,
+      enabled: true,
+      pinned: false,
+    }
     setDraftTitle('')
     setDraftUrl('')
+    setDraftImage('')
     setShowAdd(false)
-    await persistBlocks(next)
+    await insertIntoLive(block, insertAt)
+    setInsertAt(null)
   }
 
   async function connectLink(link: TrackedLink) {
     const url = `${origin()}${shortPath(link.prefix, link.code)}`
-    const next = [
-      ...blocks,
-      {
-        id: crypto.randomUUID(),
-        title: link.title || url,
-        url,
-      },
-    ]
+    const block: ProfileBlock = {
+      id: crypto.randomUUID(),
+      title: link.title || url,
+      url,
+      image: link.og_image_url || null,
+      enabled: true,
+      pinned: false,
+    }
     setShowConnect(false)
-    await persistBlocks(next)
+    await insertIntoLive(block, insertAt)
+    setInsertAt(null)
+  }
+
+  async function saveEdit() {
+    if (!editing) return
+    const next = { ...editing, title: editing.title.trim() || editing.url }
+    setEditing(null)
+    await persistBlocks(blocks.map((x) => (x.id === next.id ? next : x)))
   }
 
   async function loadStats(range: StatsRange) {
@@ -276,7 +407,7 @@ export function ProfilePanel({
           design,
           simpleAddress,
         }}
-        live={live}
+        live={previewBlocks}
         busy={busy}
         err={err}
         onBack={() => setView('main')}
@@ -414,14 +545,14 @@ export function ProfilePanel({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setShowAdd(true)}
+                onClick={() => openAdd(null)}
                 className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs"
               >
                 <Plus className="h-3.5 w-3.5" /> 블록 추가
               </button>
               <button
                 type="button"
-                onClick={() => setShowConnect(true)}
+                onClick={() => openConnect(null)}
                 className="rounded-lg bg-white/10 px-2.5 py-1.5 text-xs"
               >
                 내 링크 연결
@@ -466,6 +597,27 @@ export function ProfilePanel({
                 {blockTab === 'archive' ? '보관된 링크가 없어요' : '첫 추천 링크를 채워 보세요'}
               </p>
             </div>
+          ) : blockTab === 'list' && !blockQuery.trim() ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={visibleBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                <ul className="space-y-2">
+                  {visibleBlocks.map((b, i) => (
+                    <SortableBlockCard
+                      key={b.id}
+                      block={b}
+                      image={profileBlockImage(b, links)}
+                      onAddAbove={() => openAdd(i)}
+                      onAddBelow={() => openAdd(i + 1)}
+                      onTogglePin={() => void patchBlock(b.id, { pinned: !b.pinned })}
+                      onToggleEnabled={() =>
+                        void patchBlock(b.id, { enabled: b.enabled === false })
+                      }
+                      onSettings={() => setEditing({ ...b })}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           ) : (
             <ul className="space-y-2">
               {visibleBlocks.map((b) => (
@@ -473,44 +625,45 @@ export function ProfilePanel({
                   key={b.id}
                   className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-3 py-2"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm">{b.title}</p>
-                    <p className="truncate text-[11px] text-white/35">{b.url}</p>
+                  <div className="flex min-w-0 items-center gap-2">
+                    {profileBlockImage(b, links) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={profileBlockImage(b, links)}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                        <ImageIcon className="h-4 w-4 text-white/30" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm">{b.title}</p>
+                      <p className="truncate text-[11px] text-white/35">{b.url}</p>
+                    </div>
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    {blockTab === 'list' ? (
+                    {blockTab === 'archive' ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          const next = blocks.map((x) =>
-                            x.id === b.id ? { ...x, archived: true } : x,
-                          )
-                          void persistBlocks(next)
-                        }}
-                        className="text-xs text-white/40 hover:text-rose-300"
-                      >
-                        보관
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = blocks.map((x) =>
-                            x.id === b.id ? { ...x, archived: false } : x,
-                          )
-                          void persistBlocks(next)
-                        }}
+                        onClick={() => void patchBlock(b.id, { archived: false })}
                         className="text-xs text-[var(--accent)]"
                       >
                         복원
                       </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditing({ ...b })}
+                        className="text-xs text-white/45"
+                      >
+                        설정
+                      </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => {
-                        const next = blocks.filter((x) => x.id !== b.id)
-                        void persistBlocks(next)
-                      }}
+                      onClick={() => void persistBlocks(blocks.filter((x) => x.id !== b.id))}
                       className="text-xs text-white/30 hover:text-rose-300"
                     >
                       삭제
@@ -532,7 +685,7 @@ export function ProfilePanel({
         fontSize={fontSize}
         avatarUrl={avatarUrl}
         coverUrl={coverUrl}
-        live={live}
+        live={previewBlocks}
         sns={sns}
         design={design}
       />
@@ -633,18 +786,14 @@ export function ProfilePanel({
       ) : null}
 
       {showAdd ? (
-        <Modal title="블록 추가" onClose={() => setShowAdd(false)}>
-          <input
-            value={draftTitle}
-            onChange={(e) => setDraftTitle(e.target.value)}
-            placeholder="제목"
-            className="mb-2 w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
-          />
-          <input
-            value={draftUrl}
-            onChange={(e) => setDraftUrl(e.target.value)}
-            placeholder="https://..."
-            className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
+        <Modal title="블록 추가" onClose={() => { setShowAdd(false); setInsertAt(null) }}>
+          <BlockFields
+            title={draftTitle}
+            url={draftUrl}
+            image={draftImage}
+            onTitle={setDraftTitle}
+            onUrl={setDraftUrl}
+            onImage={setDraftImage}
           />
           <button
             type="button"
@@ -653,11 +802,81 @@ export function ProfilePanel({
           >
             추가
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowAdd(false)
+              setShowConnect(true)
+            }}
+            className="mt-2 w-full rounded-xl bg-white/10 py-2 text-xs text-white/60"
+          >
+            내 링크에서 고르기
+          </button>
+        </Modal>
+      ) : null}
+
+      {editing ? (
+        <Modal title="블록 설정" onClose={() => setEditing(null)}>
+          <BlockFields
+            title={editing.title}
+            url={editing.url}
+            image={editing.image || ''}
+            onTitle={(title) => setEditing({ ...editing, title })}
+            onUrl={(url) => setEditing({ ...editing, url })}
+            onImage={(image) => setEditing({ ...editing, image })}
+          />
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="text-sm text-white/70">고정</span>
+            <Switch
+              on={!!editing.pinned}
+              onClick={() => setEditing({ ...editing, pinned: !editing.pinned })}
+            />
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-white/70">프로필에 표시</span>
+            <Switch
+              on={editing.enabled !== false}
+              onClick={() =>
+                setEditing({ ...editing, enabled: editing.enabled === false })
+              }
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void saveEdit()}
+            className="mt-4 w-full rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white"
+          >
+            저장
+          </button>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const id = editing.id
+                setEditing(null)
+                void patchBlock(id, { archived: true })
+              }}
+              className="flex-1 rounded-xl bg-white/10 py-2 text-xs text-white/60"
+            >
+              보관
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const id = editing.id
+                setEditing(null)
+                void persistBlocks(blocks.filter((x) => x.id !== id))
+              }}
+              className="flex-1 rounded-xl bg-rose-500/15 py-2 text-xs text-rose-300"
+            >
+              삭제
+            </button>
+          </div>
         </Modal>
       ) : null}
 
       {showConnect ? (
-        <Modal title="내 링크 연결" onClose={() => setShowConnect(false)}>
+        <Modal title="내 링크 연결" onClose={() => { setShowConnect(false); setInsertAt(null) }}>
           {links.length === 0 ? (
             <p className="text-sm text-white/45">변환한 링크가 아직 없어요.</p>
           ) : (
@@ -667,9 +886,14 @@ export function ProfilePanel({
                   <button
                     type="button"
                     onClick={() => void connectLink(l)}
-                    className="flex w-full items-start gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-left hover:bg-white/[0.07]"
+                    className="flex w-full items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-left hover:bg-white/[0.07]"
                   >
-                    <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
+                    {l.og_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={l.og_image_url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                    ) : (
+                      <Link2 className="h-4 w-4 shrink-0 text-[var(--accent)]" />
+                    )}
                     <span className="min-w-0">
                       <span className="block truncate text-sm">{l.title}</span>
                       <span className="block truncate text-[11px] text-white/35">
@@ -684,6 +908,163 @@ export function ProfilePanel({
         </Modal>
       ) : null}
     </div>
+  )
+}
+
+function BlockFields({
+  title,
+  url,
+  image,
+  onTitle,
+  onUrl,
+  onImage,
+}: {
+  title: string
+  url: string
+  image: string
+  onTitle: (v: string) => void
+  onUrl: (v: string) => void
+  onImage: (v: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <input
+        value={title}
+        onChange={(e) => onTitle(e.target.value)}
+        placeholder="제목"
+        className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
+      />
+      <input
+        value={url}
+        onChange={(e) => onUrl(e.target.value)}
+        placeholder="https://..."
+        className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
+      />
+      <div className="flex items-center gap-2">
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+        ) : (
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/10">
+            <ImageIcon className="h-4 w-4 text-white/30" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <input
+            value={image}
+            onChange={(e) => onImage(e.target.value)}
+            placeholder="이미지 URL"
+            className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2 text-sm outline-none"
+          />
+          <label className="inline-flex cursor-pointer items-center gap-1 text-xs text-white/50 hover:text-white">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                onImage(await fileToDataUrl(file))
+                e.target.value = ''
+              }}
+            />
+            이미지 업로드
+          </label>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SortableBlockCard({
+  block,
+  image,
+  onAddAbove,
+  onAddBelow,
+  onTogglePin,
+  onToggleEnabled,
+  onSettings,
+}: {
+  block: ProfileBlock
+  image: string
+  onAddAbove: () => void
+  onAddBelow: () => void
+  onTogglePin: () => void
+  onToggleEnabled: () => void
+  onSettings: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: block.id,
+  })
+  const on = block.enabled !== false
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.45 : on ? 1 : 0.55,
+      }}
+      className="rounded-2xl border border-white/10 bg-[#111113]"
+    >
+      <button
+        type="button"
+        onClick={onAddAbove}
+        className="flex w-full items-center justify-center py-1.5 text-white/35 hover:bg-white/[0.04] hover:text-white"
+        title="위에 추가"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        <button
+          type="button"
+          className="cursor-grab touch-none rounded-lg p-1 text-white/35 hover:bg-white/10 hover:text-white active:cursor-grabbing"
+          title="드래그해서 순서 변경"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+            <ImageIcon className="h-4 w-4 text-white/30" />
+          </div>
+        )}
+        <p className="min-w-0 flex-1 truncate text-sm font-medium">{block.title}</p>
+        <button
+          type="button"
+          onClick={onTogglePin}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px]',
+            block.pinned ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'text-white/40 hover:text-white',
+          )}
+        >
+          <Pin className={cn('h-3 w-3', block.pinned && 'fill-current')} />
+          고정
+        </button>
+        <Switch on={on} onClick={onToggleEnabled} />
+        <button
+          type="button"
+          onClick={onSettings}
+          className="rounded-lg px-2 py-1 text-[11px] text-white/45 hover:bg-white/10 hover:text-white"
+        >
+          <Settings2 className="mr-0.5 inline h-3 w-3" />
+          설정
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onAddBelow}
+        className="flex w-full items-center justify-center py-1.5 text-white/35 hover:bg-white/[0.04] hover:text-white"
+        title="아래에 추가"
+      >
+        <ChevronDown className="h-3.5 w-3.5" />
+      </button>
+    </li>
   )
 }
 
