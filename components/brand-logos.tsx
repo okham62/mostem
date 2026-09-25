@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils'
 export type BrandId = 'threads' | 'instagram' | 'tiktok' | 'blog'
 
 const PNG: Record<BrandId, string> = {
-  threads: '/logos/threads.png',
-  instagram: '/logos/instagram.png',
-  tiktok: '/logos/tiktok.png',
-  blog: '/logos/naver-blog.png',
+  threads: '/logos/threads.png?v=3d2',
+  instagram: '/logos/instagram.png?v=3d2',
+  tiktok: '/logos/tiktok.png?v=3d2',
+  blog: '/logos/naver-blog.png?v=3d2',
 }
 
 export function BrandPng({
@@ -20,7 +20,7 @@ export function BrandPng({
 }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={PNG[id]} alt="" className={cn('shrink-0 object-contain', className)} />
+    <img src={PNG[id]} alt="" className={cn('mostem-brand-mark shrink-0 object-contain', className)} />
   )
 }
 

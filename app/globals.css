@@ -1089,3 +1089,17 @@ html[data-theme='light'] .bg-brand .text-white {
   100% { transform: translateX(420%); }
 }
 
+.mostem-brand-mark {
+  border-radius: 5px;
+}
+
+html[data-theme='light'] .mostem-brand-mark {
+  filter: drop-shadow(0 1px 1.5px rgba(20, 22, 28, 0.18));
+}
+
+html[data-theme='dark'] .mostem-brand-mark {
+  filter:
+    drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.42))
+    drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
+

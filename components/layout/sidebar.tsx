@@ -36,16 +36,16 @@ export const explore = [
 ]
 
 function ThreadsIcon() {
-  return <BrandMark id="threads" className="h-5 w-5" />
+  return <BrandMark id="threads" className="h-6 w-6" />
 }
 function InstagramIcon() {
-  return <BrandMark id="instagram" className="h-5 w-5" />
+  return <BrandMark id="instagram" className="h-6 w-6" />
 }
 function TiktokIcon() {
-  return <BrandMark id="tiktok" className="h-5 w-5" />
+  return <BrandMark id="tiktok" className="h-6 w-6" />
 }
 function BlogIcon() {
-  return <BrandMark id="blog" className="h-5 w-5" />
+  return <BrandMark id="blog" className="h-6 w-6" />
 }
 
 export const publish = [
