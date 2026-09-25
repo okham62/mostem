@@ -125,7 +125,7 @@ export function HotdealStorefront({
             : 'border-amber-300/50 bg-amber-100 text-[#3b2a08]',
         )}
       >
-        본 페이지는 쿠팡 파트너스 활동의 일환으로, 상품 구매 시 일정액의 수수료를 제공받습니다.
+        본 페이지는 토스쇼핑 쉐어링크 활동의 일환으로, 상품 구매 시 일정액의 수수료를 제공받습니다.
       </aside>
 
       <div
@@ -369,7 +369,7 @@ function ProductCard({
     <a href={item.url} target="_blank" rel="noopener noreferrer" className={card}>
       <div className={cn('relative overflow-hidden rounded-xl', grid ? 'aspect-square' : 'h-24 w-24 shrink-0')}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={item.image} alt="" className="h-full w-full object-cover" />
+        <img src={item.image} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
         {item.discountRate ? (
           <span
             className={cn(

@@ -1,21 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getShoppingBest } from '@/lib/shopping'
-import { HOTDEAL_DEMO, HOTDEAL_DEMO_SLUG, toHotdealItems } from '@/lib/hotdeal'
+import { HOTDEAL_DEMO, HOTDEAL_DEMO_SLUG } from '@/lib/hotdeal'
+import { loadTossCredsFromApis, loadTossHotdealItems } from '@/lib/toss-catalog'
 import { HotdealStorefront } from '@/components/hotdeal-storefront'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
-
-async function loadHotdealItems() {
-  const board = await getShoppingBest()
-  const coupang = board.platforms.find((p) => p.id === 'coupang')
-  return toHotdealItems(
-    (coupang?.rising.products ?? []).slice(0, 48),
-    (coupang?.popular.products ?? []).slice(0, 48),
-  )
-}
 
 export async function generateMetadata({
   params,
@@ -39,7 +30,7 @@ export async function generateMetadata({
   if (!data?.hotdeal_published) return { title: '핫딜 | Mostem' }
   return {
     title: `${data.hotdeal_name || '핫딜'} | Mostem`,
-    description: data.hotdeal_intro || '매일 자동으로 채워지는 쿠팡 핫딜',
+    description: data.hotdeal_intro || '매일 자동으로 채워지는 토스 핫딜',
   }
 }
 
@@ -49,9 +40,9 @@ export default async function PublicHotdealPage({
   params: { slug: string }
 }) {
   const slug = params.slug.toLowerCase()
-  const items = await loadHotdealItems()
 
   if (slug === HOTDEAL_DEMO_SLUG) {
+    const items = await loadTossHotdealItems({ slug, creds: loadTossCredsFromApis() })
     return (
       <HotdealStorefront
         name={HOTDEAL_DEMO.name}
@@ -73,6 +64,11 @@ export default async function PublicHotdealPage({
     .maybeSingle()
 
   if (!data || !data.hotdeal_published) notFound()
+
+  const items = await loadTossHotdealItems({
+    slug,
+    creds: loadTossCredsFromApis(data.partner_apis),
+  })
 
   return (
     <HotdealStorefront
