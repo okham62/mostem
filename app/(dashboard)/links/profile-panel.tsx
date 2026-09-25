@@ -30,6 +30,7 @@ import {
   Plus,
   Settings2,
   Share2,
+  Trash2,
   X,
 } from 'lucide-react'
 import {
@@ -1088,30 +1089,12 @@ function SortableBlockCard({
             type="button"
             onClick={onTogglePin}
             className={cn(
-              'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px]',
+              'inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px]',
               block.pinned ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'text-white/40 hover:text-white',
             )}
           >
             <Pin className={cn('h-3 w-3', block.pinned && 'fill-current')} />
             고정
-          </button>
-          <Switch on={on} onClick={onToggleEnabled} />
-          <button
-            type="button"
-            onClick={onSettings}
-            className="rounded-lg px-2 py-1 text-[11px] text-white/45 hover:bg-white/10 hover:text-white"
-          >
-            <Settings2 className="mr-0.5 inline h-3 w-3" />
-            설정
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="inline-flex items-center gap-0.5 rounded-lg px-2 py-1 text-[11px] text-white/40 hover:bg-rose-500/15 hover:text-rose-300"
-            title="삭제"
-          >
-            <X className="h-3.5 w-3.5" />
-            삭제
           </button>
         </div>
         <button
@@ -1121,6 +1104,25 @@ function SortableBlockCard({
           title="아래에 추가"
         >
           <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="flex w-11 shrink-0 flex-col items-center justify-center gap-1.5 self-stretch border-l border-white/10">
+        <button
+          type="button"
+          onClick={onSettings}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 hover:bg-white/10 hover:text-white"
+          title="설정"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </button>
+        <Switch on={on} onClick={onToggleEnabled} />
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-white/35 hover:bg-rose-500/15 hover:text-rose-300"
+          title="삭제"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
     </li>
