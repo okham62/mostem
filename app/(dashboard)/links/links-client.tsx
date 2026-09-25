@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   BarChart3,
+  ChevronDown,
   Copy,
   ExternalLink,
   Hash,
@@ -2331,8 +2332,8 @@ function MinePanel({
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-      <p className="text-xs text-white/45">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+      <p className="text-sm font-semibold text-white">{label}</p>
+      <p className="mt-1 text-xl font-bold text-white">{value}</p>
       {hint ? <p className="mt-0.5 text-[11px] text-white/30">{hint}</p> : null}
     </div>
   )
@@ -2370,6 +2371,39 @@ function formatCount(n: number | null | undefined, suffix = '') {
   return `${n.toLocaleString('ko-KR')}${suffix}`
 }
 
+function ChannelHelp() {
+  const [open, setOpen] = useState(true)
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3"
+        aria-expanded={open}
+      >
+        <span className="h-px flex-1 bg-[var(--accent)]/70" />
+        <ChevronDown className={cn('h-4 w-4 text-white/70 transition', open && 'rotate-180')} />
+      </button>
+      {open ? (
+        <div className="mt-3 space-y-3 text-sm leading-relaxed text-white/70">
+          <p>
+            클릭은 링크를 열었을 때 기록돼요. 화면을 새로고침하거나, 방금 누른 걸 바로 다시 열면 클릭이 안
+            늘어날 수 있어요. 카톡·인스타 카드로 링크를 열면 미리보기 때문에 클릭이 1회 늘 수 있어요.
+          </p>
+          <p>
+            여기서 보이는 Mostem 클릭과 쿠팡 클릭은 다를 수 있어요. 쿠팡 파트너스 숫자는 그쪽이 따로 센
+            값이라 하루 이상 늦게 반영될 수 있어요. 정산은 쿠팡 파트너스·토스 숫자가 기준이에요.
+          </p>
+          <p>
+            채널은 링크에 붙인 채널 ID(subId)로 맞춰요. 연동 전·미매칭 트래픽은 “기타(미매칭)” 또는 “구분
+            불가”로 보여요. 날짜별 클릭은 최근 30일만 기억해요.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function ChannelPanel({
   links,
   settings,
@@ -2385,6 +2419,8 @@ function ChannelPanel({
   const [loading, setLoading] = useState(true)
   const [channelDraft, setChannelDraft] = useState(settings.channel_id || '기본값')
   const [savingChannel, setSavingChannel] = useState(false)
+  const [sortRevenue, setSortRevenue] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
 
   useEffect(() => {
     setChannelDraft(settings.channel_id || '기본값')
@@ -2444,6 +2480,14 @@ function ChannelPanel({
           unmatched: false as boolean | undefined,
         }))
 
+  const displayRows = useMemo(() => {
+    const list = [...rows]
+    if (sortRevenue) {
+      list.sort((a, b) => (b.revenue ?? -1) - (a.revenue ?? -1))
+    }
+    return list
+  }, [rows, sortRevenue])
+
   const totals = stats?.totals ?? {
     mostemClicks: links.reduce((s, l) => s + (l.click_count || 0), 0),
     coupangClicks: null,
@@ -2479,20 +2523,21 @@ function ChannelPanel({
     }
   }
 
+  function linksForChannel(id: string) {
+    if (id === '기타(미매칭)') return []
+    return links.filter((l) => (l.channel || settings.channel_id || '기본값') === id)
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold">채널 실적</h2>
-          <p className="mt-1 text-sm text-white/45">
-            Mostem 유입 클릭과 쿠팡 클릭·주문·수익을 채널 ID 기준으로 비교해요.{' '}
-            <a href="/settings?tab=coupang" className="text-[var(--accent)] underline">
-              쿠팡파트너스 API
-            </a>{' '}
-            연동 후 리포트가 연결됩니다.
+          <h2 className="text-2xl font-bold text-white">채널 실적</h2>
+          <p className="mt-2 text-sm text-white/70">
+            Mostem 유입 클릭과 쿠팡 클릭·주문·수익을 채널 ID 기준으로 비교해요.
           </p>
         </div>
-        <div className="text-right text-xs text-white/40">
+        <div className="text-right text-sm font-semibold text-white">
           <p>{updated} 업데이트</p>
           <button
             type="button"
@@ -2505,42 +2550,18 @@ function ChannelPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
-        <label className="min-w-[160px] flex-1 space-y-1">
-          <span className="text-[11px] text-white/45">기본 채널 ID (쿠팡 subId)</span>
-          <input
-            value={channelDraft}
-            onChange={(e) => setChannelDraft(e.target.value.slice(0, 50))}
-            placeholder="기본값"
-            className="w-full rounded-lg border border-white/10 bg-[var(--input-bg)] px-2.5 py-1.5 text-sm outline-none focus:border-[var(--accent)]/60"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={savingChannel}
-          onClick={() => void saveChannel()}
-          className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/15 disabled:opacity-40"
-        >
-          {savingChannel ? '저장 중…' : '저장'}
-        </button>
-      </div>
-
       {stats?.error ? (
-        <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+        <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100/90">
           쿠팡 리포트: {stats.error}
         </p>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <StatCard
-          label="Mostem 클릭"
-          value={formatCount(totals.mostemClicks)}
-          hint="실시간"
-        />
+        <StatCard label="Mostem 클릭" value={formatCount(totals.mostemClicks)} hint="실시간" />
         <StatCard
           label="쿠팡 클릭"
           value={connected ? formatCount(totals.coupangClicks) : '—'}
-          hint={connected ? '쿠팡 리포트 기준 (최근 30일)' : '구분 불가'}
+          hint={connected ? '쿠팡 리포트 기준' : '구분 불가'}
         />
         <StatCard
           label="주문"
@@ -2550,53 +2571,121 @@ function ChannelPanel({
         <StatCard
           label="수익"
           value={connected ? formatWon(totals.revenue) : '—'}
-          hint={connected ? '확정 수익 (수수료)' : '구분 불가'}
+          hint={connected ? '쿠팡 확정 수익' : '구분 불가'}
         />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-white/[0.03] text-xs text-white/45">
-            <tr>
-              <th className="px-4 py-3 font-medium">채널</th>
-              <th className="px-4 py-3 font-medium">생성 링크</th>
-              <th className="px-4 py-3 font-medium">Mostem 클릭</th>
-              <th className="px-4 py-3 font-medium">쿠팡 클릭</th>
-              <th className="px-4 py-3 font-medium">주문</th>
-              <th className="px-4 py-3 font-medium">수익</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-t border-white/5">
-                <td className="px-4 py-3">
-                  {row.id}
-                  {row.unmatched ? (
-                    <span className="ml-1 text-[10px] text-white/35">미매칭</span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3">{row.links}개</td>
-                <td className="px-4 py-3">{formatCount(row.mostemClicks, '회')}</td>
-                <td className={cn('px-4 py-3', row.coupangClicks == null && 'text-white/35')}>
-                  {row.coupangClicks == null ? '구분 불가' : formatCount(row.coupangClicks, '회')}
-                </td>
-                <td className={cn('px-4 py-3', row.orders == null && 'text-white/35')}>
-                  {row.orders == null ? '구분 불가' : formatCount(row.orders, '건')}
-                </td>
-                <td className={cn('px-4 py-3', row.revenue == null && 'text-white/35')}>
-                  {row.revenue == null ? '구분 불가' : formatWon(row.revenue)}
-                </td>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-white">채널별 비교</h3>
+            <p className="mt-1 text-sm text-white/70">
+              연동 전 만든 링크는 채널 ID가 없어 쿠팡 클릭·수익을 여기에 붙일 수 없어요.
+            </p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-white">
+            <input
+              type="checkbox"
+              checked={sortRevenue}
+              onChange={(e) => setSortRevenue(e.target.checked)}
+              className="rounded border-white/20 bg-black/40"
+            />
+            수익 순으로 보기
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-white">기본 채널 ID</span>
+          <input
+            value={channelDraft}
+            onChange={(e) => setChannelDraft(e.target.value.slice(0, 50))}
+            placeholder="기본값"
+            className="w-48 rounded-lg border border-white/10 bg-[var(--input-bg)] px-2.5 py-1.5 text-sm text-white outline-none focus:border-[var(--accent)]/60"
+          />
+          <button
+            type="button"
+            disabled={savingChannel}
+            onClick={() => void saveChannel()}
+            className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-40"
+          >
+            {savingChannel ? '저장 중…' : '저장'}
+          </button>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="bg-white/[0.03] text-sm font-semibold text-white">
+              <tr>
+                <th className="px-4 py-3">채널</th>
+                <th className="px-4 py-3">생성 링크</th>
+                <th className="px-4 py-3">Mostem 클릭</th>
+                <th className="px-4 py-3">쿠팡 클릭</th>
+                <th className="px-4 py-3">주문</th>
+                <th className="px-4 py-3">수익</th>
+                <th className="w-10 px-2 py-3" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {displayRows.map((row) => {
+                const open = openId === row.id
+                const channelLinks = linksForChannel(row.id)
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className="cursor-pointer border-t border-white/5 hover:bg-white/[0.03]"
+                      onClick={() => setOpenId(open ? null : row.id)}
+                    >
+                      <td className="px-4 py-3 font-semibold text-white">
+                        {row.id}
+                        {row.id === '기본값' ? (
+                          <span className="ml-1 text-xs font-medium text-white/50">subId없음</span>
+                        ) : null}
+                        {row.unmatched ? (
+                          <span className="ml-1 text-xs font-medium text-white/50">미매칭</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-white">{row.links}개</td>
+                      <td className="px-4 py-3 text-white">{formatCount(row.mostemClicks, '회')}</td>
+                      <td className={cn('px-4 py-3', row.coupangClicks == null ? 'text-white/50' : 'text-white')}>
+                        {row.coupangClicks == null ? '구분 불가' : formatCount(row.coupangClicks, '회')}
+                      </td>
+                      <td className={cn('px-4 py-3', row.orders == null ? 'text-white/50' : 'text-white')}>
+                        {row.orders == null ? '구분 불가' : formatCount(row.orders, '건')}
+                      </td>
+                      <td className={cn('px-4 py-3', row.revenue == null ? 'text-white/50' : 'text-white')}>
+                        {row.revenue == null ? '구분 불가' : formatWon(row.revenue)}
+                      </td>
+                      <td className="px-2 py-3">
+                        <ChevronDown className={cn('h-4 w-4 text-white/70 transition', open && 'rotate-180')} />
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr className="border-t border-white/5 bg-white/[0.02]">
+                        <td colSpan={7} className="px-4 py-3">
+                          {channelLinks.length ? (
+                            <ul className="space-y-1.5">
+                              {channelLinks.map((l) => (
+                                <li key={l.id} className="flex items-center justify-between gap-3 text-sm text-white">
+                                  <span className="truncate font-medium">{l.title || '링크'}</span>
+                                  <span className="shrink-0 text-white/70">{l.click_count || 0}회</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-sm text-white/60">이 채널에 연결된 링크가 없어요.</p>
+                          )}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <p className="text-[11px] leading-relaxed text-white/30">
-        Mostem 클릭은 실시간입니다. 쿠팡 파트너스 리포트는 하루 이상 지연될 수 있습니다. API 연동 후 새로
-        만든 쿠팡 링크는 채널 ID(subId)가 붙어 리포트와 매칭됩니다. 연동 전·미매칭 트래픽은 “기타(미매칭)”
-        또는 “구분 불가”로 보일 수 있습니다.
-      </p>
+      <ChannelHelp />
     </div>
   )
 }
