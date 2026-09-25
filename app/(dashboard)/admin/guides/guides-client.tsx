@@ -215,7 +215,7 @@ export function GuidesClient({ initial }: { initial: AiGuide[] }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-[960px] space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">AI 지침서</h1>
         <p className="mt-2 text-sm text-white/45">
