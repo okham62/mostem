@@ -79,6 +79,17 @@ function hostLabel() {
   }
 }
 
+function originalProductUrl(block: ProfileBlock, links: TrackedLink[]) {
+  const hit = links.find((link) => {
+    const path = shortPath(link.prefix, link.code)
+    return (
+      block.url.includes(path) ||
+      Boolean(link.destination_url && block.url.includes(link.destination_url))
+    )
+  })
+  return String(hit?.destination_url || block.url || '').trim()
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -610,6 +621,7 @@ export function ProfilePanel({
                       key={b.id}
                       block={b}
                       image={profileBlockImage(b, links)}
+                      productUrl={originalProductUrl(b, links)}
                       onAddAbove={() => openAdd(i)}
                       onAddBelow={() => openAdd(i + 1)}
                       onTogglePin={() => void patchBlock(b.id, { pinned: !b.pinned })}
@@ -649,6 +661,17 @@ export function ProfilePanel({
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-2">
+                    {originalProductUrl(b, links) ? (
+                      <a
+                        href={originalProductUrl(b, links)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-white/45 hover:text-white"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        원본
+                      </a>
+                    ) : null}
                     {blockTab === 'archive' ? (
                       <button
                         type="button"
@@ -1024,6 +1047,7 @@ function BlockFields({
 function SortableBlockCard({
   block,
   image,
+  productUrl,
   onAddAbove,
   onAddBelow,
   onTogglePin,
@@ -1033,6 +1057,7 @@ function SortableBlockCard({
 }: {
   block: ProfileBlock
   image: string
+  productUrl: string
   onAddAbove: () => void
   onAddBelow: () => void
   onTogglePin: () => void
@@ -1085,6 +1110,18 @@ function SortableBlockCard({
         </button>
         <div className="flex items-center gap-2 px-2.5 py-1.5">
           <p className="min-w-0 flex-1 truncate text-sm font-medium">{block.title}</p>
+          {productUrl ? (
+            <a
+              href={productUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/45 hover:bg-white/10 hover:text-white"
+              title="원상품 열기"
+            >
+              <ExternalLink className="h-3 w-3" />
+              원본
+            </a>
+          ) : null}
           <button
             type="button"
             onClick={onTogglePin}
