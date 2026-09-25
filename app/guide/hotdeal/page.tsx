@@ -109,7 +109,7 @@ function Circle({ n, muted }: { n: number; muted?: boolean }) {
 export default function HotdealGuidePage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#0b0b0d] text-white">
-      <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-10 px-4 py-10 sm:px-5 sm:py-14">
+      <div className="mx-auto flex w-full max-w-[960px] flex-col gap-10 px-4 py-10 sm:px-5 sm:py-14">
         <header className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <MostemLogo size={24} rounded="lg" />
