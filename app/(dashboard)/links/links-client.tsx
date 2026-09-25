@@ -53,6 +53,19 @@ function origin() {
   return window.location.origin
 }
 
+function coupangSearchUrl(keyword: string) {
+  return `https://www.coupang.com/np/search?component=&q=${encodeURIComponent(keyword.trim())}&channel=user`
+}
+
+function tossSearchUrl(keyword: string) {
+  return `https://toss.shopping/search?keyword=${encodeURIComponent(keyword.trim())}`
+}
+
+function openSiteSearch(url: string) {
+  if (typeof window === 'undefined') return
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -1580,6 +1593,22 @@ function FindPanel({
             >
               <Search className="h-4 w-4" /> 비교하기
             </button>
+            <button
+              type="button"
+              disabled={!q.trim()}
+              onClick={() => openSiteSearch(coupangSearchUrl(q))}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 text-sm font-semibold text-white/85 hover:bg-white/10 disabled:opacity-40"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> 쿠팡에서 검색
+            </button>
+            <button
+              type="button"
+              disabled={!q.trim()}
+              onClick={() => openSiteSearch(tossSearchUrl(q))}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 text-sm font-semibold text-white/85 hover:bg-white/10 disabled:opacity-40"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> 토스에서 검색
+            </button>
           </div>
           {compareNote ? <p className="text-xs text-white/40">{compareNote}</p> : null}
           {!compareCoupang.length && !busy ? (
@@ -1625,6 +1654,17 @@ function FindPanel({
               className="rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-40"
             >
               검색
+            </button>
+            <button
+              type="button"
+              disabled={!q.trim()}
+              onClick={() =>
+                openSiteSearch(sub === 'toss' ? tossSearchUrl(q) : coupangSearchUrl(q))
+              }
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/15 bg-white/5 px-3.5 text-sm font-semibold text-white/85 hover:bg-white/10 disabled:opacity-40"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {sub === 'toss' ? '토스에서 검색' : '쿠팡에서 검색'}
             </button>
           </div>
           {note ? (
