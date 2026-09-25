@@ -17,8 +17,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ProfilePublicClient } from './profile-public-client'
 import { ProfileSnsIcons } from '@/components/profile-sns-icons'
-import { ProfilePublicLinks } from '@/components/profile-search'
-import { Link2 } from 'lucide-react'
+import { Link2, Search } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,10 +59,19 @@ export default async function PublicProfilePage({
   searchParams,
 }: {
   params: { slug: string }
-  searchParams?: { via?: string }
+  searchParams?: { via?: string; q?: string }
 }) {
   const slug = params.slug.toLowerCase()
   const viaSimple = searchParams?.via === 'simple'
+  const rawQuery = String(searchParams?.q || '')
+  const searchQuery = rawQuery.trim().toLowerCase()
+  const visibleBlocks = searchQuery
+    ? blocks.filter((b) => {
+        const title = (b.title || '').toLowerCase()
+        const url = (b.url || '').toLowerCase()
+        return title.includes(searchQuery) || url.includes(searchQuery)
+      })
+    : blocks
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('link_settings')
@@ -233,18 +241,45 @@ export default async function PublicProfilePage({
               <p className="mt-1 text-xs opacity-60">곧 새로운 추천을 채워둘게요.</p>
             </div>
           ) : (
-            <ProfilePublicLinks
-              slug={slug}
-              blocks={blocks}
-              searchEnabled
-              light={d.theme === 'light'}
-              blockClassName={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
-              blockStyle={{
-                background: d.blockStyle === 'outline' ? 'transparent' : blockBg,
-                color: blockFg,
-                border: blockBorder,
-              }}
-            />
+            <>
+              <form action="" method="get" className="relative mt-5 text-left">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                <input
+                  name="q"
+                  defaultValue={searchQuery}
+                  placeholder="검색어를 입력해주세요."
+                  className="h-11 w-full rounded-full border-0 bg-white pl-10 pr-4 text-sm text-zinc-800 shadow-sm outline-none placeholder:text-zinc-400"
+                />
+              </form>
+              {visibleBlocks.length === 0 ? (
+                <p className="mt-6 text-sm opacity-45">검색 결과가 없어요</p>
+              ) : (
+                <div className="mt-6 flex flex-col gap-3">
+                  {visibleBlocks.map((b: ProfileBlock) => (
+                    <a
+                      key={b.id}
+                      href={`/u/${slug}/go/${encodeURIComponent(b.id)}`}
+                      className={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
+                      style={{
+                        background: d.blockStyle === 'outline' ? 'transparent' : blockBg,
+                        color: blockFg,
+                        border: blockBorder,
+                      }}
+                    >
+                      {b.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={b.image}
+                          alt=""
+                          className="h-[72px] w-[72px] shrink-0 object-cover"
+                        />
+                      ) : null}
+                      <span className="min-w-0 flex-1 truncate px-4 py-3">{b.title || b.url}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {snsIcons && d.snsPosition === 'links' ? <div className="mt-8">{snsIcons}</div> : null}
