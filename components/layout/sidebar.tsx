@@ -143,7 +143,7 @@ export function Sidebar({ session, onHide }: SidebarProps) {
 
   useEffect(() => {
     const idle = (cb: () => void) =>
-      'requestIdleCallback' in window
+      typeof window.requestIdleCallback === 'function'
         ? window.requestIdleCallback(cb, { timeout: 2500 })
         : window.setTimeout(cb, 1600)
     const id = idle(() => {

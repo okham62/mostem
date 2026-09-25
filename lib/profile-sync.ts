@@ -22,15 +22,15 @@ export function applyTrackedLinksToSettings(
 }
 
 export function persistProfileBlocksLater(userId: string, blocks: ProfileBlock[]) {
-  void createAdminClient()
-    .from('link_settings')
-    .update({
-      profile_blocks: blocks,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .then(() => undefined)
-    .catch(() => undefined)
+  void Promise.resolve(
+    createAdminClient()
+      .from('link_settings')
+      .update({
+        profile_blocks: blocks,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId),
+  ).catch(() => undefined)
 }
 
 export async function syncProfileBlocksFromLinks(

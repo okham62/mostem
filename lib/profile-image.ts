@@ -6,7 +6,7 @@ export function dataUrlToResponse(raw: string) {
   if (!m) return null
   const bytes = Buffer.from(m[2].replace(/\s/g, ''), 'base64')
   if (!bytes.byteLength) return null
-  return new Response(bytes, {
+  return new Response(new Uint8Array(bytes), {
     headers: {
       'Content-Type': m[1].toLowerCase(),
       'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
@@ -15,7 +15,7 @@ export function dataUrlToResponse(raw: string) {
 }
 
 function imageResponse(bytes: Buffer, contentType: string) {
-  return new Response(bytes, {
+  return new Response(new Uint8Array(bytes), {
     headers: {
       'Content-Type': contentType,
       'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
