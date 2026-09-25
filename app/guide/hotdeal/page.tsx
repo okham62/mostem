@@ -40,7 +40,7 @@ const START = [
   {
     title: '토스도 쓸 거면 출발지 IP를 등록해요',
     body: '이걸 빼먹으면 토스 연결이 안 돼요. 모스템 설정 화면에 등록할 IP가 적혀 있으니 복사해서 토스 어드민에 넣고 저장하면 돼요.',
-    href: '/settings',
+    href: '/settings?tab=toss',
     action: '설정에서 IP 확인하기',
   },
   {
