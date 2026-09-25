@@ -2902,7 +2902,7 @@ function HotdealPanel({
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
         <div>
           <h3 className="text-sm font-medium">상품 뱃지</h3>
-          <p className="mt-1 text-xs text-white/40">상품 카드에 표시될 라벨이에요. 테마가 있는 상품에만 나타나요.</p>
+          <p className="mt-1 text-xs text-white/40">할인율은 사진 위, 상태 라벨은 제목 아래에 가로로 보여요.</p>
         </div>
         <ul className="space-y-2.5 text-xs">
           <li className="flex flex-wrap items-center gap-2">
@@ -2912,8 +2912,8 @@ function HotdealPanel({
           </li>
           <li className="flex flex-wrap items-center gap-2">
             <span aria-hidden>🔥</span>
-            <span className="rounded-full bg-rose-500/30 px-3 py-1 text-rose-200">큰 폭 할인</span>
-            <span className="text-white/40">50% 이상 할인 상품</span>
+            <span className="rounded-full bg-rose-500/30 px-3 py-1 text-rose-200">할인율</span>
+            <span className="text-white/40">사진 오른쪽 위에 %로 표시돼요</span>
           </li>
           <li className="flex flex-wrap items-center gap-2">
             <span aria-hidden>🏆</span>

@@ -116,7 +116,7 @@ export function HotdealStorefront({
         dark ? 'bg-[#0b0b0d] text-white' : 'bg-[#f4f5f8] text-[#14161c]',
       )}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
+      <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
         <ToggleGroup dark={dark}>
           <ToggleBtn active={grid} dark={dark} onClick={() => setGrid(true)} label="격자형으로 보기">
             <LayoutGrid className="size-4" />
@@ -147,7 +147,7 @@ export function HotdealStorefront({
         본 페이지는 토스쇼핑 쉐어링크 활동의 일환으로, 상품 구매 시 일정액의 수수료를 제공받습니다.
       </aside>
 
-      <div className={cn('mx-auto w-full px-4 py-8 sm:px-6 sm:py-10', toss ? 'max-w-6xl' : 'max-w-5xl')}>
+      <div className="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-6 sm:py-10">
         <section className={cn(toss ? 'text-center' : cn('rounded-[20px] border p-6 text-center sm:p-8', dark ? 'border-white/10 bg-white/[0.04]' : 'border-black/8 bg-white'))}>
           <h1 className="text-2xl font-black tracking-tight sm:text-3xl">{name}</h1>
           {intro ? (
@@ -564,10 +564,6 @@ function ProductCard({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={item.image} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/45 to-transparent" />
-        <div className="absolute left-2 top-2 flex max-w-[70%] flex-wrap gap-1">
-          <CardBadges item={item} />
-        </div>
         {item.discountRate ? (
           <span
             className={cn(
@@ -583,6 +579,7 @@ function ProductCard({
         <p className={cn('line-clamp-2 leading-tight', toss ? 'min-h-[2.5rem] text-[13px] font-semibold' : 'text-sm font-medium')}>
           {item.title}
         </p>
+        <CardBadges item={item} />
         <PriceRow item={item} dark={dark} toss={toss} />
       </div>
     </a>
@@ -590,28 +587,26 @@ function ProductCard({
 }
 
 function CardBadges({ item }: { item: HotdealItem }) {
+  const chips: { key: string; className: string; label: string }[] = []
+  if (item.timeSale) {
+    chips.push({ key: 'sale', className: 'bg-violet-600 text-white', label: '타임세일' })
+  }
+  if (item.bestRank) {
+    chips.push({ key: 'best', className: 'bg-fuchsia-600 text-white', label: `BEST ${item.bestRank}위` })
+  }
+  if (item.megaDiscount) {
+    chips.push({ key: 'mega', className: 'bg-amber-400 text-[#3b2a08]', label: '역대급 할인' })
+  }
+  if (!chips.length) return null
+
   return (
-    <>
-      {item.timeSale ? (
-        <span className="hotdeal-badge-live rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-black text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-          타임세일
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {chips.map((chip) => (
+        <span key={chip.key} className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', chip.className)}>
+          {chip.label}
         </span>
-      ) : null}
-      {item.bestRank ? (
-        <span className="rounded-full bg-fuchsia-600 px-2 py-0.5 text-[10px] font-black text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-          BEST {item.bestRank}위
-        </span>
-      ) : null}
-      {item.megaDiscount ? (
-        <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-[#3b2a08] shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-          역대급 할인
-        </span>
-      ) : item.bigDiscount ? (
-        <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-          {item.discountRate}% 할인
-        </span>
-      ) : null}
-    </>
+      ))}
+    </div>
   )
 }
 
