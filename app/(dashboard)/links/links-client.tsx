@@ -71,6 +71,21 @@ const FIND_STATE_KEY = 'mostem-find-panel'
 const FIND_HISTORY_KEY = 'mostem-find-history'
 const FIND_HISTORY_LIMIT = 20
 
+let tabMemory: TabId | null = null
+let findMemory: FindPersist | null = null
+
+function emptyFind(): FindPersist {
+  return {
+    sub: 'coupang',
+    q: '',
+    products: [],
+    note: '',
+    searchUrl: '',
+    compareCoupang: [],
+    compareNote: '',
+  }
+}
+
 function readStore<T>(key: string, kind: 'session' | 'local' = 'session'): T | null {
   if (typeof window === 'undefined') return null
   try {
@@ -88,6 +103,47 @@ function writeStore(key: string, value: unknown, kind: 'session' | 'local' = 'se
   } catch {
     /* ignore quota */
   }
+}
+
+function loadTab(): TabId {
+  if (tabMemory && TABS.some((t) => t.id === tabMemory)) return tabMemory
+  const saved = readStore<TabId>(LINKS_TAB_KEY)
+  if (saved && TABS.some((t) => t.id === saved)) {
+    tabMemory = saved
+    return saved
+  }
+  return 'convert'
+}
+
+function saveTab(tab: TabId) {
+  tabMemory = tab
+  writeStore(LINKS_TAB_KEY, tab)
+}
+
+function isFindPersist(value: unknown): value is FindPersist {
+  if (!value || typeof value !== 'object') return false
+  const row = value as Partial<FindPersist>
+  return Array.isArray(row.products)
+}
+
+function loadFind(): FindPersist {
+  if (findMemory) return findMemory
+  const saved = readStore<FindPersist>(FIND_STATE_KEY)
+  if (isFindPersist(saved)) {
+    findMemory = {
+      ...emptyFind(),
+      ...saved,
+      products: saved.products ?? [],
+      compareCoupang: saved.compareCoupang ?? [],
+    }
+    return findMemory
+  }
+  return emptyFind()
+}
+
+function saveFind(state: FindPersist) {
+  findMemory = state
+  writeStore(FIND_STATE_KEY, state)
 }
 
 function readFindHistory(): string[] {
@@ -533,10 +589,8 @@ function ImageDropZone({
 }
 
 export function LinksClient() {
-  const [tab, setTab] = useState<TabId>(() => {
-    const saved = readStore<TabId>(LINKS_TAB_KEY)
-    return TABS.some((t) => t.id === saved) ? (saved as TabId) : 'convert'
-  })
+  const [tab, setTab] = useState<TabId>('convert')
+  const [tabReady, setTabReady] = useState(false)
   const [settings, setSettings] = useState<LinkSettings | null>(null)
   const [links, setLinks] = useState<TrackedLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -545,8 +599,14 @@ export function LinksClient() {
   const [editing, setEditing] = useState<TrackedLink | null>(null)
 
   useEffect(() => {
-    writeStore(LINKS_TAB_KEY, tab)
-  }, [tab])
+    setTab(loadTab())
+    setTabReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!tabReady) return
+    saveTab(tab)
+  }, [tab, tabReady])
 
   const ping = useCallback((msg: string) => {
     setToast(msg)
@@ -699,17 +759,19 @@ export function LinksClient() {
         />
       )}
 
-      <div className={tab === 'find' ? '' : 'hidden'}>
-        <FindPanel
-          copyText={copyText}
-          onUseUrl={(url, title, image) => {
-            setTab('convert')
-            window.dispatchEvent(
-              new CustomEvent('mostem-links-prefill', { detail: { url, title, image } })
-            )
-          }}
-        />
-      </div>
+      {tabReady ? (
+        <div className={tab === 'find' ? '' : 'hidden'}>
+          <FindPanel
+            copyText={copyText}
+            onUseUrl={(url, title, image) => {
+              setTab('convert')
+              window.dispatchEvent(
+                new CustomEvent('mostem-links-prefill', { detail: { url, title, image } })
+              )
+            }}
+          />
+        </div>
+      ) : null}
 
       {tab === 'mine' && settings && (
         <MinePanel
@@ -1612,24 +1674,32 @@ function FindPanel({
   onUseUrl: (url: string, title: string, image?: string) => void
   copyText: (t: string) => void
 }) {
-  const saved = readStore<FindPersist>(FIND_STATE_KEY)
-  const [sub, setSub] = useState<FindSub>(saved?.sub === 'toss' || saved?.sub === 'compare' ? saved.sub : 'coupang')
-  const [q, setQ] = useState(saved?.q ?? '')
+  const initial = loadFind()
+  const [ready, setReady] = useState(false)
+  const [sub, setSub] = useState<FindSub>(
+    initial.sub === 'toss' || initial.sub === 'compare' ? initial.sub : 'coupang'
+  )
+  const [q, setQ] = useState(initial.q)
   const [busy, setBusy] = useState(false)
-  const [products, setProducts] = useState<FindProduct[]>(saved?.products ?? [])
-  const [note, setNote] = useState(saved?.note ?? '')
-  const [searchUrl, setSearchUrl] = useState(saved?.searchUrl ?? '')
-  const [compareCoupang, setCompareCoupang] = useState<FindProduct[]>(saved?.compareCoupang ?? [])
-  const [compareNote, setCompareNote] = useState(saved?.compareNote ?? '')
+  const [products, setProducts] = useState<FindProduct[]>(initial.products)
+  const [note, setNote] = useState(initial.note)
+  const [searchUrl, setSearchUrl] = useState(initial.searchUrl)
+  const [compareCoupang, setCompareCoupang] = useState<FindProduct[]>(initial.compareCoupang)
+  const [compareNote, setCompareNote] = useState(initial.compareNote)
   const [history, setHistory] = useState<string[]>(() => {
     const rows = readFindHistory()
-    const current = saved?.q?.trim()
+    const current = initial.q.trim()
     if (current && !rows.includes(current)) return writeFindHistory([current, ...rows])
     return rows
   })
 
   useEffect(() => {
-    writeStore(FIND_STATE_KEY, {
+    setReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!ready) return
+    saveFind({
       sub,
       q,
       products,
@@ -1637,8 +1707,8 @@ function FindPanel({
       searchUrl,
       compareCoupang,
       compareNote,
-    } satisfies FindPersist)
-  }, [sub, q, products, note, searchUrl, compareCoupang, compareNote])
+    })
+  }, [ready, sub, q, products, note, searchUrl, compareCoupang, compareNote])
 
   function rememberQuery(keyword: string) {
     const next = keyword.trim()
