@@ -2853,7 +2853,9 @@ function HotdealPanel({
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
         <h3 className="text-sm font-medium">노출 카테고리</h3>
-        <p className="text-xs text-white/40">선택하지 않으면 전체 카테고리가 노출돼요.</p>
+        <p className="text-xs text-white/40">
+          팔로워 성격에 맞는 카테고리를 2~3개만 고르면 더 자주 갱신돼요. 선택하지 않으면 전체가 노출돼요.
+        </p>
         <div className="flex flex-wrap gap-2">
           {HOTDEAL_CATEGORIES.map((c) => (
             <button
@@ -2940,7 +2942,10 @@ function HotdealPanel({
             ? '흰 카드에 얇은 실선, 각진 모서리. 세일가는 빨강으로 강조돼요.'
             : '골드 포인트에 둥근 카드예요. 모스템이 기본 그레이예요.'}
         </p>
-        <h3 className="pt-2 text-sm font-medium">배경 테마</h3>
+        <div className="pt-2">
+          <h3 className="text-sm font-medium">배경 테마</h3>
+          <p className="mt-1 text-xs text-white/40">페이지 바탕색이에요. 사이트 스타일과는 따로 골라요.</p>
+        </div>
         <div className="flex gap-2">
           {(
             [

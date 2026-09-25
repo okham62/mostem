@@ -241,9 +241,17 @@ function coupangUrl(title: string, card?: SlotCard) {
 function mapSlotCard(card: SlotCard, rank: number): ShoppingProduct | null {
   const title = stripHtml(card.productName || '')
   if (!title) return null
-  const price = Number(card.discountedSalePrice || card.salePrice || 0) || null
+  const sale = Number(card.salePrice || 0) || null
+  const discounted = Number(card.discountedSalePrice || 0) || null
+  const price = discounted || sale
+  const listPrice = discounted && sale && sale > discounted ? sale : null
   const rawDiscount = Number(card.discountedRatio || 0)
-  const discountRate = rawDiscount > 0 ? Math.round(rawDiscount) : null
+  const discountRate =
+    rawDiscount > 0
+      ? Math.round(rawDiscount)
+      : listPrice && price
+        ? Math.round((1 - price / listPrice) * 100)
+        : null
   const reviewScore =
     card.averageReviewScore != null && card.averageReviewScore > 0
       ? card.averageReviewScore.toFixed(1)
@@ -258,7 +266,7 @@ function mapSlotCard(card: SlotCard, rank: number): ShoppingProduct | null {
     image: card.images?.[0]?.imageUrl || '',
     price,
     priceText: formatWon(price),
-    listPrice: null,
+    listPrice,
     discountRate,
     mall: card.mallName || (card.mallId === 'coupang' ? '쿠팡' : '쿠팡'),
     reviewScore,

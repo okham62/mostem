@@ -9,7 +9,7 @@ const FIRST_CHECK_MS = 800
 const POLL_MS = 400
 const MESSAGE = '확장이 꺼져있어요. chrome://extensions에서 hami를 다시 켜주세요'
 const LABEL = `[ ${MESSAGE} ]`
-const HIDDEN_PREFIXES = ['/u/', '/login', '/register', '/go/']
+const HIDDEN_PREFIXES = ['/u/', '/s/', '/guide/', '/login', '/register', '/go/']
 
 function isHamiPing(data: unknown): data is { source: string; type: string; at?: number } {
   if (!data || typeof data !== 'object') return false

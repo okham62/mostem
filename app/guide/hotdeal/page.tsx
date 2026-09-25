@@ -49,19 +49,23 @@ const START = [
 const FAQ = [
   {
     q: '상품을 제가 하나하나 골라야 하나요?',
-    a: '아니요. 카테고리만 고르면 인기 상품이 자동으로 채워지고, 그 뒤로도 매일 새로고침돼요.',
+    a: '아니요. 카테고리만 고르면 인기 상품이 자동으로 채워지고, 그 뒤로도 매일 새로고침돼요. 손댈 게 없어요.',
   },
   {
     q: '사이트를 처음 만들면 언제 상품이 보여요?',
     a: '저장하고 발행하면 바로 첫 화면이 채워져요. 카테고리를 바꿔도 같은 방식이에요.',
   },
   {
-    q: '방문자가 더 비싸게 사게 되나요?',
-    a: '아니요. 가격은 쿠팡 그대로예요. 수수료는 쿠팡이 판매자와 정산하는 몫이라 방문자 부담이 아니에요.',
+    q: '품절된 상품이 계속 보이면 어떡해요?',
+    a: '새로고침될 때 자동으로 정리돼요. 화면 정리가 늦어도, 방문자가 실제로 눌렀을 때 품절이면 쿠팡에서 걸러지니 방문자가 품절 상품을 사게 되진 않아요.',
   },
   {
     q: '수수료는 어디서 확인해요?',
     a: '적립과 정산은 쿠팡 파트너스가 해요. 모스템에서는 어떤 상품이 눌렸는지 볼 수 있고, 실제 금액은 쿠팡 파트너스 리포트에서 확인하면 돼요.',
+  },
+  {
+    q: '방문자가 더 비싸게 사게 되나요?',
+    a: '아니요. 가격은 쿠팡 그대로예요. 수수료는 쿠팡이 판매자와 정산하는 몫이라 방문자 부담이 아니에요.',
   },
 ]
 
@@ -131,6 +135,53 @@ export default function HotdealGuidePage() {
               </li>
             ))}
           </ol>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="text-xl font-semibold">상품은 언제 새로고침되나요?</h2>
+          <p className="mt-1 text-sm text-white/45">방문자가 가장 많이 보는 앞부분부터 항상 먼저 챙겨요.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <p className="font-medium">🏆 인기 상품</p>
+              <p className="mt-1 text-sm text-white/45">순위에서 빠진 상품은 바로 목록에서 사라져요.</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <p className="font-medium">⏰ 오늘의 하루특가</p>
+              <p className="mt-1 text-sm text-white/45">끝난 특가는 그 자리에서 치워져요.</p>
+            </div>
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead className="bg-white/[0.04] text-white/50">
+                <tr>
+                  <th className="px-3 py-2 font-medium">무엇이</th>
+                  <th className="px-3 py-2 font-medium">언제</th>
+                  <th className="px-3 py-2 font-medium">설명</th>
+                </tr>
+              </thead>
+              <tbody className="text-white/70">
+                <tr className="border-t border-white/10">
+                  <td className="px-3 py-2">인기 상품</td>
+                  <td className="px-3 py-2">수시로</td>
+                  <td className="px-3 py-2">쿠팡 베스트를 다시 받아서, 순위에서 빠지면 바로 내려요.</td>
+                </tr>
+                <tr className="border-t border-white/10">
+                  <td className="px-3 py-2">하루특가</td>
+                  <td className="px-3 py-2">수시로</td>
+                  <td className="px-3 py-2">급상승·특가 상품을 따로 모아 타임세일 뱃지를 붙여요.</td>
+                </tr>
+                <tr className="border-t border-white/10">
+                  <td className="px-3 py-2">고른 카테고리</td>
+                  <td className="px-3 py-2">매일</td>
+                  <td className="px-3 py-2">2~3개만 고르면 그 카테고리 상품이 더 자주 보여요.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100/90">
+            💡 새로고침될 때마다 품절된 상품은 빠지고, 가격이 바뀐 상품은 새 가격으로 바뀌어요. 고른
+            카테고리가 적을수록 더 자주 갱신돼요.
+          </p>
         </section>
 
         <section className="mt-12">
