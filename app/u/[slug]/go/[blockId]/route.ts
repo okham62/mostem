@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isProfileBlockOn, type ProfileBlock } from '@/lib/links'
+import { isProfileBlockOn, parseShortLink, type ProfileBlock } from '@/lib/links'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -34,5 +34,22 @@ export async function GET(
     visitor_key: null,
   })
 
-  return NextResponse.redirect(block.url, 302)
+  const parsed = parseShortLink(block.url)
+  if (parsed) {
+    const { data: link } = await supabase
+      .from('tracked_links')
+      .select('destination_url')
+      .eq('user_id', data.user_id)
+      .eq('prefix', parsed.prefix)
+      .eq('code', parsed.code)
+      .maybeSingle()
+    if (link?.destination_url) {
+      return NextResponse.redirect(link.destination_url, 302)
+    }
+  }
+
+  const target = /^https?:\/\//i.test(block.url)
+    ? block.url
+    : new URL(block.url, 'https://www.mostem.kr').toString()
+  return NextResponse.redirect(target, 302)
 }

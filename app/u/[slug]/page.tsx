@@ -115,7 +115,13 @@ export default async function PublicProfilePage({
         : String(b.image || '').startsWith('data:image') || b.url
           ? `/u/${slug}/img/${encodeURIComponent(b.id)}`
           : null)
-    return { ...b, image }
+    return {
+      ...b,
+      image,
+      url: parsed
+        ? `/u/${slug}/go/${encodeURIComponent(parsed.prefix)}/${encodeURIComponent(parsed.code)}`
+        : `/u/${slug}/go/${encodeURIComponent(b.id)}`,
+    }
   })
   const visibleBlocks = searchQuery
     ? blocks.filter((b) => {
@@ -294,7 +300,7 @@ export default async function PublicProfilePage({
                   {visibleBlocks.map((b: ProfileBlock) => (
                     <a
                       key={b.id}
-                      href={`/u/${slug}/go/${encodeURIComponent(b.id)}`}
+                      href={b.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
