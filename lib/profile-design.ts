@@ -63,7 +63,7 @@ export const DEFAULT_PROFILE_DESIGN: ProfileDesign = {
   noticeText: '',
   noticeMarquee: true,
   noticeUrl: null,
-  searchEnabled: false,
+  searchEnabled: true,
   affiliateNoticeEnabled: true,
   affiliateNoticeText: DEFAULT_AFFILIATE_NOTICE,
   affiliateNoticeStyle: 'banner',
@@ -105,7 +105,7 @@ export function normalizeProfileDesign(raw: unknown): ProfileDesign {
     noticeText: typeof o.noticeText === 'string' ? o.noticeText : '',
     noticeMarquee: o.noticeMarquee === undefined ? true : Boolean(o.noticeMarquee),
     noticeUrl: typeof o.noticeUrl === 'string' ? o.noticeUrl : null,
-    searchEnabled: Boolean(o.searchEnabled),
+    searchEnabled: o.searchEnabled === undefined ? true : Boolean(o.searchEnabled),
     affiliateNoticeEnabled:
       o.affiliateNoticeEnabled === undefined ? true : Boolean(o.affiliateNoticeEnabled),
     affiliateNoticeText:

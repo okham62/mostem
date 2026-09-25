@@ -221,7 +221,7 @@ export default async function PublicProfilePage({
           {bio ? <p className="mt-2 text-sm opacity-50">{bio}</p> : null}
           {snsIcons && d.snsPosition !== 'links' ? <div className="mt-4">{snsIcons}</div> : null}
 
-          {blocks.length === 0 && !d.searchEnabled ? (
+          {blocks.length === 0 ? (
             <div
               className={`mt-8 border border-dashed px-4 py-10 text-sm opacity-50 ${blockRadius}`}
               style={{
@@ -236,7 +236,7 @@ export default async function PublicProfilePage({
             <ProfilePublicLinks
               slug={slug}
               blocks={blocks}
-              searchEnabled={Boolean(d.searchEnabled)}
+              searchEnabled
               light={d.theme === 'light'}
               blockClassName={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
               blockStyle={{
