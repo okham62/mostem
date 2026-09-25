@@ -11,6 +11,7 @@ import {
   Settings,
   Undo2,
   UserRound,
+  X,
 } from 'lucide-react'
 import {
   blockRadiusClass,
@@ -81,6 +82,90 @@ function cloneSnap(s: DesignSnapshot): DesignSnapshot {
     sns: s.sns.map((x) => ({ ...x })),
     design: { ...s.design },
   }
+}
+
+function ImageEditRow({
+  label,
+  image,
+  round,
+  onPick,
+  onFile,
+  onClear,
+}: {
+  label: string
+  image: string
+  round?: boolean
+  onPick: () => void
+  onFile: (file: File) => void
+  onClear: () => void
+}) {
+  const [dragOver, setDragOver] = useState(false)
+
+  return (
+    <div
+      onDragEnter={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDragOver(true)
+      }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return
+        setDragOver(false)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDragOver(false)
+        const file = e.dataTransfer.files?.[0]
+        if (file) onFile(file)
+      }}
+      className={cn(
+        'flex items-center gap-3 rounded-xl border px-3 py-2.5',
+        dragOver ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-white/10',
+      )}
+    >
+      <button
+        type="button"
+        onClick={onPick}
+        className={cn(
+          'h-11 w-11 shrink-0 overflow-hidden bg-white/10',
+          round ? 'rounded-full' : 'rounded-lg',
+        )}
+        title={`${label} 변경`}
+      >
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center">
+            {round ? <MostemLogo size={28} rounded="full" /> : <ImageIcon className="h-4 w-4 text-white/35" />}
+          </span>
+        )}
+      </button>
+      <button type="button" onClick={onPick} className="min-w-0 flex-1 text-left text-sm text-white/80">
+        {label}
+      </button>
+      {image ? (
+        <button
+          type="button"
+          onClick={onClear}
+          className="inline-flex items-center gap-0.5 text-xs text-white/40 hover:text-rose-300"
+        >
+          <X className="h-3.5 w-3.5" />
+          삭제
+        </button>
+      ) : (
+        <span className="text-xs text-white/35">변경</span>
+      )}
+    </div>
+  )
 }
 
 function Segmented<T extends string>({
@@ -492,21 +577,25 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
     })
   }
 
-  async function pickImage(kind: 'avatar' | 'cover' | 'brand') {
+  async function applyImage(kind: 'avatar' | 'cover' | 'brand', file: File) {
+    if (!file.type.startsWith('image/')) return
+    if (file.size > 4_000_000) {
+      alert('이미지는 4MB 이하로 올려 주세요')
+      return
+    }
+    const dataUrl = await fileToDataUrl(file)
+    if (kind === 'avatar') update({ avatarUrl: dataUrl })
+    else if (kind === 'cover') update({ coverUrl: dataUrl })
+    else patchDesign({ brandLogoUrl: dataUrl })
+  }
+
+  function pickImage(kind: 'avatar' | 'cover' | 'brand') {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/jpeg,image/png,image/webp'
-    input.onchange = async () => {
+    input.onchange = () => {
       const file = input.files?.[0]
-      if (!file) return
-      if (file.size > 4_000_000) {
-        alert('이미지는 4MB 이하로 올려 주세요')
-        return
-      }
-      const dataUrl = await fileToDataUrl(file)
-      if (kind === 'avatar') update({ avatarUrl: dataUrl })
-      else if (kind === 'cover') update({ coverUrl: dataUrl })
-      else patchDesign({ brandLogoUrl: dataUrl })
+      if (file) void applyImage(kind, file)
     }
     input.click()
   }
@@ -618,21 +707,22 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => void pickImage('avatar')}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 py-3 text-xs text-white/70"
-                >
-                  <ImageIcon className="h-3.5 w-3.5" /> 프로필 이미지
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void pickImage('cover')}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 py-3 text-xs text-white/70"
-                >
-                  <ImageIcon className="h-3.5 w-3.5" /> 커버 이미지
-                </button>
+              <div className="space-y-2">
+                <ImageEditRow
+                  label="프로필 이미지"
+                  image={snap.avatarUrl}
+                  round
+                  onPick={() => pickImage('avatar')}
+                  onFile={(file) => void applyImage('avatar', file)}
+                  onClear={() => update({ avatarUrl: '' })}
+                />
+                <ImageEditRow
+                  label="커버 이미지"
+                  image={snap.coverUrl}
+                  onPick={() => pickImage('cover')}
+                  onFile={(file) => void applyImage('cover', file)}
+                  onClear={() => update({ coverUrl: '' })}
+                />
               </div>
 
               <label className="block space-y-1.5">
