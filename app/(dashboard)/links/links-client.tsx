@@ -15,8 +15,6 @@ import {
   Search,
   Settings2,
   Store,
-  Sun,
-  Moon,
   Trash2,
   UserRound,
   X,
@@ -2932,7 +2930,7 @@ function HotdealPanel({
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
         <div>
-          <h3 className="text-sm font-medium">사이트 스타일</h3>
+          <h3 className="text-sm font-medium">🎨 사이트 스타일</h3>
           <p className="mt-1 text-xs leading-relaxed text-white/45">
             사이트 전체의 색과 모서리 모양이에요. 아래 배경 테마와는 따로 골라요 — 어떤 조합이든 됩니다.
           </p>
@@ -2970,7 +2968,7 @@ function HotdealPanel({
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
         <div>
-          <h3 className="text-sm font-medium">기본 상품 배치</h3>
+          <h3 className="text-sm font-medium">📦 기본 상품 배치</h3>
           <p className="mt-1 text-xs leading-relaxed text-white/45">
             방문자가 처음 들어왔을 때 하루특가·BEST·전체 목록이 이렇게 보여요. 방문자는 사이트 오른쪽 위
             버튼으로 직접 바꿀 수 있어요.
@@ -2979,9 +2977,9 @@ function HotdealPanel({
         <div className="inline-flex rounded-full bg-white/8 p-1">
           {(
             [
-              ['auto', '자동'],
-              ['grid', '격자형'],
-              ['list', '리스트형'],
+              ['auto', '🔄 자동'],
+              ['grid', '🔲 격자형'],
+              ['list', '📋 리스트형'],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -3008,7 +3006,7 @@ function HotdealPanel({
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
         <div>
-          <h3 className="text-sm font-medium">배경 테마</h3>
+          <h3 className="text-sm font-medium">🌙 배경 테마</h3>
           <p className="mt-1 text-xs text-white/40">
             방문자에게 보이는 사이트 배경색이에요. 방문자가 설정과 상관없이 여기서 고른 색으로 보여요.
           </p>
@@ -3022,8 +3020,7 @@ function HotdealPanel({
               bg === 'light' ? 'bg-white text-black' : 'text-white/50 hover:text-white/75'
             )}
           >
-            <Sun className="size-3.5" />
-            라이트
+            ☀️ 라이트
           </button>
           <button
             type="button"
@@ -3033,8 +3030,7 @@ function HotdealPanel({
               bg === 'dark' ? 'bg-[#2a2a32] text-white' : 'text-white/50 hover:text-white/75'
             )}
           >
-            <Moon className="size-3.5" />
-            다크
+            🌙 다크
           </button>
         </div>
       </section>
