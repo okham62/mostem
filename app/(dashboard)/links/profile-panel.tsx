@@ -1009,64 +1009,66 @@ function SortableBlockCard({
         transition,
         opacity: isDragging ? 0.45 : on ? 1 : 0.55,
       }}
-      className="rounded-2xl border border-white/10 bg-[#111113]"
+      className="flex overflow-hidden rounded-2xl border border-white/10 bg-[#111113]"
     >
       <button
         type="button"
-        onClick={onAddAbove}
-        className="flex w-full items-center justify-center py-1.5 text-white/35 hover:bg-white/[0.04] hover:text-white"
-        title="위에 추가"
+        className="flex w-10 shrink-0 cursor-grab touch-none items-center justify-center self-stretch border-r border-white/10 text-white/35 hover:bg-white/[0.06] hover:text-white active:cursor-grabbing"
+        title="드래그해서 순서 변경"
+        {...attributes}
+        {...listeners}
       >
-        <Plus className="h-3.5 w-3.5" />
+        <GripVertical className="h-5 w-5" />
       </button>
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
+      <div className="min-w-0 flex-1">
         <button
           type="button"
-          className="cursor-grab touch-none rounded-lg p-1 text-white/35 hover:bg-white/10 hover:text-white active:cursor-grabbing"
-          title="드래그해서 순서 변경"
-          {...attributes}
-          {...listeners}
+          onClick={onAddAbove}
+          className="flex w-full items-center justify-center py-1.5 text-white/35 hover:bg-white/[0.04] hover:text-white"
+          title="위에 추가"
         >
-          <GripVertical className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
         </button>
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
-        ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
-            <ImageIcon className="h-4 w-4 text-white/30" />
-          </div>
-        )}
-        <p className="min-w-0 flex-1 truncate text-sm font-medium">{block.title}</p>
-        <button
-          type="button"
-          onClick={onTogglePin}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px]',
-            block.pinned ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'text-white/40 hover:text-white',
+        <div className="flex items-center gap-2 px-2.5 py-1.5">
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={image} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+          ) : (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+              <ImageIcon className="h-4 w-4 text-white/30" />
+            </div>
           )}
-        >
-          <Pin className={cn('h-3 w-3', block.pinned && 'fill-current')} />
-          고정
-        </button>
-        <Switch on={on} onClick={onToggleEnabled} />
+          <p className="min-w-0 flex-1 truncate text-sm font-medium">{block.title}</p>
+          <button
+            type="button"
+            onClick={onTogglePin}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px]',
+              block.pinned ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'text-white/40 hover:text-white',
+            )}
+          >
+            <Pin className={cn('h-3 w-3', block.pinned && 'fill-current')} />
+            고정
+          </button>
+          <Switch on={on} onClick={onToggleEnabled} />
+          <button
+            type="button"
+            onClick={onSettings}
+            className="rounded-lg px-2 py-1 text-[11px] text-white/45 hover:bg-white/10 hover:text-white"
+          >
+            <Settings2 className="mr-0.5 inline h-3 w-3" />
+            설정
+          </button>
+        </div>
         <button
           type="button"
-          onClick={onSettings}
-          className="rounded-lg px-2 py-1 text-[11px] text-white/45 hover:bg-white/10 hover:text-white"
+          onClick={onAddBelow}
+          className="flex w-full items-center justify-center py-1.5 text-white/35 hover:bg-white/[0.04] hover:text-white"
+          title="아래에 추가"
         >
-          <Settings2 className="mr-0.5 inline h-3 w-3" />
-          설정
+          <ChevronDown className="h-3.5 w-3.5" />
         </button>
       </div>
-      <button
-        type="button"
-        onClick={onAddBelow}
-        className="flex w-full items-center justify-center py-1.5 text-white/35 hover:bg-white/[0.04] hover:text-white"
-        title="아래에 추가"
-      >
-        <ChevronDown className="h-3.5 w-3.5" />
-      </button>
     </li>
   )
 }
