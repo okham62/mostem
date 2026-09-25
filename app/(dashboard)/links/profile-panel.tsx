@@ -923,7 +923,7 @@ export function ProfilePanel({
             <p className="text-sm text-white/45">변환한 링크가 아직 없어요.</p>
           ) : (
             <ul className="max-h-72 space-y-2 overflow-y-auto">
-              {links.slice(0, 40).map((l) => (
+              {links.map((l) => (
                 <li key={l.id}>
                   <button
                     type="button"

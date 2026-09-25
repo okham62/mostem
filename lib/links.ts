@@ -54,6 +54,9 @@ export function persistableBlockImage(image?: string | null): string | null {
   return null
 }
 
+export const MAX_PROFILE_BLOCKS = 5_000
+export const MAX_PROFILE_BLOCKS_JSON = 2_500_000
+
 /** Drop data-URL images so profile_blocks stays small enough to save. */
 export function slimProfileBlocks(blocks: ProfileBlock[]): ProfileBlock[] {
   return (Array.isArray(blocks) ? blocks : [])

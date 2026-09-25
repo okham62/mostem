@@ -11,6 +11,8 @@ import {
   RESERVED_PROFILE_SLUGS,
   slimProfileBlocks,
   profileBlockFromTrackedLink,
+  MAX_PROFILE_BLOCKS,
+  MAX_PROFILE_BLOCKS_JSON,
   type LinkSettings,
   type ProfileBlock,
   type ProfileSnsLink,
@@ -290,9 +292,15 @@ export async function PATCH(req: Request) {
 
     if (body.profileBlocks !== undefined) {
       const slimmed = slimProfileBlocks(Array.isArray(body.profileBlocks) ? body.profileBlocks : [])
-      if (JSON.stringify(slimmed).length > 400_000) {
+      if (slimmed.length > MAX_PROFILE_BLOCKS) {
         return NextResponse.json(
-          { error: '상품 목록이 너무 커요. 이미지를 빼고 다시 저장해 주세요.' },
+          { error: `상품은 최대 ${MAX_PROFILE_BLOCKS.toLocaleString('ko-KR')}개까지 저장할 수 있어요.` },
+          { status: 400 },
+        )
+      }
+      if (JSON.stringify(slimmed).length > MAX_PROFILE_BLOCKS_JSON) {
+        return NextResponse.json(
+          { error: '상품 목록이 너무 커요. 제목을 줄이거나 일부를 보관한 뒤 다시 저장해 주세요.' },
           { status: 400 },
         )
       }
