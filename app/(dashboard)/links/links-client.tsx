@@ -682,10 +682,18 @@ export function LinksClient() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || '저장 실패')
+    const data = (await res.json().catch(() => ({}))) as { error?: string; settings?: LinkSettings }
+    if (!res.ok) {
+      throw new Error(
+        data.error ||
+          (res.status === 413
+            ? '저장 용량이 너무 커요. 상품 이미지를 빼고 다시 저장해 주세요.'
+            : '저장 실패'),
+      )
+    }
+    if (!data.settings) throw new Error('저장 응답이 비어 있어요')
     setSettings(data.settings)
-    return data.settings as LinkSettings
+    return data.settings
   }
 
   async function copyText(text: string) {

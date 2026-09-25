@@ -36,9 +36,11 @@ import {
 import {
   isProfileBlockOn,
   isValidSlug,
+  persistableBlockImage,
   profileBlockImage,
   profilePublicPath,
   shortPath,
+  slimProfileBlocks,
   sortProfileBlocks,
   type LinkSettings,
   type ProfileBlock,
@@ -200,8 +202,12 @@ export function ProfilePanel({
   const live = useMemo(() => blocks.filter((b) => !b.archived), [blocks])
   const archived = useMemo(() => blocks.filter((b) => b.archived), [blocks])
   const previewBlocks = useMemo(
-    () => sortProfileBlocks(live.filter((b) => isProfileBlockOn(b))),
-    [live],
+    () =>
+      sortProfileBlocks(live.filter((b) => isProfileBlockOn(b))).map((b) => ({
+        ...b,
+        image: profileBlockImage(b, links) || b.image,
+      })),
+    [live, links],
   )
   const visibleBlocks = (blockTab === 'list' ? live : archived).filter((b) => {
     if (!blockQuery.trim()) return true
@@ -223,18 +229,37 @@ export function ProfilePanel({
       setBusy(true)
       setErr('')
       try {
-        await onSave(patch)
+        const incoming = Array.isArray(patch.profileBlocks)
+          ? (patch.profileBlocks as ProfileBlock[])
+          : blocks
+        const slimmed = slimProfileBlocks(incoming)
+        const publishedNext =
+          typeof patch.profilePublished === 'boolean' ? patch.profilePublished : published
+        const next = await onSave({
+          ...patch,
+          profileBlocks: slimmed,
+          profilePublished: publishedNext,
+        })
+        const savedOn = Array.isArray(next?.profile_blocks)
+          ? next.profile_blocks.filter((b) => b.url && isProfileBlockOn(b)).length
+          : slimmed.filter((b) => b.url && isProfileBlockOn(b)).length
+        const sentOn = slimmed.filter((b) => b.url && isProfileBlockOn(b)).length
+        if (savedOn < sentOn) {
+          throw new Error(`상품 ${sentOn}개 중 ${savedOn}개만 저장됐어요. 다시 저장해 주세요.`)
+        }
+        setBlocks(slimmed)
         setSavedLabel('저장 완료')
         setDirty(false)
         window.setTimeout(() => setSavedLabel(''), 1800)
       } catch (e) {
-        setErr(e instanceof Error ? e.message : '저장 실패')
+        const message = e instanceof Error ? e.message : '저장 실패'
+        setErr(message)
         throw e
       } finally {
         setBusy(false)
       }
     },
-    [onSave],
+    [onSave, blocks, published],
   )
 
   const persistBlocks = (next: ProfileBlock[]) => {
@@ -254,13 +279,8 @@ export function ProfilePanel({
   }
 
   async function saveProfile() {
-    const next = blocks.map((b) => {
-      const image = profileBlockImage(b, links)
-      return image && !String(b.image || '').trim() ? { ...b, image } : b
-    })
-    if (next !== blocks) setBlocks(next)
     await save({
-      profileBlocks: next,
+      profileBlocks: blocks,
       profilePublished: published,
     })
   }
@@ -298,22 +318,16 @@ export function ProfilePanel({
       setErr('영문 소문자, 숫자, 하이픈으로 3–30자')
       return
     }
-    setBusy(true)
-    setErr('')
     try {
-      await onSave({
+      await save({
         profileSlug: nextSlug,
         profileSimpleAddress: simpleDraft,
       })
       setSlug(nextSlug)
       setSimpleAddress(simpleDraft)
       setShowAddress(false)
-      setSavedLabel('주소 저장 완료')
-      window.setTimeout(() => setSavedLabel(''), 1800)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '주소 저장 실패')
-    } finally {
-      setBusy(false)
+    } catch {
+      /* save() already set err */
     }
   }
 
@@ -323,7 +337,7 @@ export function ProfilePanel({
       id: crypto.randomUUID(),
       title: draftTitle.trim() || draftUrl.trim(),
       url: draftUrl.trim(),
-      image: draftImage.trim() || null,
+      image: persistableBlockImage(draftImage),
       enabled: true,
       pinned: false,
     }
@@ -341,7 +355,7 @@ export function ProfilePanel({
       id: crypto.randomUUID(),
       title: link.title || url,
       url,
-      image: link.og_image_url || null,
+      image: persistableBlockImage(link.og_image_url),
       enabled: true,
       pinned: false,
     }

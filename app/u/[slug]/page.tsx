@@ -1,8 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { MostemLogo } from '@/components/mostem-logo'
 import {
+  findTrackedLinkForBlock,
   isProfileBlockOn,
   normalizeLinkSettings,
+  persistableBlockImage,
   sortProfileBlocks,
   type ProfileBlock,
   type ProfileSnsLink,
@@ -78,9 +80,24 @@ export default async function PublicProfilePage({
   if (!settings.profile_published) notFound()
   if (viaSimple && !settings.profile_simple_address) notFound()
 
+  const { data: linkRefs } = await supabase
+    .from('tracked_links')
+    .select('prefix, code, destination_url')
+    .eq('user_id', settings.user_id)
+
   const blocks = sortProfileBlocks(
     settings.profile_blocks.filter((b) => b.url && isProfileBlockOn(b)),
-  )
+  ).map((b) => {
+    const httpImage = persistableBlockImage(b.image)
+    const hasThumb =
+      Boolean(httpImage) ||
+      Boolean(String(b.image || '').startsWith('data:image')) ||
+      Boolean(findTrackedLinkForBlock(b, linkRefs ?? []))
+    return {
+      ...b,
+      image: httpImage || (hasThumb ? `/u/${slug}/img/${encodeURIComponent(b.id)}` : null),
+    }
+  })
   const visibleBlocks = searchQuery
     ? blocks.filter((b) => {
         const title = (b.title || '').toLowerCase()

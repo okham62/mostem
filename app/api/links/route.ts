@@ -9,6 +9,7 @@ import {
   normalizeDestinationUrl,
   normalizeLinkSettings,
   RESERVED_PROFILE_SLUGS,
+  slimProfileBlocks,
   type LinkSettings,
   type ProfileBlock,
   type ProfileSnsLink,
@@ -259,7 +260,14 @@ export async function PATCH(req: Request) {
     }
 
     if (body.profileBlocks !== undefined) {
-      patch.profile_blocks = Array.isArray(body.profileBlocks) ? body.profileBlocks : []
+      const slimmed = slimProfileBlocks(Array.isArray(body.profileBlocks) ? body.profileBlocks : [])
+      if (JSON.stringify(slimmed).length > 400_000) {
+        return NextResponse.json(
+          { error: '상품 목록이 너무 커요. 이미지를 빼고 다시 저장해 주세요.' },
+          { status: 400 },
+        )
+      }
+      patch.profile_blocks = slimmed
     }
     if (body.profilePublished !== undefined) patch.profile_published = !!body.profilePublished
     if (body.profileSimpleAddress !== undefined) {

@@ -17,17 +17,48 @@ export type ProfileBlock = {
   enabled?: boolean
 }
 
+export function findTrackedLinkForBlock<
+  T extends { prefix: string; code: string; destination_url?: string | null },
+>(block: Pick<ProfileBlock, 'url'>, links: T[] = []): T | undefined {
+  const url = String(block.url || '')
+  if (!url) return undefined
+  return links.find((link) => {
+    const path = shortPath(link.prefix, link.code)
+    const loose = `/${link.prefix}/${link.code}`
+    return (
+      url.includes(path) ||
+      url.includes(loose) ||
+      Boolean(link.destination_url && url.includes(link.destination_url))
+    )
+  })
+}
+
+export function persistableBlockImage(image?: string | null): string | null {
+  const stored = String(image || '').trim()
+  if (!stored) return null
+  if (/^https?:\/\//i.test(stored)) return stored.slice(0, 2000)
+  return null
+}
+
+/** Drop data-URL images so profile_blocks stays small enough to save. */
+export function slimProfileBlocks(blocks: ProfileBlock[]): ProfileBlock[] {
+  return (Array.isArray(blocks) ? blocks : [])
+    .filter((b) => b && typeof b === 'object')
+    .map((b) => ({
+      id: String(b.id || '').trim() || crypto.randomUUID(),
+      title: String(b.title || '').slice(0, 240),
+      url: String(b.url || '').trim().slice(0, 2000),
+      image: persistableBlockImage(b.image),
+      archived: Boolean(b.archived),
+      pinned: Boolean(b.pinned),
+      enabled: b.enabled !== false,
+    }))
+}
+
 export function profileBlockImage(block: ProfileBlock, links: TrackedLink[] = []): string {
   const stored = String(block.image || '').trim()
   if (stored) return stored
-  const hit = links.find((link) => {
-    const path = `/${link.prefix}/${link.code}`
-    return (
-      block.url.includes(path) ||
-      Boolean(link.destination_url && block.url.includes(link.destination_url))
-    )
-  })
-  return String(hit?.og_image_url || '').trim()
+  return String(findTrackedLinkForBlock(block, links)?.og_image_url || '').trim()
 }
 
 export function isProfileBlockOn(block: ProfileBlock) {
