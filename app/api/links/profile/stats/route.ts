@@ -6,13 +6,18 @@ export const dynamic = 'force-dynamic'
 
 type RangeKey = 'today' | '7d' | '28d' | 'all'
 
+const KST_MS = 9 * 60 * 60 * 1000
+
+function inKst(d: Date) {
+  return new Date(d.getTime() + KST_MS)
+}
+
 function rangeStart(range: RangeKey): Date | null {
   const now = new Date()
   if (range === 'all') return null
   if (range === 'today') {
-    const d = new Date(now)
-    d.setHours(0, 0, 0, 0)
-    return d
+    const k = inKst(now)
+    return new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - KST_MS)
   }
   const days = range === '7d' ? 7 : 28
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
@@ -59,10 +64,38 @@ export async function GET(req: Request) {
   const clicks = rows.filter((r) => r.kind === 'click')
   const visitorSet = new Set(views.map((r) => r.visitor_key || r.id))
 
-  const dayKey = (iso: string) => iso.slice(0, 10)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const dayKey = (d: Date) => {
+    const k = inKst(d)
+    return `${k.getUTCFullYear()}-${pad(k.getUTCMonth() + 1)}-${pad(k.getUTCDate())}`
+  }
+  const hourKey = (d: Date) => {
+    const k = inKst(d)
+    return `${dayKey(d)} ${pad(k.getUTCHours())}:00`
+  }
+  const hourly = range === 'today'
+
   const seriesMap = new Map<string, { views: number; clicks: number; visitors: Set<string> }>()
+  const keys: string[] = []
+  if (hourly) {
+    const today0 = rangeStart('today') || new Date()
+    for (let h = 0; h < 24; h++) {
+      keys.push(hourKey(new Date(today0.getTime() + h * 60 * 60 * 1000)))
+    }
+  } else {
+    const days = range === '7d' ? 7 : range === '28d' ? 28 : 0
+    if (days) {
+      const today0 = rangeStart('today') || new Date()
+      for (let i = days - 1; i >= 0; i--) {
+        keys.push(dayKey(new Date(today0.getTime() - i * 24 * 60 * 60 * 1000)))
+      }
+    }
+  }
+  for (const k of keys) seriesMap.set(k, { views: 0, clicks: 0, visitors: new Set() })
+
   for (const r of rows) {
-    const k = dayKey(r.created_at)
+    const d = new Date(r.created_at)
+    const k = hourly ? hourKey(d) : dayKey(d)
     const bucket = seriesMap.get(k) || { views: 0, clicks: 0, visitors: new Set<string>() }
     if (r.kind === 'view') {
       bucket.views += 1
@@ -92,8 +125,7 @@ export async function GET(req: Request) {
     .slice(0, 5)
     .map(([blockId, count]) => ({ blockId, count }))
 
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  const todayStart = rangeStart('today') || new Date()
   const { count: todayViews } = await supabase
     .from('profile_events')
     .select('id', { count: 'exact', head: true })

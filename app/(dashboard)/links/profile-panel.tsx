@@ -1264,21 +1264,33 @@ function StatsView({
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-        <p className="mb-3 text-xs text-white/45">추이</p>
-        <div className="flex h-36 items-end gap-1">
+        <p className="mb-3 text-xs text-white/45">
+          추이 · 조회 {stats?.views ?? 0}회
+        </p>
+        <div className="flex h-40 items-stretch gap-0.5">
           {(stats?.series || []).length === 0 ? (
             <p className="m-auto text-xs text-white/35">아직 데이터가 없어요</p>
           ) : (
-            (stats?.series || []).map((s) => (
-              <div key={s.date} className="flex flex-1 flex-col items-center gap-1">
-                <div
-                  className="w-full rounded-t bg-[var(--accent)]/80"
-                  style={{ height: `${Math.max(4, (s.views / maxViews) * 100)}%` }}
-                  title={`${s.date}: 조회 ${s.views}`}
-                />
-                <span className="text-[9px] text-white/30">{s.date.slice(5)}</span>
-              </div>
-            ))
+            (stats?.series || []).map((s) => {
+              const pct = s.views <= 0 ? 0 : Math.max(8, (s.views / maxViews) * 100)
+              const hourly = s.date.includes(':')
+              const label = hourly ? s.date.slice(11, 13) : s.date.slice(5)
+              const showLabel = !hourly || ['00', '06', '12', '18'].includes(label)
+              return (
+                <div key={s.date} className="flex min-w-0 flex-1 flex-col items-center">
+                  <div className="flex min-h-0 w-full flex-1 items-end">
+                    <div
+                      className="w-full rounded-t bg-[var(--accent)]"
+                      style={{ height: `${pct}%` }}
+                      title={`${s.date} · 조회 ${s.views} · 클릭 ${s.clicks}`}
+                    />
+                  </div>
+                  <span className="mt-1 h-3 shrink-0 text-[9px] text-white/35">
+                    {showLabel ? label : ''}
+                  </span>
+                </div>
+              )
+            })
           )}
         </div>
       </div>
