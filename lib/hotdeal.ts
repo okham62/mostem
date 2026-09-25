@@ -1,6 +1,17 @@
 import { HOTDEAL_CATEGORIES } from '@/lib/links'
 import type { ShoppingProduct } from '@/lib/shopping'
 
+export const HOTDEAL_DEMO_SLUG = 'mostem-demo'
+
+export const HOTDEAL_DEMO = {
+  slug: HOTDEAL_DEMO_SLUG,
+  name: '🔥 모스템 데모 핫딜 — 매일 엄선하는 쿠팡 핫딜',
+  intro: '매일 새벽 자동으로 채워지는 쿠팡 특가 모음 — 예시 사이트예요',
+  categories: ['식품', '뷰티', '생활용품'],
+  theme: 'mostem',
+  bg: 'dark',
+}
+
 export type HotdealFilter = 'all' | 'deal' | 'best' | string
 
 export type HotdealItem = {

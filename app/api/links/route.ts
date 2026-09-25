@@ -247,6 +247,7 @@ export async function PATCH(req: Request) {
       hotdealPublished: boolean
       hotdealTheme: string
       hotdealBg: string
+      hotdealLayout: string
     }>
 
     await ensureSettings(session.user.id)
@@ -355,6 +356,9 @@ export async function PATCH(req: Request) {
         if (!isValidSlug(slug)) {
           return NextResponse.json({ error: '핫딜 주소는 영문 소문자·숫자·하이픈 3~30자' }, { status: 400 })
         }
+        if (RESERVED_PROFILE_SLUGS.has(slug)) {
+          return NextResponse.json({ error: '사용할 수 없는 핫딜 주소입니다' }, { status: 400 })
+        }
         const { data: clash } = await supabase
           .from('link_settings')
           .select('user_id')
@@ -374,13 +378,29 @@ export async function PATCH(req: Request) {
     if (body.hotdealPublished !== undefined) patch.hotdeal_published = !!body.hotdealPublished
     if (body.hotdealTheme !== undefined) patch.hotdeal_theme = body.hotdealTheme || 'mostem'
     if (body.hotdealBg !== undefined) patch.hotdeal_bg = body.hotdealBg || 'dark'
+    if (body.hotdealLayout !== undefined) {
+      const layout = String(body.hotdealLayout || 'auto')
+      patch.hotdeal_layout = layout === 'grid' || layout === 'list' ? layout : 'auto'
+    }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('link_settings')
       .update(patch)
       .eq('user_id', session.user.id)
       .select('*')
       .single()
+
+    if (error && /hotdeal_layout/i.test(error.message)) {
+      delete patch.hotdeal_layout
+      const retry = await supabase
+        .from('link_settings')
+        .update(patch)
+        .eq('user_id', session.user.id)
+        .select('*')
+        .single()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) {
       if (/column .* does not exist/i.test(error.message)) {

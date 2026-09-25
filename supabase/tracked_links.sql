@@ -13,6 +13,7 @@ create table if not exists public.link_settings (
   hotdeal_published boolean not null default false,
   hotdeal_theme text not null default 'mostem',
   hotdeal_bg text not null default 'dark',
+  hotdeal_layout text not null default 'auto',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint link_settings_prefix_format check (prefix ~ '^[a-z0-9]{1,12}$'),
@@ -23,6 +24,9 @@ create table if not exists public.link_settings (
     hotdeal_slug is null or hotdeal_slug ~ '^[a-z0-9-]{3,30}$'
   )
 );
+
+alter table public.link_settings
+  add column if not exists hotdeal_layout text not null default 'auto';
 
 create unique index if not exists link_settings_prefix_uidx
   on public.link_settings (prefix);

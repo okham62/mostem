@@ -193,7 +193,7 @@ export function SettingsClient() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[840px] space-y-5">
+    <div className="mx-auto w-full max-w-5xl space-y-5">
       {toast && (
         <div className="fixed right-4 top-4 z-[70] rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
           {toast}

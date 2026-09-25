@@ -13,10 +13,10 @@ import {
   Pencil,
   RefreshCw,
   Search,
-  Moon,
   Settings2,
   Store,
   Sun,
+  Moon,
   Trash2,
   UserRound,
   X,
@@ -734,7 +734,7 @@ export function LinksClient() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[920px] space-y-5">
+    <div className="mx-auto w-full max-w-[1024px] space-y-5">
       <div className="flex flex-wrap gap-1.5 border-b border-white/10 pb-3">
         {TABS.map((t) => {
           const Icon = t.icon
@@ -2727,6 +2727,7 @@ function HotdealPanel({
   const [cats, setCats] = useState<string[]>(settings.hotdeal_categories || [])
   const [theme, setTheme] = useState(settings.hotdeal_theme || 'mostem')
   const [bg, setBg] = useState(settings.hotdeal_bg || 'dark')
+  const [layout, setLayout] = useState(settings.hotdeal_layout || 'auto')
   const [published, setPublished] = useState(!!settings.hotdeal_published)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -2740,6 +2741,7 @@ function HotdealPanel({
     setCats(settings.hotdeal_categories || [])
     setTheme(settings.hotdeal_theme || 'mostem')
     setBg(settings.hotdeal_bg || 'dark')
+    setLayout(settings.hotdeal_layout || 'auto')
     setPublished(!!settings.hotdeal_published)
   }, [settings])
 
@@ -2783,6 +2785,7 @@ function HotdealPanel({
         hotdealCategories: cats,
         hotdealTheme: theme,
         hotdealBg: bg,
+        hotdealLayout: layout,
         hotdealPublished: nextPublished,
       })
       setPublished(nextPublished)
@@ -2807,11 +2810,14 @@ function HotdealPanel({
             {published ? '공개' : '비공개'}
           </span>
         </div>
-        {slug ? (
-          <a href={`/s/${slug}`} target="_blank" rel="noreferrer" className="text-xs text-[var(--accent)] underline">
-            사이트 보기
-          </a>
-        ) : null}
+        <a
+          href="/s/mostem-demo"
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-[var(--accent)] underline"
+        >
+          예시 사이트보기
+        </a>
       </div>
 
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/15 px-4 py-3">
@@ -2931,15 +2937,13 @@ function HotdealPanel({
             사이트 전체의 색과 모서리 모양이에요. 아래 배경 테마와는 따로 골라요 — 어떤 조합이든 됩니다.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="inline-flex rounded-full bg-white/8 p-1">
           <button
             type="button"
             onClick={() => setTheme('mostem')}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs',
-              theme === 'mostem'
-                ? 'border-white/15 bg-white/10 text-white'
-                : 'border-transparent bg-white/5 text-white/55'
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs',
+              theme === 'mostem' ? 'bg-[#2a2a32] text-white' : 'text-white/50 hover:text-white/75'
             )}
           >
             <MostemLogo size={16} rounded="full" />
@@ -2949,10 +2953,8 @@ function HotdealPanel({
             type="button"
             onClick={() => setTheme('toss')}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs',
-              theme === 'toss'
-                ? 'border-white/15 bg-white/10 text-white'
-                : 'border-transparent bg-white/5 text-white/55'
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs',
+              theme === 'toss' ? 'bg-[#2a2a32] text-white' : 'text-white/50 hover:text-white/75'
             )}
           >
             <TossLogo size={16} />
@@ -2964,19 +2966,60 @@ function HotdealPanel({
             ? '흰 카드에 얇은 실선, 각진 모서리. 세일가는 빨강으로 강조돼요.'
             : '골드 포인트에 둥근 카드예요. 모스템이 기본 그레이예요.'}
         </p>
-        <div className="pt-2">
-          <h3 className="text-sm font-medium">배경 테마</h3>
-          <p className="mt-1 text-xs text-white/40">
-            방문자에게 보이는 사이트 배경이에요. 방문자가 설정과 상관없이 여기서 고른 색으로 보여요.
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-white/10 p-4">
+        <div>
+          <h3 className="text-sm font-medium">기본 상품 배치</h3>
+          <p className="mt-1 text-xs leading-relaxed text-white/45">
+            방문자가 처음 들어왔을 때 하루특가·BEST·전체 목록이 이렇게 보여요. 방문자는 사이트 오른쪽 위
+            버튼으로 직접 바꿀 수 있어요.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="inline-flex rounded-full bg-white/8 p-1">
+          {(
+            [
+              ['auto', '자동'],
+              ['grid', '격자형'],
+              ['list', '리스트형'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setLayout(id)}
+              className={cn(
+                'rounded-full px-3.5 py-1.5 text-xs',
+                layout === id ? 'bg-[#2a2a32] text-white' : 'text-white/50 hover:text-white/75'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs leading-relaxed text-white/40">
+          {layout === 'grid'
+            ? '모든 화면에서 격자형으로 보여요.'
+            : layout === 'list'
+              ? '모든 화면에서 리스트형으로 보여요.'
+              : '휴대폰에선 리스트형, PC에선 격자형으로 보여요. 기기마다 보기가 달라요.'}
+        </p>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-white/10 p-4">
+        <div>
+          <h3 className="text-sm font-medium">배경 테마</h3>
+          <p className="mt-1 text-xs text-white/40">
+            방문자에게 보이는 사이트 배경색이에요. 방문자가 설정과 상관없이 여기서 고른 색으로 보여요.
+          </p>
+        </div>
+        <div className="inline-flex rounded-full bg-white/8 p-1">
           <button
             type="button"
             onClick={() => setBg('light')}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs',
-              bg === 'light' ? 'bg-white text-black' : 'bg-white/5 text-white/55'
+              bg === 'light' ? 'bg-white text-black' : 'text-white/50 hover:text-white/75'
             )}
           >
             <Sun className="size-3.5" />
@@ -2987,7 +3030,7 @@ function HotdealPanel({
             onClick={() => setBg('dark')}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs',
-              bg === 'dark' ? 'bg-white text-black' : 'bg-white/5 text-white/55'
+              bg === 'dark' ? 'bg-[#2a2a32] text-white' : 'text-white/50 hover:text-white/75'
             )}
           >
             <Moon className="size-3.5" />
@@ -3007,7 +3050,7 @@ function HotdealPanel({
         {coupangOn === false ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-full bg-white/5 px-4 py-2.5 text-xs text-white/65">
             <span>쿠팡 파트너스 키가 아직 연결되지 않았어요.</span>
-            <a href="/settings" className="shrink-0 font-medium text-[var(--accent)] hover:underline">
+            <a href="/settings?tab=coupang" className="shrink-0 font-medium text-[var(--accent)] hover:underline">
               설정에서 연결하기
             </a>
           </div>
@@ -3015,7 +3058,7 @@ function HotdealPanel({
         {tossOn === false ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-full bg-white/5 px-4 py-2.5 text-xs text-white/65">
             <span>토스 쉐어링크 키가 아직 연결되지 않았어요.</span>
-            <a href="/settings" className="shrink-0 font-medium text-[var(--accent)] hover:underline">
+            <a href="/settings?tab=toss" className="shrink-0 font-medium text-[var(--accent)] hover:underline">
               설정에서 연결하기
             </a>
           </div>

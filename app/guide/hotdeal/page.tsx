@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { LayoutGrid } from 'lucide-react'
+import { Clock, KeyRound, LayoutGrid } from 'lucide-react'
 import { MostemLogo } from '@/components/mostem-logo'
 import { GuideFaq } from './guide-faq'
 
@@ -88,9 +88,16 @@ const FAQ = [
   },
 ]
 
-function Circle({ n }: { n: number }) {
+const CARD =
+  'relative flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.04] gap-4 p-5 sm:p-6'
+
+function Circle({ n, muted }: { n: number; muted?: boolean }) {
   return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-bold text-white">
+    <span
+      className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+        muted ? 'bg-white/10 text-white/80' : 'bg-[var(--accent)] text-white'
+      }`}
+    >
       {n}
     </span>
   )
@@ -98,74 +105,77 @@ function Circle({ n }: { n: number }) {
 
 export default function HotdealGuidePage() {
   return (
-    <div className="min-h-screen bg-[#0b0b0d] text-white">
-      <div className="mx-auto max-w-2xl px-4 py-12">
-        <div className="mb-8 flex items-center gap-2">
-          <MostemLogo size={20} rounded="lg" />
-          <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/70">핫딜 사이트 안내</span>
-        </div>
-
-        <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-4xl">
-          내 주소로 여는 쇼핑 큐레이션
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-white/50">
-          쿠팡을 한 번 연결하면 mostem.kr/s/내이름 주소로 내 핫딜 사이트가 열려요. 상품은 매일
-          자동으로 채워지고, 방문자가 사고 나면 수수료가 내 계정에 쌓여요.
-        </p>
-
-        <div className="mt-6 grid grid-cols-3 gap-2">
-          {[
-            ['준비하는 데', '5분이면 충분해요', true],
-            ['상품 채우기', '전부 자동이에요', false],
-            ['수수료는', '내 계정으로', false],
-          ].map(([k, v, gold]) => (
-            <div key={String(k)} className="rounded-2xl bg-white/[0.05] px-2 py-4 text-center sm:px-3">
-              <p className="text-[11px] text-white/40">{k}</p>
-              <p className={`mt-1 text-xs font-semibold sm:text-sm ${gold ? 'text-amber-200' : ''}`}>{v}</p>
-            </div>
-          ))}
-        </div>
-
-        <section className="mt-6 rounded-[28px] bg-white/[0.04] p-5 sm:p-6">
+    <div className="min-h-screen overflow-x-hidden bg-[#0b0b0d] text-white">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-10 px-4 py-10 sm:px-5 sm:py-14">
+        <header className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <LayoutGrid className="size-4 text-white/50" />
-            <h2 className="text-lg font-semibold">어떻게 수익이 되나요?</h2>
+            <MostemLogo size={24} rounded="lg" />
+            <span className="inline-flex h-5 items-center rounded-full bg-amber-200/90 px-2 text-xs font-medium text-[#3b2a08]">
+              핫딜 사이트 안내
+            </span>
           </div>
-          <p className="mt-1 text-sm text-white/45">방문자가 상품을 누른 순간부터 수수료가 쌓이기까지의 순서예요.</p>
-          <ol className="mt-4 space-y-2">
+          <h1 className="text-2xl font-black tracking-[-0.02em] sm:text-3xl">내 주소로 여는 쇼핑 큐레이션</h1>
+          <p className="text-sm leading-6 text-white/50 sm:text-base">
+            쿠팡을 한 번 연결하면 <span className="font-bold text-white">mostem.kr/s/내이름</span> 주소로
+            내 핫딜 사이트가 열려요. 상품은 매일 자동으로 채워지고, 방문자가 사고 나면 수수료가 내
+            계정에 쌓여요.
+          </p>
+          <dl className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              ['준비하는 데', '5분이면 충분해요', 'text-amber-200'],
+              ['상품 채우기', '전부 자동이에요', 'text-[var(--accent)]'],
+              ['수수료는', '내 계정으로', ''],
+            ].map(([k, v, tone]) => (
+              <div key={k} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                <dt className="text-xs text-white/40">{k}</dt>
+                <dd className={`mt-1 text-base font-black leading-tight ${tone}`}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </header>
+
+        <section className={CARD}>
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-bold">
+              <LayoutGrid className="size-5 text-[var(--accent)]" />
+              어떻게 수익이 되나요?
+            </h2>
+            <p className="mt-1 text-sm text-white/45">방문자가 상품을 누른 순간부터 수수료가 쌓이기까지의 순서예요.</p>
+          </div>
+          <ol className="flex flex-col gap-3">
             {STEPS.map((step, i) => (
-              <li key={step.title} className="flex gap-3 rounded-2xl bg-white/[0.04] px-4 py-3.5">
+              <li key={step.title} className="flex gap-3 rounded-xl bg-white/[0.06] px-4 py-3">
                 <Circle n={i + 1} />
                 <div>
-                  <p className="font-medium">{step.title}</p>
-                  <p className="mt-0.5 text-sm text-white/45">{step.body}</p>
+                  <p className="text-sm font-bold">{step.title}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-white/45">{step.body}</p>
                 </div>
               </li>
             ))}
           </ol>
-          <p className="mt-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/55">
+          <p className="rounded-xl border border-dashed border-white/15 px-4 py-3 text-sm text-white/55">
             💡 링크는 내 쿠팡 파트너스 계정 이름으로 만들어져요. 모스템은 사이트를 만들고 상품을
             채워주는 역할만 하고, 수수료는 전부 내 것이에요.
           </p>
         </section>
 
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold">시작하기 — 4단계</h2>
-          <p className="mt-1 text-sm text-white/45">한 번만 해두면 그 뒤로는 손댈 일이 거의 없어요.</p>
-          <ol className="mt-5 space-y-3">
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-black">시작하기 — 4단계</h2>
+          <p className="text-sm text-white/45">한 번만 해두면 그 뒤로는 손댈 일이 거의 없어요.</p>
+          <ol className="flex flex-col gap-3">
             {START.map((step, i) => (
-              <li key={step.title} className="rounded-2xl bg-white/[0.04] px-4 py-4">
+              <li key={step.title} className={`${CARD} gap-2 p-5`}>
                 <div className="flex gap-3">
-                  <Circle n={i + 1} />
-                  <div className="min-w-0">
-                    <p className="font-medium">{step.title}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-white/45">{step.body}</p>
+                  <Circle n={i + 1} muted />
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <p className="text-sm font-bold">{step.title}</p>
+                    <p className="text-sm leading-6 text-white/45">{step.body}</p>
                     {step.action ? (
                       <Link
                         href={step.href}
                         target={step.external ? '_blank' : undefined}
                         rel={step.external ? 'noreferrer' : undefined}
-                        className="mt-3 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/15"
+                        className="inline-flex w-fit rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[0.8rem] font-medium text-white/80 hover:bg-white/[0.08]"
                       >
                         {step.action} →
                       </Link>
@@ -175,105 +185,127 @@ export default function HotdealGuidePage() {
               </li>
             ))}
           </ol>
-          <p className="mt-3 rounded-2xl bg-white/[0.04] px-4 py-3 text-sm text-white/50">
+          <p className="rounded-xl border border-dashed border-white/15 px-4 py-3 text-sm text-white/50">
             ⚠️ 1~2단계는 토스 어드민에서 하는 일이에요. 연결이 안 되는 경우 대부분은 출발지 IP를
             등록하지 않아서예요.
           </p>
         </section>
 
-        <section className="mt-8 rounded-[28px] bg-white/[0.04] p-5 sm:p-6">
-          <h2 className="text-lg font-semibold">상품은 언제 새로고침되나요?</h2>
-          <p className="mt-1 text-sm text-white/45">방문자가 가장 많이 보는 앞부분부터 항상 먼저 챙겨요.</p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white/[0.04] px-4 py-3.5">
-              <p className="font-medium">🏆 인기 상품 100개</p>
-              <p className="mt-1 text-sm text-white/45">순위에서 빠진 상품은 바로 목록에서 사라져요.</p>
+        <section className={CARD}>
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-bold">
+              <Clock className="size-5 text-[var(--accent)]" />
+              상품은 언제 새로고침되나요?
+            </h2>
+            <p className="mt-1 text-sm text-white/45">방문자가 가장 많이 보는 앞부분부터 항상 먼저 챙겨요.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-white/[0.06] px-4 py-3">
+              <p className="text-sm font-bold">🏆 인기 상품 100개</p>
+              <p className="mt-1 text-xs leading-5 text-white/45">순위에서 빠진 상품은 바로 목록에서 사라져요.</p>
             </div>
-            <div className="rounded-2xl bg-white/[0.04] px-4 py-3.5">
-              <p className="font-medium">⏰ 오늘의 하루특가</p>
-              <p className="mt-1 text-sm text-white/45">끝난 특가는 그 자리에서 치워져요.</p>
+            <div className="rounded-xl bg-white/[0.06] px-4 py-3">
+              <p className="text-sm font-bold">⏰ 오늘의 하루특가</p>
+              <p className="mt-1 text-xs leading-5 text-white/45">끝난 특가는 그 자리에서 치워져요.</p>
             </div>
           </div>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="text-xs text-white/35">
-                <tr>
-                  <th className="pb-2 font-medium">무엇이</th>
-                  <th className="pb-2 font-medium">언제</th>
-                  <th className="pb-2 font-medium">설명</th>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-xs text-white/40">
+                  <th className="pb-2 pr-3 font-semibold">무엇이</th>
+                  <th className="pb-2 pr-3 font-semibold">언제</th>
+                  <th className="pb-2 font-semibold">설명</th>
                 </tr>
               </thead>
-              <tbody className="align-top text-white/75">
+              <tbody>
                 {[
                   ['인기 상품 100개', '30분마다', '매번 목록을 통째로 새로 받아서, 순위에서 빠지면 즉시 사라져요.'],
-                  ['하루특가', '30분마다 + 아침 8시', '특가를 갈아끼우는 시각에 맞춰 따로 한 번 더 새로고침해요.'],
+                  [
+                    '하루특가',
+                    '30분마다 + 아침 8시',
+                    '특가를 갈아끼우는 시각에 맞춰 따로 한 번 더 새로고침해요.',
+                  ],
                   [
                     '내가 고른 카테고리 상품',
                     '매일 조금씩',
-                    '하루 한 번, 세부 카테고리 몇 개씩 차례로 점검해요. 카테고리가 많을수록 한 바퀴가 길어질 수 있어요. 2~3개만 고르면 훨씬 자주 갱신돼요.',
+                    '하루 한 번, 세부 카테고리 몇 개씩 차례로 점검해요. 카테고리가 많을수록 한 바퀴가 길어져서 몇 주가 걸릴 수 있어요. 2~3개만 고르면 훨씬 자주 갱신돼요.',
                   ],
                   [
                     '품절 표시 · 가격 변동',
                     '그 상품이 점검될 때',
-                    '인기 상품·특가는 30분 안에 정리되고, 카테고리 상품은 한 바퀴 도는 사이에 정리돼요.',
+                    '인기 상품·특가는 30분 안에 정리되고, 카테고리 상품은 한 바퀴(몇 주) 도는 사이에 정리돼요.',
                   ],
                 ].map(([what, when, why]) => (
-                  <tr key={what}>
-                    <td className="py-3 pr-3 font-medium text-white">{what}</td>
+                  <tr key={what} className="border-b border-white/10 align-top last:border-b-0">
+                    <td className="py-3 pr-3 font-bold">{what}</td>
                     <td className="py-3 pr-3">
-                      <span className="inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/70">
+                      <span className="inline-flex h-5 w-fit shrink-0 items-center rounded-full bg-[var(--accent)] px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white">
                         {when}
                       </span>
                     </td>
-                    <td className="py-3 text-white/55">{why}</td>
+                    <td className="py-3 text-white/50">{why}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-2 rounded-2xl bg-white/[0.04] px-4 py-3 text-sm text-white/50">
-            💡 새로고침될 때마다 품절된 상품은 빠지고, 가격이 바뀐 상품은 새 가격으로 바뀌어요. 고른
-            카테고리가 적을수록 더 자주 갱신돼요.
+          <p className="rounded-xl border border-dashed border-white/15 px-4 py-3 text-sm text-white/50">
+            💡 새로고침될 때마다{' '}
+            <span className="font-bold text-white">품절된 상품은 빠지고, 가격이 바뀐 상품은 새 가격으로</span>{' '}
+            바뀌어요. 고른 카테고리가 적을수록 더 자주 갱신돼요.
           </p>
         </section>
 
-        <section className="mt-4 rounded-[28px] bg-white/[0.04] p-5 sm:p-6">
-          <h2 className="text-lg font-semibold">하루에 받아올 수 있는 양</h2>
-          <p className="mt-1 text-sm text-white/45">
-            내 키로는 하루에 상품 정보를 1만 개까지 받아올 수 있어요. 이걸 이렇게 나눠 써요.
-          </p>
-          <div className="mt-4 flex h-16 overflow-hidden rounded-2xl text-[11px] font-medium sm:text-xs">
-            <div className="flex flex-[9] items-center justify-center bg-[#c4b5fd] px-2 text-center text-[#2a1a5e]">
-              약 9,000개 — 인기 상품·하루특가 새로고침
-            </div>
-            <div className="flex w-16 flex-col items-center justify-center bg-[#2a2a32] text-white/70 sm:w-20">
-              <span>800개</span>
-            </div>
-            <div className="flex w-14 flex-col items-center justify-center bg-amber-200 text-black/70 sm:w-16">
-              <span>약 200개</span>
+        <section className={CARD}>
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-bold">
+              <KeyRound className="size-5 text-[var(--accent)]" />
+              하루에 받아올 수 있는 양
+            </h2>
+            <p className="mt-1 text-sm text-white/45">
+              내 키로는 하루에 상품 정보를 1만 개까지 받아올 수 있어요. 이걸 이렇게 나눠 써요.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <div className="flex overflow-hidden rounded-xl">
+              <div className="flex w-[90%] items-center justify-center bg-[var(--accent)] px-2 py-3 text-xs font-black text-white">
+                약 9,000개 — 인기 상품·하루특가 새로고침
+              </div>
+              <div className="flex w-[8%] items-center justify-center bg-white/10 px-2 py-3 text-xs font-black text-white/60">
+                800개
+              </div>
+              <div className="flex w-[2%] items-center justify-center bg-amber-200 px-2 py-3 text-xs font-black text-[#3b2a08]">
+                약 200개
+              </div>
             </div>
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-white/45">
-            가운데 800개는 카테고리 상품을 매일 조금씩 점검하는 몫이에요. 수익 링크를 만드는 것
-            자체는 별도 한도(하루 1만 개)를 써서 새로고침이 그 몫을 통째로 가져가진 않지만, 마지막 약
-            200개는 오늘 처음 눌린 상품의 정보를 한 번 더 확인하는 데 같이 써요. 새로고침은 이 몫을
-            남겨 두고 멈추도록 정해져 있어요.
+          <p className="text-xs leading-5 text-white/45">
+            가운데 800개는 <span className="font-bold text-white">카테고리 상품을 매일 조금씩 점검하는 몫</span>
+            이에요. 수익 링크를 <span className="font-bold text-white">만드는 것 자체는 별도 한도(하루 1만 개)</span>
+            를 써서 새로고침이 그 몫을 통째로 가져가진 않지만, 마지막 약 200개는 오늘 처음 눌린 상품의
+            정보를 한 번 더 확인하는 데 같이 써요. 새로고침은 이 몫을 남겨 두고 멈추도록 정해져 있어요.
           </p>
         </section>
 
-        <section className="mt-14">
-          <h2 className="text-xl font-semibold">자주 묻는 질문</h2>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-black">자주 묻는 질문</h2>
           <GuideFaq items={FAQ} />
         </section>
 
-        <div className="mt-10 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             href="/links"
-            className="rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white"
+            className="inline-flex h-8 items-center rounded-xl bg-[var(--accent)] px-2.5 text-sm font-bold text-white"
           >
             내 핫딜 사이트 만들기
           </Link>
-          <Link href="/s/mostem" className="rounded-full bg-white/10 px-5 py-2.5 text-sm font-medium">
+          <Link
+            href="/s/mostem-demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 items-center rounded-xl border border-white/10 bg-white/[0.04] px-2.5 text-sm font-medium"
+          >
             예시 사이트 먼저 보기
           </Link>
         </div>

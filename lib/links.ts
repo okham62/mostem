@@ -143,6 +143,7 @@ export type LinkSettings = {
   hotdeal_published: boolean
   hotdeal_theme: string
   hotdeal_bg: string
+  hotdeal_layout: string
   created_at: string
   updated_at: string
 }
@@ -192,6 +193,10 @@ export function normalizeLinkSettings(data: Record<string, unknown>): LinkSettin
         ? data.profile_font_size
         : 'md',
     profile_design: normalizeProfileDesign(data.profile_design),
+    hotdeal_layout:
+      data.hotdeal_layout === 'grid' || data.hotdeal_layout === 'list' || data.hotdeal_layout === 'auto'
+        ? String(data.hotdeal_layout)
+        : 'auto',
   }
 }
 
@@ -240,6 +245,7 @@ export const RESERVED_PROFILE_SLUGS = new Set(
     'terms',
     'privacy',
     'mostem',
+    'mostem-demo',
     'hami',
   ].map((s) => s.toLowerCase()),
 )

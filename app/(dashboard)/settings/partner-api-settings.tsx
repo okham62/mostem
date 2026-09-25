@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, ExternalLink, KeyRound, Link2, LoaderCircle, Unplug } from 'lucide-react'
+import { AlertTriangle, Copy, ExternalLink, KeyRound, Link2, LoaderCircle, Unplug } from 'lucide-react'
 import type { PartnerStatusPublic } from '@/lib/partners'
 import { cn } from '@/lib/utils'
 
@@ -26,11 +26,11 @@ const GUIDE: Record<
   toss: {
     title: '키 발급 순서',
     steps: [
-      '토스 쉐어링크 어드민에 로그인합니다.',
-      'API 연동 메뉴에서 Access · Secret Key를 발급합니다.',
-      '출발지 IP에 서버 IP를 등록합니다. (왼쪽 안내 참고)',
-      'Publisher ID(회원 연동 ID)를 확인합니다.',
-      '키를 입력한 뒤 연결하기를 눌러 주세요.',
+      '토스 쉐어링크 어드민에 로그인해요.',
+      '왼쪽 메뉴 연동 > API 키 발급으로 들어가요.',
+      'Key 발급하기를 누르면 Access Key · Secret Key · 회원 연동 ID가 한 번에 나와요.',
+      '같은 화면 출발지 IP에 왼쪽 IP를 추가 → 저장해요.',
+      '세 값을 이 화면에 넣고 연결하기를 눌러요.',
     ],
     primaryLabel: '토스에서 키 발급',
     primaryUrl:
@@ -206,10 +206,10 @@ export function PartnerApiSettings({
         ) : null}
 
         {providerId === 'toss' ? (
-          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-3">
-            <p className="text-xs font-medium text-rose-100/90">먼저 토스에 이 IP를 등록하세요</p>
-            <p className="mt-1 text-[11px] text-rose-100/60">
-              쉐어링크 어드민 → API 연동 → 출발지 IP. Vercel은 IP가 바뀔 수 있어, 연결 실패 시 IP를 다시 확인해 주세요.
+          <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-rose-100/90">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              먼저 이 IP를 토스에 등록해 주세요
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <code className="rounded-lg bg-black/40 px-2.5 py-1.5 font-mono text-sm text-white">
@@ -219,12 +219,16 @@ export function PartnerApiSettings({
                 type="button"
                 disabled={!egressIp}
                 onClick={() => void copyIp()}
-                className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
               >
                 <Copy className="h-3.5 w-3.5" />
                 복사
               </button>
             </div>
+            <p className="mt-2 text-[11px] leading-5 text-rose-100/60">
+              토스 어드민 → API 키 발급 → 출발지 IP에 추가 → 저장해야 해요. 이걸 빼먹으면 키가 맞아도
+              연결이 안 돼요.
+            </p>
           </div>
         ) : null}
 
@@ -261,10 +265,9 @@ export function PartnerApiSettings({
                 }
                 className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]/60"
               />
-              {field.help ? <p className="text-[11px] text-white/30">{field.help}</p> : null}
+              {field.help ? <p className="text-[11px] leading-5 text-white/35">{field.help}</p> : null}
             </label>
           ))}
-          <p className="text-[11px] text-white/30">키는 계정에만 저장되며, 화면에는 일부만 표시됩니다.</p>
         </div>
 
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
@@ -285,11 +288,8 @@ export function PartnerApiSettings({
           <h3 className="text-sm font-semibold text-white">{guide.title}</h3>
           <ol className="space-y-2 text-xs leading-relaxed text-white/50">
             {guide.steps.map((step, i) => (
-              <li key={step} className="flex gap-2">
-                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold text-white/70">
-                  {i + 1}
-                </span>
-                <span>{step}</span>
+              <li key={step}>
+                {i + 1}. {step}
               </li>
             ))}
           </ol>

@@ -10,7 +10,7 @@ export function GuideFaq({
 }) {
   const [open, setOpen] = useState<number | null>(null)
   return (
-    <div className="mt-5 space-y-2">
+    <div className="mt-3 flex flex-col gap-3">
       {items.map((item, i) => {
         const on = open === i
         return (
@@ -19,12 +19,11 @@ export function GuideFaq({
             type="button"
             onClick={() => setOpen(on ? null : i)}
             className={cn(
-              'block w-full bg-white/[0.05] px-5 text-left transition',
-              on ? 'rounded-[22px] py-4' : 'rounded-full py-3.5',
+              'block w-full rounded-[20px] border border-white/10 bg-white/[0.04] p-5 text-left',
             )}
           >
-            <span className="text-sm font-medium">{item.q}</span>
-            {on ? <p className="mt-2 text-sm leading-relaxed text-white/50">{item.a}</p> : null}
+            <span className="text-sm font-bold">{item.q}</span>
+            {on ? <p className="mt-2 text-sm leading-6 text-white/50">{item.a}</p> : null}
           </button>
         )
       })}

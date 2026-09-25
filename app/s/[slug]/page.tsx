@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getShoppingBest } from '@/lib/shopping'
-import { toHotdealItems } from '@/lib/hotdeal'
+import { HOTDEAL_DEMO, HOTDEAL_DEMO_SLUG, toHotdealItems } from '@/lib/hotdeal'
 import { HotdealStorefront } from '@/components/hotdeal-storefront'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -8,16 +8,33 @@ import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+async function loadHotdealItems() {
+  const board = await getShoppingBest()
+  const coupang = board.platforms.find((p) => p.id === 'coupang')
+  return toHotdealItems(
+    (coupang?.rising.products ?? []).slice(0, 48),
+    (coupang?.popular.products ?? []).slice(0, 48),
+  )
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: { slug: string }
 }): Promise<Metadata> {
+  const slug = params.slug.toLowerCase()
+  if (slug === HOTDEAL_DEMO_SLUG) {
+    return {
+      title: `${HOTDEAL_DEMO.name} | Mostem`,
+      description: HOTDEAL_DEMO.intro,
+    }
+  }
+
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('link_settings')
     .select('hotdeal_name, hotdeal_intro, hotdeal_published')
-    .eq('hotdeal_slug', params.slug.toLowerCase())
+    .eq('hotdeal_slug', slug)
     .maybeSingle()
   if (!data?.hotdeal_published) return { title: '핫딜 | Mostem' }
   return {
@@ -31,21 +48,31 @@ export default async function PublicHotdealPage({
 }: {
   params: { slug: string }
 }) {
+  const slug = params.slug.toLowerCase()
+  const items = await loadHotdealItems()
+
+  if (slug === HOTDEAL_DEMO_SLUG) {
+    return (
+      <HotdealStorefront
+        name={HOTDEAL_DEMO.name}
+        intro={HOTDEAL_DEMO.intro}
+        categories={HOTDEAL_DEMO.categories}
+        initialTheme={HOTDEAL_DEMO.theme}
+        initialBg={HOTDEAL_DEMO.bg}
+        initialLayout="auto"
+        items={items}
+      />
+    )
+  }
+
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('link_settings')
     .select('*')
-    .eq('hotdeal_slug', params.slug.toLowerCase())
+    .eq('hotdeal_slug', slug)
     .maybeSingle()
 
   if (!data || !data.hotdeal_published) notFound()
-
-  const board = await getShoppingBest()
-  const coupang = board.platforms.find((p) => p.id === 'coupang')
-  const items = toHotdealItems(
-    (coupang?.rising.products ?? []).slice(0, 40),
-    (coupang?.popular.products ?? []).slice(0, 40),
-  )
 
   return (
     <HotdealStorefront
@@ -54,6 +81,7 @@ export default async function PublicHotdealPage({
       categories={Array.isArray(data.hotdeal_categories) ? data.hotdeal_categories : []}
       initialTheme={data.hotdeal_theme || 'mostem'}
       initialBg={data.hotdeal_bg || 'dark'}
+      initialLayout={data.hotdeal_layout || 'auto'}
       items={items}
     />
   )
