@@ -232,6 +232,7 @@ export const RESERVED_PROFILE_SLUGS = new Set(
     's',
     'l',
     'hotdeal',
+    'guide',
     'pricing',
     'docs',
     'help',

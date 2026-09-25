@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  CircleHelp,
   Hash,
   Link2,
   PackageSearch,
@@ -2789,9 +2790,22 @@ function HotdealPanel({
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-3 text-sm">
-        <p className="font-medium">핫딜 사이트 시작 가이드</p>
-        <p className="mt-1 text-xs text-white/50">주소·이름만 정하면 쿠팡 베스트 상품이 매일 채워지는 특가 페이지를 만들 수 있어요. (약 5분)</p>
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/15 px-4 py-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <CircleHelp className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
+          <p className="text-sm text-white/80">
+            처음이신가요? 핫딜 사이트 시작 가이드. 수익이 생기는 구조부터 연결·발행까지 5분이면 끝나요.
+          </p>
+        </div>
+        <a
+          href="/guide/hotdeal"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-[var(--accent)] hover:underline"
+        >
+          가이드보기
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
       </div>
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
@@ -2802,26 +2816,29 @@ function HotdealPanel({
           </button>
         </div>
         <p className="text-xs text-white/40">사이트 주소와 이름을 정하면, 상품은 매일 자동으로 채워져요.</p>
-        <label className="block space-y-1">
-          <span className="text-xs text-white/50">공개 주소</span>
-          <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[var(--input-bg)] px-3">
-            <span className="text-xs text-white/35">/s/</span>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-xs text-white/50">공개 주소</span>
+            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[var(--input-bg)] px-3">
+              <span className="text-xs text-white/35">/s/</span>
+              <input
+                value={slug}
+                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30))}
+                placeholder="my-hotdeal"
+                className="w-full bg-transparent py-2.5 text-sm outline-none"
+              />
+            </div>
+            <p className="text-[11px] text-white/35">영문 소문자, 숫자, 하이픈으로 3–30자</p>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs text-white/50">사이트 이름</span>
             <input
-              value={slug}
-              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30))}
-              placeholder="my-hotdeal"
-              className="w-full bg-transparent py-2.5 text-sm outline-none"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
             />
-          </div>
-        </label>
-        <label className="block space-y-1">
-          <span className="text-xs text-white/50">사이트 이름</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2.5 text-sm outline-none"
-          />
-        </label>
+          </label>
+        </div>
         <label className="block space-y-1">
           <span className="text-xs text-white/50">한 줄 소개</span>
           <input
@@ -2853,13 +2870,32 @@ function HotdealPanel({
       </section>
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
-        <h3 className="text-sm font-medium">상품 뱃지</h3>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-violet-500/30 px-3 py-1 text-violet-200">타임세일</span>
-          <span className="rounded-full bg-rose-500/30 px-3 py-1 text-rose-200">큰 폭 할인</span>
-          <span className="rounded-full bg-fuchsia-500/30 px-3 py-1 text-fuchsia-200">BEST 순위</span>
-          <span className="rounded-full bg-amber-500/30 px-3 py-1 text-amber-200">역대급 할인</span>
+        <div>
+          <h3 className="text-sm font-medium">상품 뱃지</h3>
+          <p className="mt-1 text-xs text-white/40">상품 카드에 표시될 라벨이에요. 테마가 있는 상품에만 나타나요.</p>
         </div>
+        <ul className="space-y-2.5 text-xs">
+          <li className="flex flex-wrap items-center gap-2">
+            <span aria-hidden>⏱️</span>
+            <span className="rounded-full bg-violet-500/30 px-3 py-1 text-violet-200">타임세일</span>
+            <span className="text-white/40">하루특가 상품에 붙는 표시예요</span>
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span aria-hidden>🔥</span>
+            <span className="rounded-full bg-rose-500/30 px-3 py-1 text-rose-200">큰 폭 할인</span>
+            <span className="text-white/40">50% 이상 할인 상품</span>
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span aria-hidden>🏆</span>
+            <span className="rounded-full bg-fuchsia-500/30 px-3 py-1 text-fuchsia-200">BEST 순위</span>
+            <span className="text-white/40">베스트 1~3위 상품</span>
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span aria-hidden>💥</span>
+            <span className="rounded-full bg-amber-500/30 px-3 py-1 text-amber-200">역대급 할인</span>
+            <span className="text-white/40">70% 이상 할인 상품</span>
+          </li>
+        </ul>
       </section>
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
