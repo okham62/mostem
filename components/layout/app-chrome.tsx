@@ -29,6 +29,7 @@ export function AppChrome({
 }) {
   const [hidden, setHidden] = useState(false)
   const [ready, setReady] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     setHidden(localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1')
@@ -51,6 +52,9 @@ export function AppChrome({
       <div className="flex h-full overflow-hidden bg-background">
         <div
           data-ready={ready ? '1' : '0'}
+          data-expanded={expanded && !hidden ? '1' : '0'}
+          onMouseEnter={() => setExpanded(true)}
+          onMouseLeave={() => setExpanded(false)}
           className={cn(
             'mostem-sidebar-rail hidden md:block',
             hidden && 'mostem-sidebar-rail-hidden'

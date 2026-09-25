@@ -14,11 +14,45 @@ import {
   normalizeProfileDesign,
 } from '@/lib/profile-design'
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import { ProfilePublicClient } from './profile-public-client'
 import { ProfileSnsIcons } from '@/components/profile-sns-icons'
 import { Link2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}): Promise<Metadata> {
+  const slug = params.slug.toLowerCase()
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('link_settings')
+    .select('display_name, profile_slug, profile_bio, profile_avatar_url')
+    .eq('profile_slug', slug)
+    .maybeSingle()
+
+  const name = String(data?.display_name || data?.profile_slug || slug)
+  const bio = String(data?.profile_bio || '')
+  const icon = String(data?.profile_avatar_url || '')
+
+  return {
+    title: name,
+    description: bio || `${name} 링크`,
+    applicationName: name,
+    manifest: `/u/${slug}/manifest.webmanifest`,
+    icons: icon
+      ? { icon: [{ url: icon }], apple: [{ url: icon }] }
+      : undefined,
+    appleWebApp: {
+      capable: true,
+      title: name,
+      statusBarStyle: 'black-translucent',
+    },
+  }
+}
 
 export default async function PublicProfilePage({
   params,

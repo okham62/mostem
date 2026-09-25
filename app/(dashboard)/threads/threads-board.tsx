@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import {
   BarChart3,
   CalendarClock,
@@ -109,7 +109,6 @@ export function ThreadsBoard({
   posts: CollectedPost[]
   accounts: ConnectedAccount[]
 }) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [posts, setPosts] = useState(initialPosts)
   const [accounts, setAccounts] = useState(initialAccounts)

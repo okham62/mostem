@@ -75,8 +75,8 @@ function NavGroup({
   const router = useRouter()
   const { activePath, mark } = useInstantNav()
   return (
-    <div className="mb-5">
-      <div className="mb-2 flex items-center gap-2 px-3">
+    <div className="mostem-sidebar-group">
+      <div className="mostem-sidebar-group-head mb-2 flex items-center gap-2 px-3">
         <span className="h-3.5 w-[3px] shrink-0 rounded-full bg-gold" />
         <p className="text-sm font-extrabold tracking-tight text-white">{title}</p>
         <span className="h-px min-w-4 flex-1 bg-white/12" />
@@ -91,6 +91,7 @@ function NavGroup({
               <Link
                 href={item.href}
                 prefetch
+                title={item.label}
                 onClick={() => {
                   mark(item.href)
                   previewHideMarketTicker(itemPath === '/markets')
@@ -114,14 +115,14 @@ function NavGroup({
                   if (itemPath === '/trends') warmTrendCache()
                 }}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-semibold transition-colors',
+                  'mostem-sidebar-link flex items-center rounded-lg py-2 text-[15px] font-semibold transition-colors',
                   isActive
                     ? 'bg-brand/20 text-brand'
                     : 'text-white hover:bg-white/10'
                 )}
               >
                 <Icon className="h-5 w-5 shrink-0" />
-                {item.label}
+                <span className="mostem-sidebar-label">{item.label}</span>
               </Link>
             </li>
           )
@@ -147,8 +148,8 @@ export function Sidebar({ session, onHide }: SidebarProps) {
   }, [])
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
-      <div className="flex items-center justify-end gap-2 px-2 pt-2">
+    <aside className="flex h-full w-full flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
+      <div className="mostem-sidebar-toolbar flex items-center justify-end gap-2 px-2 pt-2">
         <button
           type="button"
           aria-label="사이드바 숨기기"
@@ -181,7 +182,7 @@ export function Sidebar({ session, onHide }: SidebarProps) {
             prefetch
             onClick={() => mark('/settings')}
             className={cn(
-              'mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2',
+              'mostem-sidebar-user mb-1 flex items-center rounded-lg py-2',
               isNavActive(activePath, '/settings')
                 ? 'bg-brand/20'
                 : 'hover:bg-white/5'
@@ -189,13 +190,13 @@ export function Sidebar({ session, onHide }: SidebarProps) {
           >
             {user.image ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.image} alt="" className="h-7 w-7 rounded-full object-cover" />
+              <img src={user.image} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
             ) : (
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-xs font-medium text-white">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-medium text-white">
                 {user.name?.[0]?.toUpperCase() ?? 'U'}
               </div>
             )}
-            <div className="min-w-0 flex-1">
+            <div className="mostem-sidebar-user-meta min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-white">{user.name}</p>
               <p className="truncate text-[10px] text-white/40">
                 {user.username || user.email?.replace(/@mostem\.local$/, '')}
@@ -205,10 +206,10 @@ export function Sidebar({ session, onHide }: SidebarProps) {
         )}
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/40 transition-colors hover:bg-red-900/20 hover:text-red-400"
+          className="mostem-sidebar-signout flex w-full items-center rounded-lg py-2.5 text-sm font-medium text-white/40 transition-colors hover:bg-red-900/20 hover:text-red-400"
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          로그아웃
+          <span className="mostem-sidebar-label">로그아웃</span>
         </button>
       </div>
     </aside>

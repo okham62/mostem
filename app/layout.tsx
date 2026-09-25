@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { PreventFileDrop } from '@/components/prevent-file-drop'
-import { ExtensionStatusBanner } from '@/components/layout/extension-status-banner'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ChunkErrorReload } from '@/components/chunk-error-reload'
 import { THEME_BOOT_SCRIPT } from '@/lib/theme'
@@ -53,7 +52,6 @@ export default function RootLayout({
         <ThemeProvider>
           <ChunkErrorReload />
           <PreventFileDrop />
-          <ExtensionStatusBanner />
           <div className="min-h-0 flex-1">{children}</div>
         </ThemeProvider>
       </body>

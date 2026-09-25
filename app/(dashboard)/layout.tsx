@@ -6,6 +6,7 @@ import { MobileHeader } from '@/components/layout/mobile-header'
 import { MarketTicker } from '@/components/layout/market-ticker'
 import { ActivityTracker } from '@/components/layout/activity-tracker'
 import { AppSessionProvider } from '@/components/session-provider'
+import { ExtensionStatusBanner } from '@/components/layout/extension-status-banner'
 
 export default async function DashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default async function DashboardLayout({
 
   return (
     <AppSessionProvider session={session}>
+    <ExtensionStatusBanner />
     <AppChrome session={session}>
       <MobileHeader session={session} />
 

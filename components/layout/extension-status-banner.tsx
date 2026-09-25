@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 const PING_SOURCE = 'hami-extension'
 const STALE_MS = 3500
@@ -8,6 +9,7 @@ const FIRST_CHECK_MS = 800
 const POLL_MS = 400
 const MESSAGE = '확장이 꺼져있어요. chrome://extensions에서 hami를 다시 켜주세요'
 const LABEL = `[ ${MESSAGE} ]`
+const HIDDEN_PREFIXES = ['/u/', '/login', '/register', '/go/']
 
 function isHamiPing(data: unknown): data is { source: string; type: string; at?: number } {
   if (!data || typeof data !== 'object') return false
@@ -16,10 +18,23 @@ function isHamiPing(data: unknown): data is { source: string; type: string; at?:
 }
 
 export function ExtensionStatusBanner() {
+  const pathname = usePathname() || ''
+  const hiddenByRoute = HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))
   const [online, setOnline] = useState<boolean | null>(null)
+  const [mobile, setMobile] = useState(true)
   const bannerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const sync = () => setMobile(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    if (hiddenByRoute || mobile) return
+
     let lastPing = Number(document.documentElement.getAttribute('data-hami-at') || 0)
 
     const mark = (at?: number) => {
@@ -47,12 +62,13 @@ export function ExtensionStatusBanner() {
       window.clearTimeout(start)
       window.clearInterval(interval)
     }
-  }, [])
+  }, [hiddenByRoute, mobile])
 
   useLayoutEffect(() => {
     const root = document.documentElement
+    const show = !hiddenByRoute && !mobile && online === false
     const apply = () => {
-      const height = online === false ? bannerRef.current?.offsetHeight ?? 0 : 0
+      const height = show ? bannerRef.current?.offsetHeight ?? 0 : 0
       root.style.setProperty('--hami-ext-banner-h', `${height}px`)
     }
     apply()
@@ -61,9 +77,9 @@ export function ExtensionStatusBanner() {
       window.removeEventListener('resize', apply)
       root.style.setProperty('--hami-ext-banner-h', '0px')
     }
-  }, [online])
+  }, [hiddenByRoute, mobile, online])
 
-  if (online !== false) return null
+  if (hiddenByRoute || mobile || online !== false) return null
 
   const copies = Array.from({ length: 10 }, (_, i) => i)
 

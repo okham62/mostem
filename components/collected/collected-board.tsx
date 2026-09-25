@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import {
   BarChart3,
   CalendarClock,
@@ -70,7 +70,6 @@ export function CollectedBoard({
   posts: CollectedPost[]
   accounts: ConnectedAccount[]
 }) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const brandId = platform as BrandId
   const basePath = `/${platform}`
