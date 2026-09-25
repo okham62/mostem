@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState, type ReactNode }
-import { LayoutGrid, List, Moon, ShoppingBag, Sun } from 'lucide-react'
+import { LayoutGrid, List, Moon, Sun } from 'lucide-react'
 import { MostemLogo } from '@/components/mostem-logo'
+import { TossLogo } from '@/components/toss-logo'
 import { filterHotdealItems, type HotdealFilter, type HotdealItem } from '@/lib/hotdeal'
 import { cn } from '@/lib/utils'
 
@@ -101,7 +102,7 @@ export function HotdealStorefront({
                   : 'bg-white text-black/55',
             )}
           >
-            <ShoppingBag className="size-3.5" />
+            <TossLogo size={14} />
             토스 UI
           </button>
         </div>

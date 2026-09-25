@@ -13,9 +13,10 @@ import {
   Pencil,
   RefreshCw,
   Search,
+  Moon,
   Settings2,
-  ShoppingBag,
   Store,
+  Sun,
   Trash2,
   UserRound,
   X,
@@ -37,6 +38,7 @@ import {
 } from '@/lib/threads-publish'
 import { cn } from '@/lib/utils'
 import { MostemLogo } from '@/components/mostem-logo'
+import { TossLogo } from '@/components/toss-logo'
 import dynamic from 'next/dynamic'
 
 const ProfilePanel = dynamic(
@@ -2728,6 +2730,8 @@ function HotdealPanel({
   const [published, setPublished] = useState(!!settings.hotdeal_published)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [coupangOn, setCoupangOn] = useState<boolean | null>(null)
+  const [tossOn, setTossOn] = useState<boolean | null>(null)
 
   useEffect(() => {
     setSlug(settings.hotdeal_slug || '')
@@ -2738,6 +2742,24 @@ function HotdealPanel({
     setBg(settings.hotdeal_bg || 'dark')
     setPublished(!!settings.hotdeal_published)
   }, [settings])
+
+  useEffect(() => {
+    let alive = true
+    void fetch('/api/settings/partners', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!alive || !data) return
+        const list = Array.isArray(data.providers) ? data.providers : Array.isArray(data) ? data : []
+        const coupang = list.find((p: { id?: string }) => p.id === 'coupang')
+        const toss = list.find((p: { id?: string }) => p.id === 'toss')
+        setCoupangOn(Boolean(coupang?.connected))
+        setTossOn(Boolean(toss?.connected))
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
 
   function fillExample() {
     setSlug((s) => s || 'my-hotdeal')
@@ -2933,7 +2955,7 @@ function HotdealPanel({
                 : 'border-transparent bg-white/5 text-white/55'
             )}
           >
-            <ShoppingBag className="size-3.5" />
+            <TossLogo size={16} />
             토스
           </button>
         </div>
@@ -2944,50 +2966,80 @@ function HotdealPanel({
         </p>
         <div className="pt-2">
           <h3 className="text-sm font-medium">배경 테마</h3>
-          <p className="mt-1 text-xs text-white/40">페이지 바탕색이에요. 사이트 스타일과는 따로 골라요.</p>
+          <p className="mt-1 text-xs text-white/40">
+            방문자에게 보이는 사이트 배경이에요. 방문자가 설정과 상관없이 여기서 고른 색으로 보여요.
+          </p>
         </div>
         <div className="flex gap-2">
-          {(
-            [
-              ['light', '라이트'],
-              ['dark', '다크'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setBg(id)}
-              className={cn(
-                'rounded-full px-3.5 py-1.5 text-xs',
-                bg === id ? 'bg-white text-black' : 'bg-white/5 text-white/55'
-              )}
-            >
-              {label}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => setBg('light')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs',
+              bg === 'light' ? 'bg-white text-black' : 'bg-white/5 text-white/55'
+            )}
+          >
+            <Sun className="size-3.5" />
+            라이트
+          </button>
+          <button
+            type="button"
+            onClick={() => setBg('dark')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs',
+              bg === 'dark' ? 'bg-white text-black' : 'bg-white/5 text-white/55'
+            )}
+          >
+            <Moon className="size-3.5" />
+            다크
+          </button>
         </div>
       </section>
 
-      {err ? <p className="text-sm text-rose-300">{err}</p> : null}
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void save(false)}
-          className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
-        >
-          저장
-        </button>
-        <button
-          type="button"
-          disabled={busy || !slug}
-          onClick={() => void save(true)}
-          className="rounded-xl bg-white/10 px-5 py-2.5 text-sm font-semibold disabled:opacity-40"
-        >
-          저장하고 발행
-        </button>
-      </div>
+      <section className="space-y-3 rounded-2xl border border-white/10 p-4">
+        <div>
+          <h3 className="text-sm font-medium">발행</h3>
+          <p className="mt-1 text-xs leading-relaxed text-white/40">
+            발행하면 누구나 /s/{slug || '내이름'}에서 사이트를 볼 수 있어요. 방문자가 상품을 누르면 쿠팡
+            파트너스·토스 키로 링크가 연결돼요.
+          </p>
+        </div>
+        {coupangOn === false ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-full bg-white/5 px-4 py-2.5 text-xs text-white/65">
+            <span>쿠팡 파트너스 키가 아직 연결되지 않았어요.</span>
+            <a href="/settings" className="shrink-0 font-medium text-[var(--accent)] hover:underline">
+              설정에서 연결하기
+            </a>
+          </div>
+        ) : null}
+        {tossOn === false ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-full bg-white/5 px-4 py-2.5 text-xs text-white/65">
+            <span>토스 쉐어링크 키가 아직 연결되지 않았어요.</span>
+            <a href="/settings" className="shrink-0 font-medium text-[var(--accent)] hover:underline">
+              설정에서 연결하기
+            </a>
+          </div>
+        ) : null}
+        {err ? <p className="text-sm text-rose-300">{err}</p> : null}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void save(false)}
+            className="rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            저장
+          </button>
+          <button
+            type="button"
+            disabled={busy || !slug}
+            onClick={() => void save(true)}
+            className="rounded-full bg-white/10 px-5 py-2 text-sm font-semibold disabled:opacity-40"
+          >
+            저장하고 발행
+          </button>
+        </div>
+      </section>
     </div>
   )
 }
