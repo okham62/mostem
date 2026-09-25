@@ -259,6 +259,8 @@ export default async function PublicProfilePage({
                     <a
                       key={b.id}
                       href={`/u/${slug}/go/${encodeURIComponent(b.id)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
                       style={{
                         background: d.blockStyle === 'outline' ? 'transparent' : blockBg,
