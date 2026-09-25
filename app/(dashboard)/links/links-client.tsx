@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Settings2,
+  ShoppingBag,
   Store,
   Trash2,
   UserRound,
@@ -35,6 +36,7 @@ import {
   type HamiCoupangProduct,
 } from '@/lib/threads-publish'
 import { cn } from '@/lib/utils'
+import { MostemLogo } from '@/components/mostem-logo'
 import dynamic from 'next/dynamic'
 
 const ProfilePanel = dynamic(
@@ -2899,27 +2901,48 @@ function HotdealPanel({
       </section>
 
       <section className="space-y-3 rounded-2xl border border-white/10 p-4">
-        <h3 className="text-sm font-medium">사이트 스타일</h3>
-        <div className="flex gap-2">
-          {(
-            [
-              ['mostem', '모스템'],
-              ['toss', '토스 (Pro)'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTheme(id)}
-              className={cn(
-                'rounded-full px-3.5 py-1.5 text-xs',
-                theme === id ? 'bg-[var(--gold)] text-black' : 'bg-white/5 text-white/55'
-              )}
-            >
-              {label}
-            </button>
-          ))}
+        <div>
+          <h3 className="text-sm font-medium">사이트 스타일</h3>
+          <p className="mt-1 text-xs leading-relaxed text-white/45">
+            사이트 전체의 색과 모서리 모양이에요. 아래 배경 테마와는 따로 골라요 — 어떤 조합이든 됩니다.
+          </p>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTheme('mostem')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs',
+              theme === 'mostem'
+                ? 'border-white/15 bg-white/10 text-white'
+                : 'border-transparent bg-white/5 text-white/55'
+            )}
+          >
+            <MostemLogo size={16} rounded="full" />
+            모스템
+          </button>
+          <button
+            type="button"
+            onClick={() => setTheme('toss')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs',
+              theme === 'toss'
+                ? 'border-white/15 bg-white/10 text-white'
+                : 'border-transparent bg-white/5 text-white/55'
+            )}
+          >
+            <ShoppingBag className="size-3.5" />
+            토스
+            <span className="rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black">
+              Pro 이상
+            </span>
+          </button>
+        </div>
+        <p className="text-xs leading-relaxed text-white/40">
+          {theme === 'toss'
+            ? '흰 카드에 얇은 실선, 각진 모서리. 세일가는 빨강으로 강조돼요.'
+            : '골드 포인트에 둥근 카드예요. 모스템이 기본 그레이예요.'}
+        </p>
         <h3 className="pt-2 text-sm font-medium">배경 테마</h3>
         <div className="flex gap-2">
           {(
