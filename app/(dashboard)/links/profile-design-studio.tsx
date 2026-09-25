@@ -133,15 +133,15 @@ function ImageEditRow({
         if (file) onFile(file)
       }}
       className={cn(
-        'flex items-center gap-3 rounded-xl border px-3 py-2.5',
-        dragOver ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-white/10',
+        'flex items-center gap-3 rounded-xl px-1 py-1',
+        dragOver && 'bg-[var(--accent)]/10',
       )}
     >
       <button
         type="button"
         onClick={onPick}
         className={cn(
-          'h-11 w-11 shrink-0 overflow-hidden bg-white/10',
+          'h-12 w-12 shrink-0 overflow-hidden bg-white/10 ring-1 ring-white/10',
           round ? 'rounded-full' : 'rounded-lg',
         )}
         title={`${label} 수정`}
@@ -151,13 +151,11 @@ function ImageEditRow({
           <img src={shown} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="flex h-full w-full items-center justify-center">
-            {round ? <MostemLogo size={28} rounded="full" /> : <ImageIcon className="h-4 w-4 text-white/35" />}
+            {round ? <MostemLogo size={32} rounded="full" /> : <ImageIcon className="h-5 w-5 text-white/35" />}
           </span>
         )}
       </button>
-      <button type="button" onClick={onPick} className="min-w-0 flex-1 text-left text-sm text-white/85">
-        {label}
-      </button>
+      <span className="min-w-0 flex-1 text-sm text-white/85">{label}</span>
       <button
         type="button"
         onClick={onPick}
@@ -683,6 +681,9 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
 
         <div className="max-h-[45vh] space-y-4 overflow-y-auto border-b border-white/10 p-4 lg:max-h-none lg:border-b-0 lg:border-r lg:border-white/10">
           <h3 className="text-sm font-semibold">{panelTitle}</h3>
+          {tab === 'profile' ? (
+            <p className="text-[11px] text-white/35">현재 프로필 사진을 확인하고 오른쪽에서 수정하세요.</p>
+          ) : null}
 
           {tab === 'profile' ? (
             <>
