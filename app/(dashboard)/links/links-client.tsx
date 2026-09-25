@@ -724,13 +724,13 @@ export function LinksClient() {
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition',
+                'inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition',
                 active
                   ? 'bg-[var(--accent)] text-white shadow-[0_0_0_1px_rgba(139,92,246,0.5)]'
-                  : 'text-white/55 hover:bg-white/5 hover:text-white/80'
+                  : 'text-white hover:bg-white/10'
               )}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className="h-4 w-4" />
               {t.label}
             </button>
           )
@@ -1809,8 +1809,8 @@ function FindPanel({
             type="button"
             onClick={() => setSub(id)}
             className={cn(
-              'rounded-full px-3.5 py-1.5 text-xs font-medium',
-              sub === id ? 'bg-[var(--gold)] text-black' : 'bg-white/5 text-white/55 hover:bg-white/10'
+              'rounded-full px-3.5 py-1.5 text-sm font-semibold',
+              sub === id ? 'bg-[var(--gold)] text-black' : 'bg-white/5 text-white hover:bg-white/10'
             )}
           >
             {label}
@@ -2179,24 +2179,24 @@ function MinePanel({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
         <button
           type="button"
           onClick={() => setSort('clicks')}
-          className={cn('rounded-full px-3 py-1', sort === 'clicks' ? 'bg-[var(--accent)]' : 'bg-white/5 text-white/50')}
+          className={cn('rounded-full px-3 py-1', sort === 'clicks' ? 'bg-[var(--accent)] text-white' : 'bg-white/5 text-white')}
         >
           클릭 많은순
         </button>
         <button
           type="button"
           onClick={() => setSort('newest')}
-          className={cn('rounded-full px-3 py-1', sort === 'newest' ? 'bg-[var(--accent)]' : 'bg-white/5 text-white/50')}
+          className={cn('rounded-full px-3 py-1', sort === 'newest' ? 'bg-[var(--accent)] text-white' : 'bg-white/5 text-white')}
         >
           최신순
         </button>
-        <span className="text-white/35">전체 ({links.length})</span>
-        <span className="text-white/35">클릭 있음 ({withClicks})</span>
-        <span className="text-white/35">쿠팡 ({coupangCount})</span>
+        <span className="text-white">전체 ({links.length})</span>
+        <span className="text-white">클릭 있음 ({withClicks})</span>
+        <span className="text-white">쿠팡 ({coupangCount})</span>
 
         {links.length > 0 ? (
           <div className="ml-auto flex flex-wrap items-center gap-1.5">

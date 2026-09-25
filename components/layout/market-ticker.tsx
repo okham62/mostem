@@ -123,10 +123,10 @@ export function MarketTicker() {
                   className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.06] px-2.5 py-1 will-change-transform [transition:transform_160ms_cubic-bezier(0.22,1,0.36,1)] hover:border-white/40 hover:bg-white/10 md:gap-2 md:px-3 md:py-1.5"
                 >
                   <MarketIcon id={item.id} className="h-5 w-5 md:h-6 md:w-6" />
-                  <span className="text-[12px] font-bold tracking-tight text-white md:text-[13px]">{item.label}</span>
-                  <span className="text-[12px] font-bold text-gold md:text-[13px]">{formatKrw(item.krw)}</span>
+                  <span className="text-[13px] font-bold tracking-tight text-white md:text-[14px]">{item.label}</span>
+                  <span className="text-[13px] font-bold text-gold md:text-[14px]">{formatKrw(item.krw)}</span>
                   {item.kind === 'coin' ? (
-                    <span className="hidden text-[13px] font-semibold text-white/80 md:inline">{formatUsd(item.usd)}</span>
+                    <span className="hidden text-[14px] font-semibold text-white/80 md:inline">{formatUsd(item.usd)}</span>
                   ) : null}
                   {item.change != null ? (
                     <span

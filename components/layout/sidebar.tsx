@@ -78,7 +78,7 @@ function NavGroup({
     <div className="mb-5">
       <div className="mb-2 flex items-center gap-2 px-3">
         <span className="h-3.5 w-[3px] shrink-0 rounded-full bg-gold" />
-        <p className="text-[13px] font-extrabold tracking-tight text-white">{title}</p>
+        <p className="text-sm font-extrabold tracking-tight text-white">{title}</p>
         <span className="h-px min-w-4 flex-1 bg-white/12" />
       </div>
       <ul className="space-y-0.5">
@@ -119,10 +119,10 @@ function NavGroup({
                   if (itemPath === '/trends') warmTrendCache()
                 }}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-semibold transition-colors',
                   isActive
                     ? 'bg-brand/20 text-brand'
-                    : 'text-white/50 hover:bg-white/5 hover:text-white'
+                    : 'text-white hover:bg-white/10'
                 )}
               >
                 <Icon className="h-5 w-5 shrink-0" />
