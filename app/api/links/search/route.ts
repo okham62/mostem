@@ -1,17 +1,55 @@
-import { getShoppingBest, type ShoppingProduct } from '@/lib/shopping'
 import { auth } from '@/auth'
+import { scrapeCoupangSearch } from '@/lib/coupang-web-search'
+import { normalizeLinkSettings } from '@/lib/links'
+import {
+  getPartnerDef,
+  isPartnerConnected,
+  parsePartnerApis,
+} from '@/lib/partners'
+import { searchCoupangProducts, type CoupangSearchProduct } from '@/lib/partners-coupang'
+import { createAdminClient } from '@/lib/supabase/admin'
+import type { ShoppingProduct } from '@/lib/shopping'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-function score(title: string, q: string) {
-  const t = title.toLowerCase()
-  const parts = q.toLowerCase().split(/\s+/).filter(Boolean)
-  if (!parts.length) return 0
-  let hit = 0
-  for (const p of parts) if (t.includes(p)) hit++
-  return hit / parts.length
+export type FindProduct = ShoppingProduct & {
+  affiliateUrl?: string
+  productId?: string
+}
+
+function toFindProduct(row: CoupangSearchProduct): FindProduct {
+  return {
+    rank: row.rank,
+    title: row.title,
+    image: row.image,
+    price: row.price,
+    priceText: row.priceText,
+    listPrice: null,
+    discountRate: null,
+    mall: '쿠팡',
+    reviewScore: '',
+    reviewCount: '',
+    url: row.url,
+    affiliateUrl: row.affiliateUrl,
+    productId: row.productId,
+  }
+}
+
+async function loadCoupangCreds(userId: string) {
+  const supabase = createAdminClient()
+  const { data } = await supabase.from('link_settings').select('*').eq('user_id', userId).maybeSingle()
+  if (!data) return { cred: null, channel: '기본값', connected: false }
+  const settings = normalizeLinkSettings(data as Record<string, unknown>)
+  const apis = parsePartnerApis((data as Record<string, unknown>).partner_apis)
+  const def = getPartnerDef('coupang')
+  const cred = apis.coupang
+  return {
+    cred,
+    channel: settings.channel_id || '기본값',
+    connected: Boolean(def && isPartnerConnected(def, cred) && cred?.accessKey && cred?.secretKey),
+  }
 }
 
 export async function GET(req: Request) {
@@ -22,11 +60,11 @@ export async function GET(req: Request) {
   const q = (searchParams.get('q') || '').trim()
   const source = (searchParams.get('source') || 'coupang').toLowerCase()
 
-  if (!q) return NextResponse.json({ products: [], query: q, source })
+  if (!q) return NextResponse.json({ products: [] as FindProduct[], query: q, source })
 
   if (source === 'toss') {
     return NextResponse.json({
-      products: [] as ShoppingProduct[],
+      products: [] as FindProduct[],
       query: q,
       source: 'toss',
       note: '토스 상품 검색은 토스 쉐어링크 키 연동 후 제공됩니다. 설정에서 연결해 주세요.',
@@ -34,38 +72,68 @@ export async function GET(req: Request) {
     })
   }
 
-  const board = await getShoppingBest()
-  const coupang = board.platforms.find((p) => p.id === 'coupang')
-  const pool = [
-    ...(coupang?.rising.products ?? []),
-    ...(coupang?.popular.products ?? []),
-  ]
+  const { cred, channel, connected } = await loadCoupangCreds(session.user.id)
+  const searchUrl = `https://www.coupang.com/np/search?q=${encodeURIComponent(q)}&channel=user`
 
-  const ranked = pool
-    .map((p) => ({ p, s: score(p.title, q) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s || (a.p.price ?? 0) - (b.p.price ?? 0))
-
-  const seen = new Set<string>()
-  const products: ShoppingProduct[] = []
-  for (const { p } of ranked) {
-    const key = `${p.title}|${p.priceText}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    products.push(p)
-    if (products.length >= 24) break
+  if (connected && cred?.accessKey && cred?.secretKey) {
+    const searched = await searchCoupangProducts(
+      String(cred.accessKey),
+      String(cred.secretKey),
+      q,
+      channel
+    )
+    if (searched.ok && searched.products.length) {
+      return NextResponse.json({
+        products: searched.products.map(toFindProduct),
+        query: q,
+        source: 'coupang',
+        searchUrl: searched.landingUrl || searchUrl,
+      })
+    }
+    if (!searched.ok) {
+      // Fall through to page scrape before failing hard.
+      try {
+        const scraped = await scrapeCoupangSearch(q)
+        if (scraped.length) {
+          return NextResponse.json({
+            products: scraped.map(toFindProduct),
+            query: q,
+            source: 'coupang',
+            searchUrl,
+            note: '쿠팡 API 검색이 잠시 실패해서 쿠팡 검색 페이지 결과를 보여 드려요.',
+          })
+        }
+      } catch {
+        /* ignore scrape, surface API error */
+      }
+      return NextResponse.json({ error: searched.error || '쿠팡 검색 실패' }, { status: 400 })
+    }
   }
 
-  // Fallback: open-ended search URL if nothing matched in bestsellers
-  if (!products.length) {
-    return NextResponse.json({
-      products: [],
-      query: q,
-      source: 'coupang',
-      note: '베스트 목록에서 일치 상품이 없어요. 쿠팡 검색으로 이동해 보세요.',
-      searchUrl: `https://www.coupang.com/np/search?q=${encodeURIComponent(q)}&channel=user`,
-    })
+  try {
+    const scraped = await scrapeCoupangSearch(q)
+    if (scraped.length) {
+      return NextResponse.json({
+        products: scraped.map(toFindProduct),
+        query: q,
+        source: 'coupang',
+        searchUrl,
+        note: connected
+          ? undefined
+          : '쿠팡파트너스 API를 연결하면 제휴링크가 바로 복사됩니다.',
+      })
+    }
+  } catch {
+    /* ignore */
   }
 
-  return NextResponse.json({ products, query: q, source: 'coupang' })
+  return NextResponse.json({
+    products: [] as FindProduct[],
+    query: q,
+    source: 'coupang',
+    note: connected
+      ? '검색 결과가 없어요. 다른 키워드로 다시 시도해 보세요.'
+      : '쿠팡 검색을 쓰려면 설정에서 쿠팡파트너스 API를 연결해 주세요.',
+    searchUrl,
+  })
 }

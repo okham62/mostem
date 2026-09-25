@@ -630,6 +630,7 @@ export function LinksClient() {
 
       {tab === 'find' && (
         <FindPanel
+          copyText={copyText}
           onUseUrl={(url, title, image) => {
             setTab('convert')
             window.dispatchEvent(
@@ -1419,14 +1420,22 @@ function ConvertPanel({
   )
 }
 
-function FindPanel({ onUseUrl }: { onUseUrl: (url: string, title: string, image?: string) => void }) {
+type FindProduct = ShoppingProduct & { affiliateUrl?: string }
+
+function FindPanel({
+  onUseUrl,
+  copyText,
+}: {
+  onUseUrl: (url: string, title: string, image?: string) => void
+  copyText: (t: string) => void
+}) {
   const [sub, setSub] = useState<FindSub>('coupang')
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
-  const [products, setProducts] = useState<ShoppingProduct[]>([])
+  const [products, setProducts] = useState<FindProduct[]>([])
   const [note, setNote] = useState('')
   const [searchUrl, setSearchUrl] = useState('')
-  const [compareCoupang, setCompareCoupang] = useState<ShoppingProduct[]>([])
+  const [compareCoupang, setCompareCoupang] = useState<FindProduct[]>([])
   const [compareNote, setCompareNote] = useState('')
 
   async function runSearch(source: 'coupang' | 'toss') {
@@ -1534,6 +1543,7 @@ function FindPanel({ onUseUrl }: { onUseUrl: (url: string, title: string, image?
                 title="쿠팡"
                 products={compareCoupang}
                 onUse={onUseUrl}
+                copyText={copyText}
               />
               <div className="rounded-2xl border border-dashed border-white/10 p-6 text-sm text-white/40">
                 <p className="font-medium text-white/60">토스</p>
@@ -1577,7 +1587,12 @@ function FindPanel({ onUseUrl }: { onUseUrl: (url: string, title: string, image?
               ) : null}
             </div>
           ) : null}
-          <ProductColumn title={sub === 'coupang' ? '쿠팡' : '토스'} products={products} onUse={onUseUrl} />
+          <ProductColumn
+            title={sub === 'coupang' ? '쿠팡' : '토스'}
+            products={products}
+            onUse={onUseUrl}
+            copyText={copyText}
+          />
         </div>
       )}
     </div>
@@ -1588,46 +1603,87 @@ function ProductColumn({
   title,
   products,
   onUse,
+  copyText,
 }: {
   title: string
-  products: ShoppingProduct[]
+  products: FindProduct[]
   onUse: (url: string, title: string, image?: string) => void
+  copyText: (t: string) => void
 }) {
+  const [copyingKey, setCopyingKey] = useState<string | null>(null)
+
+  async function copyAffiliate(p: FindProduct) {
+    const key = `${p.rank}-${p.title}`
+    setCopyingKey(key)
+    try {
+      const ready = String(p.affiliateUrl || '').trim()
+      if (ready && /link\.coupang\.com|coupa\.ng/i.test(ready)) {
+        copyText(ready)
+        return
+      }
+      const res = await fetch('/api/links/affiliate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: ready || p.url }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '제휴링크 변환 실패')
+      copyText(String(data.affiliateUrl || ''))
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '제휴링크 복사 실패')
+    } finally {
+      setCopyingKey(null)
+    }
+  }
+
   if (!products.length) return null
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-white/50">{title}</p>
       <ul className="space-y-2">
-        {products.map((p) => (
-          <li
-            key={`${p.rank}-${p.title}`}
-            className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.image} alt="" className="h-14 w-14 rounded-xl object-cover" />
-            <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-sm">{p.title}</p>
-              <p className="mt-0.5 text-sm font-semibold text-[var(--gold)]">{p.priceText}</p>
-              <div className="mt-2 flex gap-2">
-                <a
-                  href={p.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg bg-white/10 px-2 py-1 text-[11px] text-white/70"
-                >
-                  열기
-                </a>
-                <button
-                  type="button"
-                  onClick={() => onUse(p.url, p.title, p.image || undefined)}
-                  className="rounded-lg bg-[var(--accent)]/80 px-2 py-1 text-[11px] text-white"
-                >
-                  링크로 변환
-                </button>
+        {products.map((p) => {
+          const key = `${p.rank}-${p.title}`
+          return (
+            <li
+              key={key}
+              className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+            >
+              <div className="flex gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.image} alt="" className="h-14 w-14 rounded-xl object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-sm">{p.title}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[var(--gold)]">{p.priceText}</p>
+                  <div className="mt-2 flex gap-2">
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-lg bg-white/10 px-2 py-1 text-[11px] text-white/70"
+                    >
+                      열기
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => onUse(p.affiliateUrl || p.url, p.title, p.image || undefined)}
+                      className="rounded-lg bg-white/10 px-2 py-1 text-[11px] text-white/70"
+                    >
+                      링크로 변환
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
+              <button
+                type="button"
+                disabled={copyingKey === key}
+                onClick={() => void copyAffiliate(p)}
+                className="w-full rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {copyingKey === key ? '복사 중…' : '제휴링크 복사'}
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

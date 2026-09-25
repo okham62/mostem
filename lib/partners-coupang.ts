@@ -3,6 +3,7 @@ import { createHmac } from 'crypto'
 const DOMAIN = 'https://api-gateway.coupang.com'
 const GOLDBOX_PATH = '/v2/providers/affiliate_open_api/apis/openapi/v1/products/goldbox'
 const DEEPLINK_PATH = '/v2/providers/affiliate_open_api/apis/openapi/v1/deeplink'
+const SEARCH_PATH = '/v2/providers/affiliate_open_api/apis/openapi/v1/products/search'
 const COMMISSION_PATH = '/v2/providers/affiliate_open_api/apis/openapi/v1/reports/commission'
 
 function signedDateUtc(): string {
@@ -107,6 +108,78 @@ export async function createCoupangDeeplink(
     return { ok: false, error: '쿠팡 딥링크 변환 결과가 비어 있습니다' }
   }
   return { ok: true, shortenUrl: shortenUrl || landingUrl, landingUrl: landingUrl || shortenUrl }
+}
+
+export type CoupangSearchProduct = {
+  rank: number
+  productId: string
+  title: string
+  image: string
+  price: number | null
+  priceText: string
+  url: string
+  affiliateUrl: string
+  isRocket?: boolean
+}
+
+type CoupangSearchPayload = {
+  landingUrl?: string
+  productData?: Array<{
+    rank?: number
+    productId?: number | string
+    productName?: string
+    productImage?: string
+    productPrice?: number
+    productUrl?: string
+    isRocket?: boolean
+  }>
+}
+
+export async function searchCoupangProducts(
+  accessKey: string,
+  secretKey: string,
+  keyword: string,
+  subId: string
+): Promise<
+  | { ok: true; products: CoupangSearchProduct[]; landingUrl: string }
+  | { ok: false; error: string }
+> {
+  const qs = [
+    `keyword=${encodeURIComponent(keyword.trim())}`,
+    'limit=10',
+    `subId=${encodeURIComponent(toCoupangSubId(subId))}`,
+    'imageSize=512x512',
+    'srpLinkOnly=false',
+  ].join('&')
+  const res = await coupangRequest<CoupangSearchPayload>('GET', `${SEARCH_PATH}?${qs}`, accessKey, secretKey)
+  if (!res.ok) return res
+  const rows = Array.isArray(res.data?.productData) ? res.data.productData : []
+  const products: CoupangSearchProduct[] = []
+  for (const row of rows) {
+    const title = String(row.productName || '').trim()
+    const affiliateUrl = String(row.productUrl || '').trim()
+    const productId = String(row.productId || '').trim()
+    if (!title || !affiliateUrl) continue
+    const price = typeof row.productPrice === 'number' ? row.productPrice : null
+    products.push({
+      rank: Number(row.rank) || products.length + 1,
+      productId,
+      title,
+      image: String(row.productImage || '').trim(),
+      price,
+      priceText: price != null ? `${price.toLocaleString('ko-KR')}원` : '',
+      url: productId
+        ? `https://www.coupang.com/vp/products/${productId}`
+        : affiliateUrl,
+      affiliateUrl,
+      isRocket: Boolean(row.isRocket),
+    })
+  }
+  return {
+    ok: true,
+    products,
+    landingUrl: String(res.data?.landingUrl || '').trim(),
+  }
 }
 
 export type CoupangCommissionRow = {
