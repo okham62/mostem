@@ -46,22 +46,50 @@ export function HotdealStorefront({
   const [filter, setFilter] = useState<HotdealFilter>('all')
   const toss = theme === 'toss'
 
+  const cats = useMemo(() => {
+    if (categories.length) return categories
+    return [...new Set(items.map((item) => item.category).filter(Boolean))] as string[]
+  }, [categories, items])
+
   const chips = useMemo(() => {
     const next: { id: HotdealFilter; label: string }[] = [{ id: 'all', label: '전체' }]
     if (items.some((item) => item.timeSale)) next.push({ id: 'deal', label: '⏰ 하루특가' })
     if (items.some((item) => item.best)) next.push({ id: 'best', label: '🏆 BEST' })
-    const cats = categories.length
-      ? categories
-      : ([...new Set(items.map((item) => item.category).filter(Boolean))] as string[])
     cats.forEach((cat) => next.push({ id: cat, label: cat }))
     return next
-  }, [categories, items])
+  }, [cats, items])
 
   const deals = items.filter((item) => item.timeSale)
   const best = items.filter((item) => item.best)
-  const visible = filterHotdealItems(items, filter)
-  const section =
-    filter === 'deal' ? '⏰ 하루특가' : filter === 'best' ? '🏆 BEST' : filter === 'all' ? '' : filter
+
+  function sectionId(id: HotdealFilter) {
+    if (id === 'all') return 'deals'
+    if (id === 'deal') return 'today-deals'
+    if (id === 'best') return 'best'
+    return `cat-${id}`
+  }
+
+  function goTo(id: HotdealFilter) {
+    setFilter(id)
+    const hash = sectionId(id)
+    const el = document.getElementById(hash)
+    if (el) {
+      el.scrollIntoView({ behavior: 'auto', block: 'start' })
+    }
+    window.history.replaceState(null, '', `#${hash}`)
+  }
+
+  useEffect(() => {
+    const raw = decodeURIComponent(window.location.hash.replace(/^#/, ''))
+    if (!raw) return
+    const match = chips.find((chip) => sectionId(chip.id) === raw)
+    if (match) {
+      setFilter(match.id)
+      requestAnimationFrame(() => {
+        document.getElementById(raw)?.scrollIntoView({ behavior: 'auto', block: 'start' })
+      })
+    }
+  }, [chips])
 
   return (
     <article
@@ -153,12 +181,17 @@ export function HotdealStorefront({
           ) : null}
         </section>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div
+          className={cn(
+            'sticky top-0 z-10 mt-6 flex flex-wrap gap-2 py-3',
+            dark ? 'bg-[#0b0b0d]' : 'bg-[#f4f5f8]',
+          )}
+        >
           {chips.map((chip) => (
             <button
               key={chip.id}
               type="button"
-              onClick={() => setFilter(chip.id)}
+              onClick={() => goTo(chip.id)}
               className={cn(
                 'rounded-full px-4 py-2 text-sm font-semibold',
                 filter === chip.id
@@ -173,27 +206,28 @@ export function HotdealStorefront({
           ))}
         </div>
 
-        {filter === 'all' ? (
-          <>
-            {deals.length ? (
-              <ProductSection title="⏰ 하루특가" items={deals} grid={grid} toss={toss} dark={dark} />
-            ) : null}
-            {best.length ? (
-              <ProductSection title="🏆 BEST" items={best} grid={grid} toss={toss} dark={dark} />
-            ) : null}
-            <ProductSection title="📦 전체 핫딜 모음집" items={items} grid={grid} toss={toss} dark={dark} />
-          </>
-        ) : (
-          <>
-            {section ? <h2 className="mt-10 text-xl font-black">{section}</h2> : null}
-            <ProductGrid items={visible} grid={grid} toss={toss} dark={dark} />
-            {!visible.length ? (
-              <p className={cn('mt-10 text-center text-sm', dark ? 'text-white/40' : 'text-black/40')}>
-                이 조건에 맞는 상품이 아직 없어요.
-              </p>
-            ) : null}
-          </>
-        )}
+        {deals.length ? (
+          <ProductSection id="today-deals" title="⏰ 하루특가" items={deals} grid={grid} toss={toss} dark={dark} />
+        ) : null}
+        {best.length ? (
+          <ProductSection id="best" title="🏆 BEST" items={best} grid={grid} toss={toss} dark={dark} />
+        ) : null}
+        {cats.map((cat) => {
+          const rows = filterHotdealItems(items, cat)
+          if (!rows.length) return null
+          return (
+            <ProductSection
+              key={cat}
+              id={`cat-${cat}`}
+              title={cat}
+              items={rows}
+              grid={grid}
+              toss={toss}
+              dark={dark}
+            />
+          )
+        })}
+        <ProductSection id="deals" title="📦 전체 핫딜 모음집" items={items} grid={grid} toss={toss} dark={dark} />
 
         <footer
           className={cn(
@@ -213,12 +247,14 @@ export function HotdealStorefront({
 }
 
 function ProductSection({
+  id,
   title,
   items,
   grid,
   toss,
   dark,
 }: {
+  id?: string
   title: string
   items: HotdealItem[]
   grid: boolean
@@ -226,7 +262,7 @@ function ProductSection({
   dark: boolean
 }) {
   return (
-    <section className="mt-10 scroll-mt-4">
+    <section id={id} className="mt-10 scroll-mt-24">
       <h2 className="text-xl font-black">{title}</h2>
       <ProductGrid items={items} grid={grid} toss={toss} dark={dark} />
     </section>
