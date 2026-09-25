@@ -1640,44 +1640,44 @@ function ProductColumn({
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-white/50">{title}</p>
-      <ul className="space-y-2">
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {products.map((p) => {
           const key = `${p.rank}-${p.title}`
           return (
             <li
               key={key}
-              className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+              className="flex min-w-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-2.5"
             >
-              <div className="flex gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image} alt="" className="h-14 w-14 rounded-xl object-cover" />
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm">{p.title}</p>
-                  <p className="mt-0.5 text-sm font-semibold text-[var(--gold)]">{p.priceText}</p>
-                  <div className="mt-2 flex gap-2">
-                    <a
-                      href={p.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg bg-white/10 px-2 py-1 text-[11px] text-white/70"
-                    >
-                      열기
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => onUse(p.affiliateUrl || p.url, p.title, p.image || undefined)}
-                      className="rounded-lg bg-white/10 px-2 py-1 text-[11px] text-white/70"
-                    >
-                      링크로 변환
-                    </button>
-                  </div>
-                </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.image}
+                alt=""
+                className="aspect-square w-full rounded-xl object-cover"
+              />
+              <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-xs leading-snug">{p.title}</p>
+              <p className="mt-1 text-sm font-semibold text-[var(--gold)]">{p.priceText}</p>
+              <div className="mt-2 flex gap-1">
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md bg-white/10 px-1.5 py-1 text-[10px] text-white/70"
+                >
+                  열기
+                </a>
+                <button
+                  type="button"
+                  onClick={() => onUse(p.affiliateUrl || p.url, p.title, p.image || undefined)}
+                  className="rounded-md bg-white/10 px-1.5 py-1 text-[10px] text-white/70"
+                >
+                  변환
+                </button>
               </div>
               <button
                 type="button"
                 disabled={copyingKey === key}
                 onClick={() => void copyAffiliate(p)}
-                className="w-full rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                className="mt-2 w-full rounded-lg bg-[var(--accent)] px-2 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
               >
                 {copyingKey === key ? '복사 중…' : '제휴링크 복사'}
               </button>
