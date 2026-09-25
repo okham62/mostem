@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils'
 import { MostemLogo } from '@/components/mostem-logo'
 import { ProfileSnsIcons } from '@/components/profile-sns-icons'
 import { resolveSnsUrl, SNS_PRESETS, type SnsKind } from '@/lib/profile-sns'
+import { ProfileSearchBox, useProfileSearch } from '@/components/profile-search'
 
 export type DesignTab = 'profile' | 'style' | 'block' | 'settings'
 
@@ -326,6 +327,7 @@ export function ProfilePhonePreview({
   const affiliateFg = d.affiliateTextColor || '#ffffff'
   const noticeText = d.affiliateNoticeText || DEFAULT_AFFILIATE_NOTICE
   const profileLeft = (d.profileAlign || 'center') === 'left'
+  const { query, setQuery, visible } = useProfileSearch(live, Boolean(d.searchEnabled))
   const snsIcons =
     sns.length > 0 ? (
       <ProfileSnsIcons sns={sns} size="sm" align={d.snsAlign || 'center'} />
@@ -442,6 +444,14 @@ export function ProfilePhonePreview({
           <p className={cn('font-semibold', font)}>{name}</p>
           {bio ? <p className="mt-1 text-[11px] opacity-45">{bio}</p> : null}
           {snsIcons && d.snsPosition !== 'links' ? <div className="mt-3">{snsIcons}</div> : null}
+          {d.searchEnabled ? (
+            <ProfileSearchBox
+              value={query}
+              onChange={setQuery}
+              compact
+              light={d.theme === 'light'}
+            />
+          ) : null}
           {live.length === 0 ? (
             <div
               className={cn(
@@ -457,9 +467,11 @@ export function ProfilePhonePreview({
               <p className="text-xs opacity-50">아직 공개된 링크가 없어요</p>
               <p className="mt-1 text-[10px] opacity-35">곧 새로운 추천을 채워둘게요.</p>
             </div>
+          ) : visible.length === 0 ? (
+            <p className="mt-4 text-[11px] opacity-45">검색 결과가 없어요</p>
           ) : (
             <div className={cn('mt-4 space-y-2', d.blockAlign === 'center' && 'mx-auto')}>
-              {live.map((b) => (
+              {visible.map((b) => (
                 <div
                   key={b.id}
                   className={cn(

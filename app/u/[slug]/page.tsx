@@ -17,6 +17,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ProfilePublicClient } from './profile-public-client'
 import { ProfileSnsIcons } from '@/components/profile-sns-icons'
+import { ProfilePublicLinks } from '@/components/profile-search'
 import { Link2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -220,7 +221,7 @@ export default async function PublicProfilePage({
           {bio ? <p className="mt-2 text-sm opacity-50">{bio}</p> : null}
           {snsIcons && d.snsPosition !== 'links' ? <div className="mt-4">{snsIcons}</div> : null}
 
-          {blocks.length === 0 ? (
+          {blocks.length === 0 && !d.searchEnabled ? (
             <div
               className={`mt-8 border border-dashed px-4 py-10 text-sm opacity-50 ${blockRadius}`}
               style={{
@@ -232,30 +233,18 @@ export default async function PublicProfilePage({
               <p className="mt-1 text-xs opacity-60">곧 새로운 추천을 채워둘게요.</p>
             </div>
           ) : (
-            <div className="mt-6 flex flex-col gap-3">
-              {blocks.map((b: ProfileBlock) => (
-                <a
-                  key={b.id}
-                  href={`/u/${slug}/go/${encodeURIComponent(b.id)}`}
-                  className={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
-                  style={{
-                    background: d.blockStyle === 'outline' ? 'transparent' : blockBg,
-                    color: blockFg,
-                    border: blockBorder,
-                  }}
-                >
-                  {b.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={b.image}
-                      alt=""
-                      className="h-[72px] w-[72px] shrink-0 object-cover"
-                    />
-                  ) : null}
-                  <span className="min-w-0 flex-1 truncate px-4 py-3">{b.title || b.url}</span>
-                </a>
-              ))}
-            </div>
+            <ProfilePublicLinks
+              slug={slug}
+              blocks={blocks}
+              searchEnabled={Boolean(d.searchEnabled)}
+              light={d.theme === 'light'}
+              blockClassName={`${blockRadius} ${blockShadow} ${blockAlign} flex items-stretch overflow-hidden p-0 text-sm font-medium transition hover:opacity-90`}
+              blockStyle={{
+                background: d.blockStyle === 'outline' ? 'transparent' : blockBg,
+                color: blockFg,
+                border: blockBorder,
+              }}
+            />
           )}
 
           {snsIcons && d.snsPosition === 'links' ? <div className="mt-8">{snsIcons}</div> : null}
