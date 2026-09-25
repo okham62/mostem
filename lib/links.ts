@@ -17,20 +17,34 @@ export type ProfileBlock = {
   enabled?: boolean
 }
 
+export function parseShortLink(url: string): { prefix: string; code: string } | null {
+  const raw = String(url || '').trim()
+  if (!raw) return null
+  try {
+    const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'https://www.mostem.kr')
+    const m = parsed.pathname.match(/^\/l\/([a-z0-9]+)\/([a-z0-9]+)/i)
+    if (m) return { prefix: m[1].toLowerCase(), code: m[2].toLowerCase() }
+  } catch {
+    /* fall through */
+  }
+  const m = raw.match(/\/l\/([a-z0-9]+)\/([a-z0-9]+)/i)
+  return m ? { prefix: m[1].toLowerCase(), code: m[2].toLowerCase() } : null
+}
+
 export function findTrackedLinkForBlock<
   T extends { prefix: string; code: string; destination_url?: string | null },
 >(block: Pick<ProfileBlock, 'url'>, links: T[] = []): T | undefined {
+  const parsed = parseShortLink(block.url)
+  if (parsed) {
+    return links.find(
+      (link) =>
+        String(link.prefix || '').toLowerCase() === parsed.prefix &&
+        String(link.code || '').toLowerCase() === parsed.code,
+    )
+  }
   const url = String(block.url || '')
   if (!url) return undefined
-  return links.find((link) => {
-    const path = shortPath(link.prefix, link.code)
-    const loose = `/${link.prefix}/${link.code}`
-    return (
-      url.includes(path) ||
-      url.includes(loose) ||
-      Boolean(link.destination_url && url.includes(link.destination_url))
-    )
-  })
+  return links.find((link) => Boolean(link.destination_url && url === link.destination_url))
 }
 
 export function persistableBlockImage(image?: string | null): string | null {

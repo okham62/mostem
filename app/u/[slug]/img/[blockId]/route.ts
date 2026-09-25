@@ -1,21 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { findTrackedLinkForBlock, isProfileBlockOn, type ProfileBlock } from '@/lib/links'
+import { isProfileBlockOn, parseShortLink, type ProfileBlock } from '@/lib/links'
+import { serveProductImage } from '@/lib/profile-image'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
-
-function dataUrlToResponse(raw: string) {
-  const m = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/)
-  if (!m) return null
-  const bytes = Buffer.from(m[2], 'base64')
-  if (!bytes.byteLength) return null
-  return new NextResponse(bytes, {
-    headers: {
-      'Content-Type': m[1],
-      'Cache-Control': 'public, max-age=86400',
-    },
-  })
-}
 
 export async function GET(
   _req: Request,
@@ -39,25 +27,28 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const stored = String(block.image || '').trim()
-  if (/^https?:\/\//i.test(stored)) {
-    return NextResponse.redirect(stored, 302)
+  const parsed = parseShortLink(block.url)
+  if (parsed) {
+    const { data: link } = await supabase
+      .from('tracked_links')
+      .select('og_image_url, destination_url')
+      .eq('user_id', data.user_id)
+      .eq('prefix', parsed.prefix)
+      .eq('code', parsed.code)
+      .maybeSingle()
+
+    const fromLink = await serveProductImage({
+      ogImageUrl: link?.og_image_url ?? block.image,
+      destinationUrl: link?.destination_url || block.url,
+    })
+    if (fromLink) return fromLink
   }
-  const fromBlock = stored.startsWith('data:image') ? dataUrlToResponse(stored) : null
+
+  const fromBlock = await serveProductImage({
+    ogImageUrl: block.image,
+    destinationUrl: block.url,
+  })
   if (fromBlock) return fromBlock
-
-  const { data: links } = await supabase
-    .from('tracked_links')
-    .select('prefix, code, destination_url, og_image_url')
-    .eq('user_id', data.user_id)
-
-  const hit = findTrackedLinkForBlock(block, links ?? [])
-  const og = String(hit?.og_image_url || '').trim()
-  if (/^https?:\/\//i.test(og)) {
-    return NextResponse.redirect(og, 302)
-  }
-  const fromLink = og.startsWith('data:image') ? dataUrlToResponse(og) : null
-  if (fromLink) return fromLink
 
   return NextResponse.json({ error: 'Not found' }, { status: 404 })
 }

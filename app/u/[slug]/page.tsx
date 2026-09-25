@@ -4,6 +4,7 @@ import {
   findTrackedLinkForBlock,
   isProfileBlockOn,
   normalizeLinkSettings,
+  parseShortLink,
   persistableBlockImage,
   sortProfileBlocks,
   type ProfileBlock,
@@ -103,14 +104,18 @@ export default async function PublicProfilePage({
     allBlocks.filter((b) => b.url && isProfileBlockOn(b)),
   ).map((b) => {
     const httpImage = persistableBlockImage(b.image)
-    const hasThumb =
-      Boolean(httpImage) ||
-      Boolean(String(b.image || '').startsWith('data:image')) ||
-      Boolean(findTrackedLinkForBlock(b, linkRefs ?? []))
-    return {
-      ...b,
-      image: httpImage || (hasThumb ? `/u/${slug}/img/${encodeURIComponent(b.id)}` : null),
-    }
+    const hit = findTrackedLinkForBlock(b, linkRefs ?? [])
+    const parsed = hit
+      ? { prefix: hit.prefix, code: hit.code }
+      : parseShortLink(b.url)
+    const image =
+      httpImage ||
+      (parsed
+        ? `/u/${slug}/og/${encodeURIComponent(parsed.prefix)}/${encodeURIComponent(parsed.code)}`
+        : String(b.image || '').startsWith('data:image') || b.url
+          ? `/u/${slug}/img/${encodeURIComponent(b.id)}`
+          : null)
+    return { ...b, image }
   })
   const visibleBlocks = searchQuery
     ? blocks.filter((b) => {
