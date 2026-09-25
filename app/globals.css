@@ -1088,3 +1088,18 @@ html[data-theme='light'] .bg-brand .text-white {
   0% { transform: translateX(-120%); }
   100% { transform: translateX(420%); }
 }
+
+@keyframes hotdealBadgePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.55); }
+  50% { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+}
+
+.hotdeal-badge-live {
+  animation: hotdealBadgePulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hotdeal-badge-live {
+    animation: none;
+  }
+}

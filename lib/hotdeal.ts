@@ -24,9 +24,30 @@ export type HotdealItem = {
   discountRate: number | null
   timeSale: boolean
   best: boolean
+  bestRank: number | null
   bigDiscount: boolean
   megaDiscount: boolean
   category: string | null
+  endAt?: string | null
+}
+
+/** Toss 하루특가 endAt. Falls back to today 23:59:59 KST. */
+export function tossDealEndAt(items: Array<{ timeSale?: boolean; endAt?: string | null }>) {
+  const times = items
+    .filter((item) => item.timeSale)
+    .map((item) => Date.parse(String(item.endAt || '')))
+    .filter((value) => Number.isFinite(value))
+  if (times.length) return new Date(Math.max(...times)).toISOString()
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+  return `${year}-${month}-${day}T14:59:59.000Z`
 }
 
 const CATEGORY_WORDS: Record<string, string[]> = {
@@ -91,6 +112,7 @@ export function toHotdealItems(
       discountRate: discount,
       timeSale: kind === 'deal',
       best: kind === 'best' && p.rank <= 3,
+      bestRank: kind === 'best' && p.rank <= 3 ? p.rank : null,
       bigDiscount: (discount ?? 0) >= 50,
       megaDiscount: (discount ?? 0) >= 70,
       category: guessHotdealCategory(p.title),

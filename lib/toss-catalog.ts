@@ -1,5 +1,5 @@
 import type { HotdealItem } from '@/lib/hotdeal'
-import { guessHotdealCategory } from '@/lib/hotdeal'
+import { guessHotdealCategory, tossDealEndAt } from '@/lib/hotdeal'
 import { parsePartnerApis } from '@/lib/partners'
 import {
   fetchTossHotdealLists,
@@ -55,9 +55,11 @@ function toItem(
     discountRate: discount,
     timeSale: kind === 'deal',
     best: kind === 'best',
+    bestRank: kind === 'best' && product.rank <= 3 ? product.rank : null,
     bigDiscount: (discount ?? 0) >= 50,
     megaDiscount: (discount ?? 0) >= 70,
     category: guessHotdealCategory(product.displayName),
+    endAt: product.endAt || null,
   }
 }
 
@@ -71,6 +73,8 @@ function mergeItems(deals: HotdealItem[], best: HotdealItem[]) {
       if (existing) {
         existing.best = existing.best || item.best
         existing.timeSale = existing.timeSale || item.timeSale
+        existing.bestRank = existing.bestRank || item.bestRank
+        existing.endAt = existing.endAt || item.endAt
       }
       return
     }
@@ -100,6 +104,9 @@ function parsePublicBoard(html: string, goBase: string): HotdealItem[] {
   const cards = [...html.matchAll(/href="\/s\/hypeduck-demo\/go\/(\d+)"([\s\S]*?)<\/a>/gi)]
   const deals: HotdealItem[] = []
   const best: HotdealItem[] = []
+  const boardEndAt =
+    /20\d{2}-\d{2}-\d{2}T14:59:59(?:\.\d+)?Z/.exec(html)?.[0] || tossDealEndAt([])
+  let bestCount = 0
 
   for (const match of cards) {
     const itemId = match[1]
@@ -127,9 +134,11 @@ function parsePublicBoard(html: string, goBase: string): HotdealItem[] {
       discountRate,
       timeSale: heading.includes('하루특가'),
       best: heading.includes('BEST'),
+      bestRank: heading.includes('BEST') ? (++bestCount <= 3 ? bestCount : null) : null,
       bigDiscount: (discountRate ?? 0) >= 50,
       megaDiscount: (discountRate ?? 0) >= 70,
       category: guessHotdealCategory(title),
+      endAt: heading.includes('하루특가') ? boardEndAt : null,
     }
     if (item.timeSale) deals.push(item)
     else if (item.best) best.push(item)

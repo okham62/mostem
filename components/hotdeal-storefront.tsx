@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { LayoutGrid, List, Moon, Sun } from 'lucide-react'
 import { MostemLogo } from '@/components/mostem-logo'
 import { TossLogo } from '@/components/toss-logo'
-import { filterHotdealItems, type HotdealFilter, type HotdealItem } from '@/lib/hotdeal'
+import { filterHotdealItems, tossDealEndAt, type HotdealFilter, type HotdealItem } from '@/lib/hotdeal'
 import { cn } from '@/lib/utils'
 
 export function HotdealStorefront({
@@ -230,6 +230,8 @@ export function HotdealStorefront({
                 toss={toss}
                 dark={dark}
                 timer
+                rail
+                endAt={tossDealEndAt(deals)}
               />
             ) : null}
             {best.length ? (
@@ -359,15 +361,13 @@ function CheckIcon({ checked }: { checked: boolean }) {
   )
 }
 
-function DealTimer() {
+function DealTimer({ endAt }: { endAt?: string }) {
   const [label, setLabel] = useState('')
 
   useEffect(() => {
+    const end = new Date(endAt || tossDealEndAt([]))
     const tick = () => {
-      const now = new Date()
-      const end = new Date(now)
-      end.setHours(23, 59, 59, 999)
-      const left = Math.max(0, end.getTime() - now.getTime())
+      const left = Math.max(0, end.getTime() - Date.now())
       const h = Math.floor(left / 3_600_000)
       const m = Math.floor((left % 3_600_000) / 60_000)
       const s = Math.floor((left % 60_000) / 1000)
@@ -377,7 +377,7 @@ function DealTimer() {
     tick()
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
-  }, [])
+  }, [endAt])
 
   if (!label) return null
   return (
@@ -395,6 +395,8 @@ function ProductSection({
   toss,
   dark,
   timer,
+  rail,
+  endAt,
 }: {
   id?: string
   title: string
@@ -403,15 +405,59 @@ function ProductSection({
   toss: boolean
   dark: boolean
   timer?: boolean
+  rail?: boolean
+  endAt?: string
 }) {
   return (
     <section id={id} className="mt-10 scroll-mt-24 first:mt-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-black">{title}</h2>
-        {timer ? <DealTimer /> : null}
+        {timer ? <DealTimer endAt={endAt} /> : null}
       </div>
-      <ProductGrid items={items} grid={grid} toss={toss} dark={dark} />
+      {rail ? (
+        <HorizontalRail dark={dark}>
+          {items.map((item) => (
+            <div key={`${item.id}-${item.timeSale ? 'd' : 'b'}`} className="w-44 shrink-0 snap-start sm:w-52 lg:w-[calc((100%-2.25rem)/4)]">
+              <ProductCard item={item} grid toss={toss} dark={dark} />
+            </div>
+          ))}
+        </HorizontalRail>
+      ) : (
+        <ProductGrid items={items} grid={grid} toss={toss} dark={dark} />
+      )}
     </section>
+  )
+}
+
+function HorizontalRail({ children, dark }: { children: ReactNode; dark: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ x: number; left: number } | null>(null)
+
+  return (
+    <div
+      ref={ref}
+      onPointerDown={(event) => {
+        if (event.pointerType !== 'mouse' || event.button !== 0 || !ref.current) return
+        drag.current = { x: event.clientX, left: ref.current.scrollLeft }
+        ref.current.setPointerCapture(event.pointerId)
+      }}
+      onPointerMove={(event) => {
+        if (!drag.current || !ref.current) return
+        ref.current.scrollLeft = drag.current.left - (event.clientX - drag.current.x)
+      }}
+      onPointerUp={() => {
+        drag.current = null
+      }}
+      className={cn(
+        'mt-4 flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto pb-3 active:cursor-grabbing',
+        '[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:rounded-full',
+        dark
+          ? '[&::-webkit-scrollbar-track]:bg-white/10 [&::-webkit-scrollbar-thumb]:bg-white/35'
+          : '[&::-webkit-scrollbar-track]:bg-black/10 [&::-webkit-scrollbar-thumb]:bg-black/30',
+      )}
+    >
+      {children}
+    </div>
   )
 }
 
@@ -498,106 +544,86 @@ function ProductCard({
   toss: boolean
   dark: boolean
 }) {
-  if (toss) {
-    return (
-      <a href={item.url} target="_blank" rel="noopener noreferrer" className={cn(grid ? 'flex flex-col' : 'flex gap-3')}>
-        <div
-          className={cn(
-            'relative overflow-hidden rounded-2xl',
-            dark ? 'bg-[#17181b]' : 'bg-[#f2f3f6]',
-            grid ? 'aspect-square' : 'h-24 w-24 shrink-0',
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.image} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-          {item.discountRate ? (
-            <span className="absolute left-2 top-2 rounded-full bg-[#f04452] px-2 py-0.5 text-[11px] font-black text-white">
-              {item.discountRate}% 특가
-            </span>
-          ) : null}
-        </div>
-        <div className={cn(grid ? 'mt-2' : 'min-w-0 flex-1')}>
-          <p className="line-clamp-2 min-h-[2.5rem] text-[13px] font-semibold leading-tight">{item.title}</p>
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5">
-            <span className="text-sm font-black tabular-nums">{item.priceText}</span>
-            {item.listPriceText ? (
-              <span className={cn('text-xs line-through', dark ? 'text-white/35' : 'text-black/35')}>
-                {item.listPriceText}
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {item.timeSale ? <TossChip dark={dark}>타임세일</TossChip> : null}
-            {item.bigDiscount || item.megaDiscount ? (
-              <TossChip dark={dark}>{item.discountRate}% 할인</TossChip>
-            ) : null}
-          </div>
-        </div>
-      </a>
-    )
-  }
-
-  const card = cn(
-    'block overflow-hidden rounded-[20px] border transition hover:-translate-y-0.5',
-    dark ? 'border-white/10 bg-white/[0.04]' : 'border-black/8 bg-white shadow-sm',
-    grid ? 'flex h-full flex-col gap-2 p-3' : 'flex gap-3 p-3',
-  )
+  const card = toss
+    ? cn(grid ? 'flex flex-col' : 'flex gap-3')
+    : cn(
+        'block overflow-hidden rounded-[20px] border transition hover:-translate-y-0.5',
+        dark ? 'border-white/10 bg-white/[0.04]' : 'border-black/8 bg-white shadow-sm',
+        grid ? 'flex h-full flex-col gap-2 p-3' : 'flex gap-3 p-3',
+      )
 
   return (
     <a href={item.url} target="_blank" rel="noopener noreferrer" className={card}>
-      <div className={cn('relative overflow-hidden rounded-xl', grid ? 'aspect-square' : 'h-24 w-24 shrink-0')}>
+      <div
+        className={cn(
+          'relative overflow-hidden',
+          toss ? 'rounded-2xl' : 'rounded-xl',
+          toss && (dark ? 'bg-[#17181b]' : 'bg-[#f2f3f6]'),
+          grid ? 'aspect-square' : 'h-24 w-24 shrink-0',
+        )}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={item.image} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/45 to-transparent" />
+        <div className="absolute left-2 top-2 flex max-w-[70%] flex-wrap gap-1">
+          <CardBadges item={item} />
+        </div>
         {item.discountRate ? (
-          <span className="absolute left-2 top-2 rounded-md bg-[var(--accent)] px-1.5 py-0.5 text-[11px] font-bold text-white">
-            {item.discountRate}%
+          <span
+            className={cn(
+              'absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-black text-white shadow',
+              toss ? 'bg-[#f04452]' : 'bg-[var(--accent)]',
+            )}
+          >
+            {toss ? `${item.discountRate}% 특가` : `${item.discountRate}%`}
           </span>
         ) : null}
       </div>
-      <div className={cn(grid ? '' : 'min-w-0 flex-1')}>
-        <div className="mb-1.5 flex flex-wrap gap-1">
-          {item.timeSale ? <Badge dark={dark}>⏱️ 타임세일</Badge> : null}
-          {item.megaDiscount ? (
-            <Badge dark={dark}>💥 역대급 할인</Badge>
-          ) : item.bigDiscount ? (
-            <Badge dark={dark}>🔥 {item.discountRate}% 할인</Badge>
-          ) : null}
-          {item.best ? <Badge dark={dark}>🏆 BEST</Badge> : null}
-        </div>
-        <p className="line-clamp-2 text-sm font-medium leading-snug">{item.title}</p>
-        <p className="mt-1.5 text-sm font-semibold text-[var(--accent)]">{item.priceText}</p>
-        {item.listPriceText ? (
-          <p className={cn('text-xs line-through', dark ? 'text-white/35' : 'text-black/35')}>
-            {item.listPriceText}
-          </p>
-        ) : null}
+      <div className={cn(grid ? (toss ? 'mt-2' : '') : 'min-w-0 flex-1')}>
+        <p className={cn('line-clamp-2 leading-tight', toss ? 'min-h-[2.5rem] text-[13px] font-semibold' : 'text-sm font-medium')}>
+          {item.title}
+        </p>
+        <PriceRow item={item} dark={dark} toss={toss} />
       </div>
     </a>
   )
 }
 
-function TossChip({ children, dark }: { children: ReactNode; dark: boolean }) {
+function CardBadges({ item }: { item: HotdealItem }) {
   return (
-    <span
-      className={cn(
-        'rounded-full px-2 py-0.5 text-[10px]',
-        dark ? 'bg-white/8 text-white/55' : 'bg-black/5 text-black/50',
-      )}
-    >
-      {children}
-    </span>
+    <>
+      {item.timeSale ? (
+        <span className="hotdeal-badge-live rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-black text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+          타임세일
+        </span>
+      ) : null}
+      {item.bestRank ? (
+        <span className="rounded-full bg-fuchsia-600 px-2 py-0.5 text-[10px] font-black text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+          BEST {item.bestRank}위
+        </span>
+      ) : null}
+      {item.megaDiscount ? (
+        <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-[#3b2a08] shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+          역대급 할인
+        </span>
+      ) : item.bigDiscount ? (
+        <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+          {item.discountRate}% 할인
+        </span>
+      ) : null}
+    </>
   )
 }
 
-function Badge({ children, dark }: { children: ReactNode; dark: boolean }) {
+function PriceRow({ item, dark, toss }: { item: HotdealItem; dark: boolean; toss: boolean }) {
   return (
-    <span
-      className={cn(
-        'rounded-full px-2 py-0.5 text-[10px]',
-        dark ? 'bg-white/10 text-white/80' : 'bg-black/5 text-black/65',
-      )}
-    >
-      {children}
-    </span>
+    <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5">
+      <span className={cn('text-sm font-black tabular-nums', !toss && 'text-[var(--accent)]')}>{item.priceText}</span>
+      {item.listPriceText ? (
+        <span className={cn('text-xs tabular-nums line-through', dark ? 'text-white/40' : 'text-black/40')}>
+          {item.listPriceText}
+        </span>
+      ) : null}
+    </div>
   )
 }

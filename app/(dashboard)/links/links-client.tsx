@@ -2908,7 +2908,7 @@ function HotdealPanel({
           <li className="flex flex-wrap items-center gap-2">
             <span aria-hidden>⏱️</span>
             <span className="rounded-full bg-violet-500/30 px-3 py-1 text-violet-200">타임세일</span>
-            <span className="text-white/40">하루특가 상품에 붙는 표시예요</span>
+            <span className="text-white/40">하루특가 상품. 섹션에 토스 종료시각 남은 시간도 보여요</span>
           </li>
           <li className="flex flex-wrap items-center gap-2">
             <span aria-hidden>🔥</span>
