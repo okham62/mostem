@@ -2933,9 +2933,6 @@ function HotdealPanel({
           >
             <ShoppingBag className="size-3.5" />
             토스
-            <span className="rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black">
-              Pro 이상
-            </span>
           </button>
         </div>
         <p className="text-xs leading-relaxed text-white/40">
