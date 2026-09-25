@@ -99,6 +99,7 @@ function NavGroup({
                   if (itemPath === '/shopping') warmShoppingCache()
                   if (itemPath === '/markets') warmMarketCharts()
                   if (itemPath === '/trends') warmTrendCache()
+                  if (itemPath === '/links') void fetch('/api/links', { cache: 'no-store' })
                 }}
                 onMouseEnter={() => {
                   router.prefetch(item.href)
@@ -106,6 +107,7 @@ function NavGroup({
                   if (itemPath === '/shopping') warmShoppingCache()
                   if (itemPath === '/markets') warmMarketCharts()
                   if (itemPath === '/trends') warmTrendCache()
+                  if (itemPath === '/links') void fetch('/api/links', { cache: 'no-store' })
                 }}
                 onFocus={() => {
                   router.prefetch(item.href)
@@ -113,6 +115,7 @@ function NavGroup({
                   if (itemPath === '/shopping') warmShoppingCache()
                   if (itemPath === '/markets') warmMarketCharts()
                   if (itemPath === '/trends') warmTrendCache()
+                  if (itemPath === '/links') void fetch('/api/links', { cache: 'no-store' })
                 }}
                 className={cn(
                   'mostem-sidebar-link flex items-center rounded-lg py-2 text-[15px] font-semibold transition-colors',
@@ -139,12 +142,19 @@ export function Sidebar({ session, onHide }: SidebarProps) {
   const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
+    const idle = (cb: () => void) =>
+      'requestIdleCallback' in window
+        ? window.requestIdleCallback(cb, { timeout: 2500 })
+        : window.setTimeout(cb, 1600)
+    const id = idle(() => {
       warmRealtimeCache()
       warmMarketCharts()
       warmTrendCache()
-    }, 300)
-    return () => window.clearTimeout(id)
+    })
+    return () => {
+      if (typeof id === 'number') window.clearTimeout(id)
+      else window.cancelIdleCallback?.(id)
+    }
   }, [])
 
   return (

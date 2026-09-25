@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveOgImageForStorage } from '@/lib/link-preview'
 import { detectLinkPlatform, normalizeDestinationUrl, type TrackedLink } from '@/lib/links'
+import { slimTrackedLink } from '@/lib/link-media'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -49,7 +50,10 @@ export async function PATCH(
 
     if (body.clearImage) {
       patch.og_image_url = null
-    } else if (body.ogImageUrl !== undefined) {
+    } else if (
+      body.ogImageUrl !== undefined &&
+      !(typeof body.ogImageUrl === 'string' && body.ogImageUrl.startsWith('/api/links/media/'))
+    ) {
       const og = await resolveOgImageForStorage(
         typeof body.ogImageUrl === 'string' ? body.ogImageUrl : null
       )
@@ -75,7 +79,7 @@ export async function PATCH(
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ link: link as TrackedLink })
+    return NextResponse.json({ link: slimTrackedLink(link as TrackedLink) })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'failed'
     return NextResponse.json({ error: message }, { status: 400 })

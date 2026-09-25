@@ -1,4 +1,4 @@
-import { fetchPageOg, imageUrlToDataUrl } from '@/lib/link-preview'
+import { fetchImageBytes, fetchPageOg } from '@/lib/link-preview'
 
 export function dataUrlToResponse(raw: string) {
   const trimmed = String(raw || '').trim()
@@ -9,14 +9,23 @@ export function dataUrlToResponse(raw: string) {
   return new Response(bytes, {
     headers: {
       'Content-Type': m[1].toLowerCase(),
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+    },
+  })
+}
+
+function imageResponse(bytes: Buffer, contentType: string) {
+  return new Response(bytes, {
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
     },
   })
 }
 
 async function proxyRemoteImage(url: string) {
-  const dataUrl = await imageUrlToDataUrl(url)
-  return dataUrl ? dataUrlToResponse(dataUrl) : null
+  const fetched = await fetchImageBytes(url, 4_000)
+  return fetched ? imageResponse(fetched.bytes, fetched.contentType) : null
 }
 
 export async function serveProductImage(input: {
@@ -35,7 +44,16 @@ export async function serveProductImage(input: {
 
   const dest = String(input.destinationUrl || '').trim()
   if (!dest) return null
-  const og = await fetchPageOg(dest)
-  if (!og.imageUrl) return null
-  return proxyRemoteImage(og.imageUrl)
+  try {
+    const og = await Promise.race([
+      fetchPageOg(dest),
+      new Promise<{ title: null; imageUrl: null }>((resolve) =>
+        setTimeout(() => resolve({ title: null, imageUrl: null }), 2500),
+      ),
+    ])
+    if (!og.imageUrl) return null
+    return proxyRemoteImage(og.imageUrl)
+  } catch {
+    return null
+  }
 }

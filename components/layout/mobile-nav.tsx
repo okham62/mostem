@@ -38,6 +38,7 @@ function warmPath(href: string) {
   if (href === '/shopping') warmShoppingCache()
   if (href === '/markets') warmMarketCharts()
   if (href === '/trends') warmTrendCache()
+  if (href === '/links') void fetch('/api/links', { cache: 'no-store' })
 }
 
 export function MobileNav({ session }: { session: Session | null }) {
@@ -48,12 +49,19 @@ export function MobileNav({ session }: { session: Session | null }) {
   const primaryActive = PRIMARY.some((item) => isNavActive(activePath, item.href))
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
+    const idle = (cb: () => void) =>
+      'requestIdleCallback' in window
+        ? window.requestIdleCallback(cb, { timeout: 2500 })
+        : window.setTimeout(cb, 1600)
+    const id = idle(() => {
       warmRealtimeCache()
       warmMarketCharts()
       warmTrendCache()
-    }, 300)
-    return () => window.clearTimeout(id)
+    })
+    return () => {
+      window.clearTimeout(id as number)
+      window.cancelIdleCallback?.(id as number)
+    }
   }, [])
 
   useEffect(() => {

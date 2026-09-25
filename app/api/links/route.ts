@@ -25,7 +25,8 @@ import {
   parsePartnerApis,
 } from '@/lib/partners'
 import { normalizeProfileDesign } from '@/lib/profile-design'
-import { syncProfileBlocksFromLinks } from '@/lib/profile-sync'
+import { applyTrackedLinksToSettings, persistProfileBlocksLater } from '@/lib/profile-sync'
+import { slimTrackedLink } from '@/lib/link-media'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -86,7 +87,7 @@ export async function GET() {
 
   try {
     const supabase = createAdminClient()
-    await ensureSettings(session.user.id)
+    const settings = await ensureSettings(session.user.id)
     const { data: links, error } = await supabase
       .from('tracked_links')
       .select('*')
@@ -95,16 +96,16 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const origin = 'https://www.mostem.kr'
-    const synced = await syncProfileBlocksFromLinks(
-      session.user.id,
+    const merged = applyTrackedLinksToSettings(
+      settings,
       (links ?? []) as TrackedLink[],
-      origin,
+      'https://www.mostem.kr',
     )
+    if (merged.added) persistProfileBlocksLater(session.user.id, merged.blocks)
 
     return NextResponse.json({
-      settings: synced.settings,
-      links: (links ?? []) as TrackedLink[],
+      settings: merged.settings,
+      links: ((links ?? []) as TrackedLink[]).map(slimTrackedLink),
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'failed'
@@ -208,7 +209,7 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     return NextResponse.json({
-      link: link as TrackedLink,
+      link: slimTrackedLink(link as TrackedLink),
       settings: updated
         ? normalizeLinkSettings(updated as Record<string, unknown>)
         : { ...settings, profile_blocks: nextBlocks },

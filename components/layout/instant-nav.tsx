@@ -43,7 +43,16 @@ export function InstantNavProvider({ children }: { children: React.ReactNode }) 
     [mark, pathname, pending],
   )
 
-  return <InstantNavContext.Provider value={value}>{children}</InstantNavContext.Provider>
+  return (
+    <InstantNavContext.Provider value={value}>
+      {pending ? (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[90] h-0.5 overflow-hidden bg-white/10">
+          <div className="h-full w-1/3 animate-[mostemNav_0.7s_ease-in-out_infinite] bg-[var(--accent)]" />
+        </div>
+      ) : null}
+      {children}
+    </InstantNavContext.Provider>
+  )
 }
 
 export function useInstantNav() {

@@ -102,12 +102,14 @@ export async function fetchPageOg(pageUrl: string): Promise<{ title: string | nu
   }
 }
 
-export async function imageUrlToDataUrl(imageUrl: string): Promise<string | null> {
+export async function fetchImageBytes(
+  imageUrl: string,
+  timeoutMs = 4_000,
+): Promise<{ bytes: Buffer; contentType: string } | null> {
   const parsed = isPublicHttpUrl(imageUrl)
   if (!parsed) return null
 
   const candidates = [parsed.toString()]
-  // Prefer a mid-size Coupang CDN thumb when the URL embeds a size token
   if (/coupangcdn\.com/i.test(parsed.hostname)) {
     const mid = parsed
       .toString()
@@ -125,7 +127,7 @@ export async function imageUrlToDataUrl(imageUrl: string): Promise<string | null
           Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
           Referer: 'https://www.coupang.com/',
         },
-        signal: AbortSignal.timeout(12_000),
+        signal: AbortSignal.timeout(timeoutMs),
       })
       if (!res.ok) continue
 
@@ -135,13 +137,18 @@ export async function imageUrlToDataUrl(imageUrl: string): Promise<string | null
       const buf = Buffer.from(await res.arrayBuffer())
       if (!buf.byteLength || buf.byteLength > MAX_IMAGE_BYTES) continue
 
-      const outType = ctype && ctype.startsWith('image/') ? ctype : 'image/jpeg'
-      return `data:${outType};base64,${buf.toString('base64')}`
+      return { bytes: buf, contentType: ctype && ctype.startsWith('image/') ? ctype : 'image/jpeg' }
     } catch {
-      // try next candidate
+      /* try next */
     }
   }
   return null
+}
+
+export async function imageUrlToDataUrl(imageUrl: string): Promise<string | null> {
+  const fetched = await fetchImageBytes(imageUrl, 8_000)
+  if (!fetched) return null
+  return `data:${fetched.contentType};base64,${fetched.bytes.toString('base64')}`
 }
 
 /** Store-ready OG image: keep data URLs, fetch+inline remote http(s) images. */

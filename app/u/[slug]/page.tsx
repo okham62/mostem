@@ -3,7 +3,6 @@ import { MostemLogo } from '@/components/mostem-logo'
 import {
   findTrackedLinkForBlock,
   isProfileBlockOn,
-  normalizeLinkSettings,
   parseShortLink,
   persistableBlockImage,
   sortProfileBlocks,
@@ -11,7 +10,8 @@ import {
   type ProfileSnsLink,
   type TrackedLink,
 } from '@/lib/links'
-import { syncProfileBlocksFromLinks } from '@/lib/profile-sync'
+import { applyTrackedLinksToSettings, persistProfileBlocksLater } from '@/lib/profile-sync'
+import { getProfileBySlug } from '@/lib/profile-query'
 import { headers } from 'next/headers'
 import {
   blockRadiusClass,
@@ -33,25 +33,23 @@ export async function generateMetadata({
   params: { slug: string }
 }): Promise<Metadata> {
   const slug = params.slug.toLowerCase()
-  const supabase = createAdminClient()
-  const { data } = await supabase
-    .from('link_settings')
-    .select('display_name, profile_slug, profile_bio, profile_avatar_url')
-    .eq('profile_slug', slug)
-    .maybeSingle()
+  const settings = await getProfileBySlug(slug)
 
-  const name = String(data?.display_name || data?.profile_slug || slug)
-  const bio = String(data?.profile_bio || '')
-  const icon = String(data?.profile_avatar_url || '')
+  const name = String(settings?.display_name || settings?.profile_slug || slug)
+  const bio = String(settings?.profile_bio || '')
+  const icon = String(settings?.profile_avatar_url || '')
 
   return {
     title: name,
     description: bio || `${name} 링크`,
     applicationName: name,
     manifest: `/u/${slug}/manifest.webmanifest`,
-    icons: icon
-      ? { icon: [{ url: icon }], apple: [{ url: icon }] }
-      : undefined,
+    icons:
+      icon && /^https?:\/\//i.test(icon)
+        ? { icon: [{ url: icon }], apple: [{ url: icon }] }
+        : icon
+          ? { icon: [{ url: `/u/${slug}/avatar` }], apple: [{ url: `/u/${slug}/avatar` }] }
+          : undefined,
     appleWebApp: {
       capable: true,
       title: name,
@@ -71,19 +69,12 @@ export default async function PublicProfilePage({
   const viaSimple = searchParams?.via === 'simple'
   const rawQuery = String(searchParams?.q || '')
   const searchQuery = rawQuery.trim().toLowerCase()
-  const supabase = createAdminClient()
-  const { data } = await supabase
-    .from('link_settings')
-    .select('*')
-    .eq('profile_slug', slug)
-    .maybeSingle()
-
-  if (!data) notFound()
-
-  const settings = normalizeLinkSettings(data as Record<string, unknown>)
+  const settings = await getProfileBySlug(slug)
+  if (!settings) notFound()
   if (!settings.profile_published) notFound()
   if (viaSimple && !settings.profile_simple_address) notFound()
 
+  const supabase = createAdminClient()
   const { data: tracked } = await supabase
     .from('tracked_links')
     .select('id, prefix, code, destination_url, title, created_at')
@@ -92,12 +83,9 @@ export default async function PublicProfilePage({
 
   const h = headers()
   const origin = `${h.get('x-forwarded-proto') || 'https'}://${h.get('x-forwarded-host') || h.get('host') || 'www.mostem.kr'}`
-  const synced = await syncProfileBlocksFromLinks(
-    settings.user_id,
-    (tracked ?? []) as TrackedLink[],
-    origin,
-  )
-  const allBlocks = synced.blocks.length ? synced.blocks : settings.profile_blocks
+  const merged = applyTrackedLinksToSettings(settings, (tracked ?? []) as TrackedLink[], origin)
+  if (merged.added) persistProfileBlocksLater(settings.user_id, merged.blocks)
+  const allBlocks = merged.blocks
   const linkRefs = tracked ?? []
 
   const blocks = sortProfileBlocks(
@@ -135,7 +123,15 @@ export default async function PublicProfilePage({
   const layout = settings.profile_layout || 'cover'
   const fontSize = settings.profile_font_size || 'md'
   const avatarUrl = settings.profile_avatar_url
+    ? /^https?:\/\//i.test(settings.profile_avatar_url)
+      ? settings.profile_avatar_url
+      : `/u/${slug}/avatar`
+    : ''
   const coverUrl = settings.profile_cover_url
+    ? /^https?:\/\//i.test(settings.profile_cover_url)
+      ? settings.profile_cover_url
+      : `/u/${slug}/cover`
+    : ''
   const sns = settings.profile_sns as ProfileSnsLink[]
   const d = normalizeProfileDesign(settings.profile_design)
   const font = fontSize === 'sm' ? 'text-lg' : fontSize === 'lg' ? 'text-3xl' : 'text-2xl'

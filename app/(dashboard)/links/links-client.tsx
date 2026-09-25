@@ -34,7 +34,12 @@ import {
   type HamiCoupangProduct,
 } from '@/lib/threads-publish'
 import { cn } from '@/lib/utils'
-import { ProfilePanel } from './profile-panel'
+import dynamic from 'next/dynamic'
+
+const ProfilePanel = dynamic(
+  () => import('./profile-panel').then((m) => ({ default: m.ProfilePanel })),
+  { loading: () => <div className="h-48 animate-pulse rounded-2xl bg-white/5" /> },
+)
 
 type TabId = 'convert' | 'find' | 'mine' | 'channel' | 'profile' | 'hotdeal'
 type FindSub = 'coupang' | 'toss' | 'compare'

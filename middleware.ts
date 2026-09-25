@@ -18,6 +18,15 @@ export default auth((req) => {
     }
   }
 
+  if (
+    pathname.startsWith('/u/') ||
+    pathname.startsWith('/l/') ||
+    pathname.startsWith('/s/') ||
+    pathname.startsWith('/icon')
+  ) {
+    return NextResponse.next()
+  }
+
   const onDashboard = authConfig.callbacks?.authorized?.({
     auth: req.auth,
     request: { nextUrl: req.nextUrl },
