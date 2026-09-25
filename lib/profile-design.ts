@@ -8,6 +8,7 @@ export type BlockShadow = 'none' | 'soft' | 'medium' | 'strong'
 export type BlockAlign = 'left' | 'center'
 export type BlockAnim = 'none' | 'wave' | 'bounce'
 export type AffiliateNoticeStyle = 'banner' | 'card' | 'text'
+export type SnsPosition = 'profile' | 'links'
 
 export type ProfileDesign = {
   theme: ProfileTheme
@@ -23,6 +24,8 @@ export type ProfileDesign = {
   blockTextColor: string | null
   hideLogo: boolean
   brandLogoUrl: string | null
+  snsPosition: SnsPosition
+  snsAlign: BlockAlign
   noticeEnabled: boolean
   noticeText: string
   noticeMarquee: boolean
@@ -52,6 +55,8 @@ export const DEFAULT_PROFILE_DESIGN: ProfileDesign = {
   blockTextColor: null,
   hideLogo: false,
   brandLogoUrl: null,
+  snsPosition: 'links',
+  snsAlign: 'center',
   noticeEnabled: false,
   noticeText: '',
   noticeMarquee: true,
@@ -91,6 +96,8 @@ export function normalizeProfileDesign(raw: unknown): ProfileDesign {
     blockTextColor: typeof o.blockTextColor === 'string' ? o.blockTextColor : null,
     hideLogo: Boolean(o.hideLogo),
     brandLogoUrl: typeof o.brandLogoUrl === 'string' ? o.brandLogoUrl : null,
+    snsPosition: pick('snsPosition', ['profile', 'links'] as const),
+    snsAlign: pick('snsAlign', ['left', 'center'] as const),
     noticeEnabled: Boolean(o.noticeEnabled),
     noticeText: typeof o.noticeText === 'string' ? o.noticeText : '',
     noticeMarquee: o.noticeMarquee === undefined ? true : Boolean(o.noticeMarquee),

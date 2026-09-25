@@ -15,6 +15,7 @@ import {
 } from '@/lib/profile-design'
 import { notFound } from 'next/navigation'
 import { ProfilePublicClient } from './profile-public-client'
+import { ProfileSnsIcons } from '@/components/profile-sns-icons'
 import { Link2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -79,6 +80,10 @@ export default async function PublicProfilePage({
   const affiliateFg = d.affiliateTextColor || '#ffffff'
   const noticeText = d.affiliateNoticeText || DEFAULT_AFFILIATE_NOTICE
   const pageBg = d.theme === 'light' ? '#e4e4e7' : '#0b0b0d'
+  const snsIcons =
+    sns.length > 0 ? (
+      <ProfileSnsIcons sns={sns} align={d.snsAlign || 'center'} />
+    ) : null
 
   return (
     <div className="min-h-screen px-4 py-8" style={{ background: pageBg, color: themeFg }}>
@@ -178,23 +183,7 @@ export default async function PublicProfilePage({
         >
           <h1 className={`font-bold ${font}`}>{name}</h1>
           {bio ? <p className="mt-2 text-sm opacity-50">{bio}</p> : null}
-
-          {sns.length > 0 ? (
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              {sns.map((s) => (
-                <a
-                  key={s.id}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-full px-3 py-1 text-xs opacity-70"
-                  style={{ background: 'rgba(128,128,128,0.2)' }}
-                >
-                  {s.label || 'SNS'}
-                </a>
-              ))}
-            </div>
-          ) : null}
+          {snsIcons && d.snsPosition !== 'links' ? <div className="mt-4">{snsIcons}</div> : null}
 
           {blocks.length === 0 ? (
             <div
@@ -233,6 +222,8 @@ export default async function PublicProfilePage({
               ))}
             </div>
           )}
+
+          {snsIcons && d.snsPosition === 'links' ? <div className="mt-8">{snsIcons}</div> : null}
 
           {!d.hideLogo ? (
             <div className="mt-10 flex items-center justify-center gap-2 text-xs opacity-35">

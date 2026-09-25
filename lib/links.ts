@@ -45,6 +45,7 @@ export type ProfileSnsLink = {
   id: string
   label: string
   url: string
+  kind?: string
 }
 
 export type LinkSettings = {

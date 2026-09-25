@@ -29,6 +29,8 @@ import {
 } from '@/lib/links'
 import { cn } from '@/lib/utils'
 import { MostemLogo } from '@/components/mostem-logo'
+import { ProfileSnsIcons } from '@/components/profile-sns-icons'
+import { resolveSnsUrl, SNS_PRESETS, type SnsKind } from '@/lib/profile-sns'
 
 export type DesignTab = 'profile' | 'style' | 'block' | 'settings'
 
@@ -317,6 +319,10 @@ export function ProfilePhonePreview({
   const affiliateBg = d.affiliateBgColor || '#5b3cc4'
   const affiliateFg = d.affiliateTextColor || '#ffffff'
   const noticeText = d.affiliateNoticeText || DEFAULT_AFFILIATE_NOTICE
+  const snsIcons =
+    sns.length > 0 ? (
+      <ProfileSnsIcons sns={sns} size="sm" align={d.snsAlign || 'center'} />
+    ) : null
 
   return (
     <aside className="mx-auto w-full max-w-[260px]">
@@ -427,20 +433,7 @@ export function ProfilePhonePreview({
         >
           <p className={cn('font-semibold', font)}>{name}</p>
           {bio ? <p className="mt-1 text-[11px] opacity-45">{bio}</p> : null}
-          {sns.length > 0 ? (
-            <div className="mt-2 flex flex-wrap justify-center gap-1">
-              {sns.map((s) => (
-                <span
-                  key={s.id}
-                  className="rounded-full px-2 py-0.5 text-[10px] opacity-70"
-                  style={{ background: 'rgba(128,128,128,0.2)' }}
-                >
-                  {s.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
+          {snsIcons && d.snsPosition !== 'links' ? <div className="mt-3">{snsIcons}</div> : null}
           {live.length === 0 ? (
             <div
               className={cn(
@@ -490,6 +483,8 @@ export function ProfilePhonePreview({
             </div>
           )}
 
+          {snsIcons && d.snsPosition === 'links' ? <div className="mt-6">{snsIcons}</div> : null}
+
           {!d.hideLogo ? (
             <div className="mt-6 flex items-center justify-center gap-1.5 opacity-50">
               {d.brandLogoUrl ? (
@@ -513,6 +508,10 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
   const [past, setPast] = useState<DesignSnapshot[]>([])
   const [future, setFuture] = useState<DesignSnapshot[]>([])
   const [savedLabel, setSavedLabel] = useState('')
+  const [showSns, setShowSns] = useState(false)
+  const [snsDraft, setSnsDraft] = useState<Record<SnsKind, string>>(() =>
+    Object.fromEntries(SNS_PRESETS.map((p) => [p.kind, ''])) as Record<SnsKind, string>,
+  )
   const skipHistory = useRef(false)
 
   const pushHistory = useCallback((prev: DesignSnapshot) => {
@@ -609,7 +608,7 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
       role="presentation"
     >
       <div
-        className="flex h-[min(860px,92vh)] w-full max-w-[1080px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0d] text-white shadow-2xl"
+        className="relative flex h-[min(860px,92vh)] w-full max-w-[1080px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0d] text-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -750,14 +749,15 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
                   <span className="text-xs text-white/50">SNS</span>
                   <button
                     type="button"
-                    onClick={() =>
-                      update({
-                        sns: [
-                          ...snap.sns,
-                          { id: crypto.randomUUID(), label: 'SNS', url: 'https://' },
-                        ],
-                      })
-                    }
+                    onClick={() => {
+                      const draft = Object.fromEntries(SNS_PRESETS.map((p) => [p.kind, ''])) as Record<SnsKind, string>
+                      for (const s of snap.sns) {
+                        const kind = (s.kind || '') as SnsKind
+                        if (kind && kind in draft) draft[kind] = s.url.replace(/^https?:\/\/(www\.)?/, '')
+                      }
+                      setSnsDraft(draft)
+                      setShowSns(true)
+                    }}
                     className="text-xs text-[var(--accent)]"
                   >
                     + 추가
@@ -807,6 +807,32 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
                     { id: 'sm', label: '작게' },
                     { id: 'md', label: '보통' },
                     { id: 'lg', label: '크게' },
+                  ]}
+                />
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs text-white/50">SNS 표시 위치</p>
+                <Segmented<'profile' | 'links'>
+                  value={snap.design.snsPosition || 'links'}
+                  onChange={(v) => patchDesign({ snsPosition: v })}
+                  cols={2}
+                  options={[
+                    { id: 'profile', label: '프로필 영역' },
+                    { id: 'links', label: '링크 영역' },
+                  ]}
+                />
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs text-white/50">정렬</p>
+                <Segmented<'left' | 'center'>
+                  value={snap.design.snsAlign || 'center'}
+                  onChange={(v) => patchDesign({ snsAlign: v })}
+                  cols={2}
+                  options={[
+                    { id: 'left', label: '왼쪽' },
+                    { id: 'center', label: '가운데' },
                   ]}
                 />
               </div>
@@ -1083,6 +1109,62 @@ export function DesignStudio({ initial, live, busy, err, onBack, onPersist }: Pr
           />
         </div>
       </div>
+      {showSns ? (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 p-4"
+          onClick={() => setShowSns(false)}
+          role="presentation"
+        >
+          <div
+            className="max-h-[min(80vh,640px)] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#16161a] p-5"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="SNS 정보"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold">SNS 정보</h3>
+                <p className="mt-1 text-xs text-white/40">채널 주소나 아이디를 입력하세요.</p>
+              </div>
+              <button type="button" onClick={() => setShowSns(false)} className="rounded-lg p-1 text-white/40">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              {SNS_PRESETS.map((p) => (
+                <label key={p.kind} className="block space-y-1">
+                  <span className="text-xs text-white/50">{p.label}</span>
+                  <input
+                    value={snsDraft[p.kind] || ''}
+                    onChange={(e) => setSnsDraft((cur) => ({ ...cur, [p.kind]: e.target.value }))}
+                    placeholder={p.placeholder}
+                    className="w-full rounded-xl border border-white/10 bg-[var(--input-bg)] px-3 py-2 text-sm outline-none"
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const next = [...snap.sns]
+                for (const p of SNS_PRESETS) {
+                  const url = resolveSnsUrl(p.kind, snsDraft[p.kind] || '')
+                  if (!url) continue
+                  const i = next.findIndex((s) => s.kind === p.kind)
+                  const row = { id: i >= 0 ? next[i].id : crypto.randomUUID(), label: p.label, url, kind: p.kind }
+                  if (i >= 0) next[i] = row
+                  else next.push(row)
+                }
+                update({ sns: next })
+                setShowSns(false)
+              }}
+              className="mt-4 w-full rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white"
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      ) : null}
       </div>
     </div>
   )
