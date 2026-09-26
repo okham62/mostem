@@ -602,7 +602,7 @@ function TradeHistory({
           </button>
         </div>
       ) : null}
-      <div className="space-y-1 px-3 py-3 sm:hidden">
+      <div className="space-y-1 px-3 py-3 lg:hidden">
         {groups.map(([key, monthRows]) => {
           const open = openMonths.includes(key) || groups.length === 1
           const last = monthRows[monthRows.length - 1]
@@ -679,7 +679,7 @@ function TradeHistory({
           )
         })}
       </div>
-      <div className="hidden sm:block">
+      <div className="hidden lg:block">
         {groups.map(([key, monthRows]) => {
           const open = openMonths.includes(key) || groups.length === 1
           const last = monthRows[monthRows.length - 1]
