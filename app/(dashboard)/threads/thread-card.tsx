@@ -2,7 +2,7 @@
 
 import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
-import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
+import { isHashtag, parseMediaItems, serializeMediaItems, splitCaption } from '@/lib/collect-media'
 import { openThreadEdit } from '@/lib/open-thread-edit'
 import {
   clearStoredSchedule,
@@ -143,7 +143,17 @@ export function ThreadCard({
 
       <div className="mb-3 aspect-[8/5] w-full overflow-hidden rounded-2xl">
         {mediaItems.length > 0 ? (
-          <ThreadMedia items={mediaItems} />
+          <ThreadMedia
+            items={mediaItems}
+            postId={post.id}
+            onRefreshed={(items) =>
+              onUpdated?.({
+                ...post,
+                media_url: serializeMediaItems(items),
+                thumbnail_url: items[0]?.poster ?? items[0]?.url ?? post.thumbnail_url,
+              })
+            }
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center rounded-2xl border border-white/10 bg-[#101014] text-[11px] text-white/25">
             미디어 없음

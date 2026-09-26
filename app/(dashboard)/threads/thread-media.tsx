@@ -26,12 +26,24 @@ function MuteIcon({ muted = true }: { muted?: boolean }) {
   )
 }
 
+const mediaRefreshOnce = new Set<string>()
+
+async function refreshPostMedia(postId: string) {
+  if (!postId || mediaRefreshOnce.has(postId)) return null
+  mediaRefreshOnce.add(postId)
+  const res = await fetch(`/api/threads/posts/${postId}/refresh-media`, { method: 'POST' })
+  const data = await res.json().catch(() => ({}))
+  return Array.isArray(data.items) ? (data.items as CollectMediaItem[]) : null
+}
+
 function FallbackImage({
   url,
   fit = 'cover',
+  onDead,
 }: {
   url: string
   fit?: 'cover' | 'contain'
+  onDead?: () => void
 }) {
   const direct = cleanMediaUrl(url)
   const proxied = direct ? mediaSrc(direct) : null
@@ -52,6 +64,7 @@ function FallbackImage({
           return
         }
         setHidden(true)
+        onDead?.()
       }}
     />
   )
@@ -61,26 +74,29 @@ function MediaTile({
   item,
   extraCount,
   onOpen,
+  onDead,
 }: {
   item: CollectMediaItem
   extraCount?: number
   onOpen: () => void
+  onDead?: () => void
 }) {
   const imageUrl = imagePosterUrl(item.poster, item.url)
   const videoUrl = cleanMediaUrl(item.videoUrl) ?? (item.type === 'video' ? cleanMediaUrl(item.url) : null)
   const tileRef = useRef<HTMLButtonElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [inView, setInView] = useState(false)
+  const [inView, setInView] = useState(true)
   const [videoReady, setVideoReady] = useState(false)
 
   useEffect(() => {
     const node = tileRef.current
     if (!node || !videoUrl) return
+    const root = document.getElementById('mostem-scroll')
     const observer = new IntersectionObserver(
       ([entry]) => {
         setInView(Boolean(entry?.isIntersecting))
       },
-      { rootMargin: '320px', threshold: 0.05 }
+      { root: root ?? undefined, rootMargin: '480px', threshold: 0.01 }
     )
     observer.observe(node)
     return () => observer.disconnect()
@@ -121,10 +137,10 @@ function MediaTile({
     <button ref={tileRef} type="button" onClick={onOpen} className="relative h-full w-full cursor-pointer bg-black">
       {imageUrl ? (
         <div className={`absolute inset-0 ${videoReady ? 'opacity-0' : 'opacity-100'} transition-opacity duration-150`}>
-          <FallbackImage url={imageUrl} />
+          <FallbackImage url={imageUrl} onDead={onDead} />
         </div>
       ) : null}
-      {videoUrl && inView ? (
+      {videoUrl ? (
         <video
           ref={videoRef}
           src={mediaSrc(videoUrl) ?? videoUrl}
@@ -133,8 +149,9 @@ function MediaTile({
           loop
           playsInline
           autoPlay
-          preload="auto"
+          preload={inView ? 'auto' : 'metadata'}
           disablePictureInPicture
+          onError={() => onDead?.()}
           onLoadedData={(event) => {
             setVideoReady(true)
             const el = event.currentTarget
@@ -325,7 +342,15 @@ function MediaLightbox({ viewer, onClose, onIndex }: { viewer: Viewer; onClose: 
   )
 }
 
-export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
+export function ThreadMedia({
+  items,
+  postId,
+  onRefreshed,
+}: {
+  items: CollectMediaItem[]
+  postId?: string
+  onRefreshed?: (items: CollectMediaItem[]) => void
+}) {
   const valid = useMemo(
     () =>
       sortMediaVideoLeft(items).filter(
@@ -336,6 +361,13 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
   const photos = useMemo(() => valid.filter((item) => !isVideoItem(item)), [valid])
   const { shown, hidden } = previewMedia(valid)
   const [viewer, setViewer] = useState<Viewer | null>(null)
+
+  function requestRefresh() {
+    if (!postId) return
+    void refreshPostMedia(postId).then((next) => {
+      if (next?.length) onRefreshed?.(next)
+    })
+  }
 
   if (shown.length === 0) return null
 
@@ -352,15 +384,15 @@ export function ThreadMedia({ items }: { items: CollectMediaItem[] }) {
     <>
       {shown.length === 1 ? (
         <div className="h-full w-full overflow-hidden rounded-2xl">
-          <MediaTile item={shown[0]} extraCount={hidden || undefined} onOpen={() => openTile(shown[0])} />
+          <MediaTile item={shown[0]} extraCount={hidden || undefined} onOpen={() => openTile(shown[0])} onDead={requestRefresh} />
         </div>
       ) : (
         <div className="grid h-full w-full grid-cols-2 gap-1.5">
           <div className="h-full overflow-hidden rounded-2xl">
-            <MediaTile item={shown[0]} onOpen={() => openTile(shown[0])} />
+            <MediaTile item={shown[0]} onOpen={() => openTile(shown[0])} onDead={requestRefresh} />
           </div>
           <div className="h-full overflow-hidden rounded-2xl">
-            <MediaTile item={shown[1]} extraCount={hidden || undefined} onOpen={() => openTile(shown[1])} />
+            <MediaTile item={shown[1]} extraCount={hidden || undefined} onOpen={() => openTile(shown[1])} onDead={requestRefresh} />
           </div>
         </div>
       )}
