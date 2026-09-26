@@ -34,6 +34,7 @@ export const PAGE_LABELS: Record<string, string> = {
   '/compose': '새 글 만들기',
   '/ai': 'AI 도구',
   '/links': '링크 변환',
+  '/coins': '코인 장부',
   '/settings': '설정',
   '/admin': '회원 관리',
   '/admin/guides': 'AI 지침서',

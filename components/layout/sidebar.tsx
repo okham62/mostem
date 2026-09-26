@@ -16,6 +16,7 @@ import {
   LogOut,
   PanelLeftClose,
   Sparkles,
+  Coins,
 } from 'lucide-react'
 import { BrandMark } from '@/components/brand-logos'
 import { cn } from '@/lib/utils'
@@ -58,6 +59,7 @@ export const publish = [
 export const tools = [
   { href: '/ai', label: 'AI 도구', icon: Sparkles },
   { href: '/links', label: '링크 변환', icon: Link2 },
+  { href: '/coins', label: '코인 장부', icon: Coins },
 ]
 
 interface SidebarProps {
