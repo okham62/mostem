@@ -86,8 +86,8 @@ export async function POST(req: Request, { params }: { params: { personId: strin
   }
 
   try {
-    const people = await upsertCoinTrade(session.user.id, params.personId, trade)
-    return NextResponse.json({ people })
+    const person = await upsertCoinTrade(session.user.id, params.personId, trade)
+    return NextResponse.json({ person })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : '거래를 저장하지 못했습니다.' },

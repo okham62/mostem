@@ -62,12 +62,10 @@ export async function listCoinPeople(userId: string): Promise<CoinPerson[]> {
     .from('templates')
     .select('id, name, description_format, default_tags, created_at')
     .eq('user_id', userId)
+    .contains('default_tags', [LEDGER_TAG])
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
-  return ((data ?? []) as TemplateRow[])
-    .filter((row) => (row.default_tags ?? []).includes(LEDGER_TAG))
-    .map(fromRow)
-    .map(stripPersonFiles)
+  return ((data ?? []) as TemplateRow[]).map(fromRow).map(stripPersonFiles)
 }
 
 export async function getCoinPerson(userId: string, id: string): Promise<CoinPerson | null> {
@@ -125,15 +123,15 @@ export async function deleteCoinPerson(userId: string, id: string) {
   return ensureDefaultCoinPerson(userId)
 }
 
-async function saveTrades(userId: string, id: string, trades: CoinTrade[]) {
+async function saveTrades(userId: string, person: CoinPerson, trades: CoinTrade[]) {
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('templates')
     .update({ description_format: encodeTrades(trades) })
-    .eq('id', id)
+    .eq('id', person.id)
     .eq('user_id', userId)
   if (error) throw new Error(error.message)
-  return listCoinPeople(userId)
+  return stripPersonFiles({ ...person, trades })
 }
 
 export async function upsertCoinTrade(userId: string, personId: string, trade: CoinTrade) {
@@ -142,7 +140,7 @@ export async function upsertCoinTrade(userId: string, personId: string, trade: C
   const next = current.trades.some((item) => item.id === trade.id)
     ? current.trades.map((item) => (item.id === trade.id ? { ...item, ...trade, files: trade.files ?? item.files } : item))
     : [...current.trades, trade]
-  return saveTrades(userId, personId, next)
+  return saveTrades(userId, current, next)
 }
 
 export async function deleteCoinTrade(userId: string, personId: string, tradeId: string) {
@@ -150,7 +148,7 @@ export async function deleteCoinTrade(userId: string, personId: string, tradeId:
   if (!current) throw new Error('사람을 찾지 못했습니다.')
   return saveTrades(
     userId,
-    personId,
+    current,
     current.trades.filter((item) => item.id !== tradeId),
   )
 }

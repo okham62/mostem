@@ -109,6 +109,25 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
     if (!next.some((item) => item.id === personId) && next[0]) setPersonId(next[0].id)
   }
 
+  function mergePerson(next: CoinPerson) {
+    setPeople((prev) => {
+      const has = prev.some((item) => item.id === next.id)
+      return has ? prev.map((item) => (item.id === next.id ? next : item)) : [...prev, next]
+    })
+  }
+
+  function patchTrade(targetId: string, trade: CoinTrade) {
+    setPeople((prev) =>
+      prev.map((item) => {
+        if (item.id !== targetId) return item
+        const trades = item.trades.some((row) => row.id === trade.id)
+          ? item.trades.map((row) => (row.id === trade.id ? { ...row, ...trade } : row))
+          : [...item.trades, trade]
+        return { ...item, trades }
+      }),
+    )
+  }
+
   async function addPerson() {
     const name = window.prompt('사람 이름')
     if (!name?.trim()) return
@@ -149,15 +168,20 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
   async function removeTrade(trade: CoinTrade) {
     if (!person) return
     if (!window.confirm('이 거래를 삭제할까요? 평단이 다시 계산됩니다.')) return
-    setSaving(true)
+    const snapshot = people
+    setPeople((prev) =>
+      prev.map((item) =>
+        item.id === person.id ? { ...item, trades: item.trades.filter((row) => row.id !== trade.id) } : item,
+      ),
+    )
     const res = await fetch(`/api/coins/${person.id}/trades/${trade.id}`, { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
-    setSaving(false)
     if (!res.ok) {
+      setPeople(snapshot)
       setMessage(data.error || '삭제하지 못했습니다.')
       return
     }
-    if (Array.isArray(data.people)) applyPeople(data.people)
+    if (data.person) mergePerson(data.person)
   }
 
   async function openFile(trade: CoinTrade, file: CoinTradeFile) {
@@ -232,7 +256,9 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
       <div className="space-y-2">
         {holdings.length ? (
           holdings.map((item) => {
-            const price = prices[item.symbol]?.krw ?? 0
+            const quote = prices[item.symbol]
+            const price = quote?.krw ?? 0
+            const change = quote?.change ?? 0
             const value = item.qty * price
             const pnl = value - item.principal
             const pct = item.principal > 0 ? (pnl / item.principal) * 100 : 0
@@ -249,6 +275,17 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
                       </p>
                       <p className="text-[11px] text-white/40">
                         최종 {formatQty(item.qty)}개 · 최종평단 {formatKrw(item.avg)} · 최종원금 {formatKrw(item.principal)}
+                      </p>
+                      <p className="mt-0.5 text-[12px] font-semibold text-white">
+                        업비트 현재가{' '}
+                        {price ? (
+                          <>
+                            {formatKrw(price)}{' '}
+                            <span className={change >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]'}>{formatPct(change)}</span>
+                          </>
+                        ) : (
+                          <span className="text-white/35">불러오는 중</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -356,19 +393,43 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
 
       {sheet && person ? (
         <TradeSheet
-          personId={person.id}
           holdingQty={holdings.find((item) => item.symbol === sheet.symbol)?.qty ?? 0}
           sheet={sheet}
-          saving={saving}
           onClose={() => setSheet(null)}
-          onSaving={setSaving}
-          onDone={(next, error) => {
-            if (error) setMessage(error)
-            else {
-              applyPeople(next)
-              setSheet(null)
-              setMessage('저장했습니다.')
-            }
+          onSubmit={(trade, uploaded) => {
+            const snapshot = people
+            patchTrade(person.id, {
+              ...trade,
+              files: trade.files.map((file) => ({
+                id: file.id,
+                name: file.name,
+                mime: file.mime,
+                size: file.size,
+              })),
+            })
+            setSheet(null)
+            setMessage('저장했습니다.')
+            void fetch(`/api/coins/${person.id}/trades`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...trade,
+                files: uploaded.some((file) => file.data) ? uploaded : undefined,
+              }),
+            })
+              .then(async (res) => {
+                const data = await res.json().catch(() => ({}))
+                if (!res.ok) {
+                  setPeople(snapshot)
+                  setMessage(data.error || '저장하지 못했습니다.')
+                  return
+                }
+                if (data.person) mergePerson(data.person)
+              })
+              .catch(() => {
+                setPeople(snapshot)
+                setMessage('저장하지 못했습니다.')
+              })
           }}
         />
       ) : null}
@@ -377,21 +438,15 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
 }
 
 function TradeSheet({
-  personId,
   holdingQty,
   sheet,
-  saving,
   onClose,
-  onSaving,
-  onDone,
+  onSubmit,
 }: {
-  personId: string
   holdingQty: number
   sheet: SheetState
-  saving: boolean
   onClose: () => void
-  onSaving: (value: boolean) => void
-  onDone: (people: CoinPerson[], error?: string) => void
+  onSubmit: (trade: CoinTrade, files: CoinTradeFile[]) => void
 }) {
   const edit = sheet.edit
   const [side, setSide] = useState<CoinTradeSide>(sheet.side)
@@ -409,6 +464,7 @@ function TradeSheet({
   const [memo, setMemo] = useState(edit?.memo ?? '')
   const [files, setFiles] = useState<CoinTradeFile[]>(edit?.files ?? [])
   const [dragging, setDragging] = useState(false)
+  const [hint, setHint] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -446,17 +502,14 @@ function TradeSheet({
     })
   }
 
-  async function save() {
+  function save() {
     if (!symbol) {
-      onDone([], '코인을 고르세요.')
+      setHint('코인을 고르세요.')
       return
     }
-    onSaving(true)
-    const res = await fetch(`/api/coins/${personId}/trades`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: edit?.id,
+    onSubmit(
+      {
+        id: edit?.id || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`),
         symbol,
         coinName,
         side,
@@ -468,15 +521,10 @@ function TradeSheet({
         exchange,
         memo,
         files,
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    onSaving(false)
-    if (!res.ok) {
-      onDone([], data.error || '저장하지 못했습니다.')
-      return
-    }
-    onDone(Array.isArray(data.people) ? data.people : [])
+        createdAt: edit?.createdAt ?? new Date().toISOString(),
+      },
+      files,
+    )
   }
 
   return (
@@ -659,11 +707,11 @@ function TradeSheet({
           ) : null}
         </div>
 
+        {hint ? <p className="mt-2 text-xs text-gold">{hint}</p> : null}
         <button
           type="button"
-          disabled={saving}
-          onClick={() => void save()}
-          className="mt-4 h-11 w-full rounded-xl bg-gold text-sm font-bold text-black disabled:opacity-50"
+          onClick={save}
+          className="mt-4 h-11 w-full rounded-xl bg-gold text-sm font-bold text-black"
         >
           저장
         </button>
