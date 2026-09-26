@@ -362,10 +362,11 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
                       <tr>
                         <th className="px-3 py-2 font-medium">날짜</th>
                         <th className="px-3 py-2 font-medium">수량</th>
+                        <th className="px-3 py-2 font-medium">평단</th>
                         <th className="px-3 py-2 font-medium">투자금</th>
                         <th className="px-3 py-2 font-medium">누적수량</th>
                         <th className="px-3 py-2 font-medium">누적원금</th>
-                        <th className="px-3 py-2 font-medium">평단가</th>
+                        <th className="px-3 py-2 font-medium">최종평단</th>
                         <th className="px-3 py-2 font-medium">메모</th>
                         <th className="px-3 py-2 font-medium"></th>
                       </tr>
@@ -377,6 +378,7 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
                           <td className={cn('px-3 py-2 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
                             {formatSignedQty(row.signedQty)}
                           </td>
+                          <td className="px-3 py-2 text-white">{formatKrw(row.trade.unitPrice)}</td>
                           <td className={cn('px-3 py-2 font-semibold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
                             {formatSignedKrw(row.signedAmount)}
                           </td>
