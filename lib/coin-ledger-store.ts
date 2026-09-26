@@ -94,20 +94,22 @@ export async function createCoinPerson(userId: string, name: string) {
     })
     .select('id, name, description_format, default_tags')
     .single()
-  if (error || !data) throw new Error(error?.message || '사람을 만들지 못했습니다.')
+  if (error || !data) throw new Error(error?.message || '장부를 만들지 못했습니다.')
   return stripPersonFiles(fromRow(data as TemplateRow))
 }
 
 export async function ensureDefaultCoinPerson(userId: string) {
   const people = await listCoinPeople(userId)
-  if (people.length) return people
-  await createCoinPerson(userId, '본인')
-  return listCoinPeople(userId)
+  const emptySelf = people.find((item) => item.name === '본인' && item.trades.length === 0)
+  if (!emptySelf) return people
+  const supabase = createAdminClient()
+  await supabase.from('templates').delete().eq('id', emptySelf.id).eq('user_id', userId)
+  return people.filter((item) => item.id !== emptySelf.id)
 }
 
 export async function renameCoinPerson(userId: string, id: string, name: string) {
   const current = await getCoinPerson(userId, id)
-  if (!current) throw new Error('사람을 찾지 못했습니다.')
+  if (!current) throw new Error('장부를 찾지 못했습니다.')
   const supabase = createAdminClient()
   const { error } = await supabase.from('templates').update({ name }).eq('id', id).eq('user_id', userId)
   if (error) throw new Error(error.message)
@@ -116,11 +118,11 @@ export async function renameCoinPerson(userId: string, id: string, name: string)
 
 export async function deleteCoinPerson(userId: string, id: string) {
   const current = await getCoinPerson(userId, id)
-  if (!current) throw new Error('사람을 찾지 못했습니다.')
+  if (!current) throw new Error('장부를 찾지 못했습니다.')
   const supabase = createAdminClient()
   const { error } = await supabase.from('templates').delete().eq('id', id).eq('user_id', userId)
   if (error) throw new Error(error.message)
-  return ensureDefaultCoinPerson(userId)
+  return listCoinPeople(userId)
 }
 
 async function saveTrades(userId: string, person: CoinPerson, trades: CoinTrade[]) {
@@ -136,7 +138,7 @@ async function saveTrades(userId: string, person: CoinPerson, trades: CoinTrade[
 
 export async function upsertCoinTrade(userId: string, personId: string, trade: CoinTrade) {
   const current = await getCoinPerson(userId, personId)
-  if (!current) throw new Error('사람을 찾지 못했습니다.')
+  if (!current) throw new Error('장부를 찾지 못했습니다.')
   const next = current.trades.some((item) => item.id === trade.id)
     ? current.trades.map((item) => (item.id === trade.id ? { ...item, ...trade, files: trade.files ?? item.files } : item))
     : [...current.trades, trade]
@@ -145,7 +147,7 @@ export async function upsertCoinTrade(userId: string, personId: string, trade: C
 
 export async function deleteCoinTrade(userId: string, personId: string, tradeId: string) {
   const current = await getCoinPerson(userId, personId)
-  if (!current) throw new Error('사람을 찾지 못했습니다.')
+  if (!current) throw new Error('장부를 찾지 못했습니다.')
   return saveTrades(
     userId,
     current,

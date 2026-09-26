@@ -1,12 +1,16 @@
 export const COIN_EXCHANGES = [
-  { id: 'upbit', label: '업비트' },
-  { id: 'bithumb', label: '빗썸' },
-  { id: 'coinone', label: '코인원' },
-  { id: 'korbit', label: '코빗' },
-  { id: 'binance', label: '바이낸스' },
-  { id: 'bybit', label: '바이비트' },
-  { id: 'other', label: '기타' },
+  { id: 'upbit', label: '업비트', logo: '/logos/exchanges/upbit.png' },
+  { id: 'bithumb', label: '빗썸', logo: '/logos/exchanges/bithumb.png' },
+  { id: 'coinone', label: '코인원', logo: '/logos/exchanges/coinone.png' },
+  { id: 'korbit', label: '코빗', logo: '/logos/exchanges/korbit.png' },
+  { id: 'binance', label: '바이낸스', logo: '/logos/exchanges/binance.png' },
+  { id: 'bybit', label: '바이비트', logo: '/logos/exchanges/bybit.png' },
+  { id: 'other', label: '기타', logo: '/logos/exchanges/other.svg' },
 ] as const
+
+export function exchangeLogo(id: string) {
+  return COIN_EXCHANGES.find((item) => item.id === id)?.logo ?? '/logos/exchanges/other.svg'
+}
 
 export const MAX_TRADE_FILES = 5
 export const MAX_TRADE_FILE_BYTES = 2 * 1024 * 1024
@@ -177,6 +181,10 @@ export function canSell(holding: CoinHolding | undefined, qty: number, ignoreTra
       )
     : holding
   return qty <= replay.qty + 1e-12
+}
+
+export function tradeAmount(qty: number, unitPrice: number, fee = 0, side: CoinTradeSide = 'buy') {
+  return Math.round(qty * unitPrice + (side === 'buy' ? fee : 0))
 }
 
 export function num(value: unknown) {

@@ -5,6 +5,7 @@ import {
   MAX_TRADE_FILE_BYTES,
   MAX_TRADE_FILES,
   num,
+  tradeAmount,
   type CoinTrade,
   type CoinTradeFile,
   type CoinTradeSide,
@@ -38,7 +39,8 @@ export async function POST(req: Request, { params }: { params: { personId: strin
   const qty = num(body?.qty)
   const unitPrice = num(body?.unitPrice)
   const fee = Math.max(0, num(body?.fee))
-  const amount = num(body?.amount) || qty * unitPrice + (side === 'buy' ? fee : 0)
+  const requestedAmount = num(body?.amount)
+  const derivedAmount = tradeAmount(qty, unitPrice, fee, side)
   const exchange = String(body?.exchange ?? 'upbit')
   const memo = String(body?.memo ?? '').trim()
   if (!symbol || !tradedAt || qty <= 0 || unitPrice <= 0) {
@@ -46,10 +48,20 @@ export async function POST(req: Request, { params }: { params: { personId: strin
   }
 
   const person = await getCoinPerson(session.user.id, params.personId)
-  if (!person) return NextResponse.json({ error: '사람을 찾지 못했습니다.' }, { status: 404 })
+  if (!person) return NextResponse.json({ error: '장부를 찾지 못했습니다.' }, { status: 404 })
 
   const tradeId = typeof body?.id === 'string' && body.id ? body.id : newTradeId()
   const existing = person.trades.find((item) => item.id === tradeId)
+  const inputsChanged =
+    !existing ||
+    existing.qty !== qty ||
+    existing.unitPrice !== unitPrice ||
+    existing.fee !== fee ||
+    existing.side !== side
+  const amount =
+    requestedAmount > 0 && (!inputsChanged || requestedAmount !== existing?.amount)
+      ? requestedAmount
+      : derivedAmount
   const uploaded = asFiles(body?.files)
   const kept = Array.isArray(body?.files)
     ? (body.files as Array<{ id?: string; name?: string }>)

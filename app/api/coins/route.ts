@@ -1,5 +1,5 @@
 import { auth } from '@/auth'
-import { createCoinPerson, ensureDefaultCoinPerson } from '@/lib/coin-ledger-store'
+import { createCoinPerson, ensureDefaultCoinPerson, listCoinPeople } from '@/lib/coin-ledger-store'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
@@ -24,11 +24,11 @@ export async function POST(req: Request) {
   if (!name) return NextResponse.json({ error: '이름을 입력하세요.' }, { status: 400 })
   try {
     const person = await createCoinPerson(session.user.id, name)
-    const people = await ensureDefaultCoinPerson(session.user.id)
+    const people = await listCoinPeople(session.user.id)
     return NextResponse.json({ person, people })
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '사람을 만들지 못했습니다.' },
+      { error: error instanceof Error ? error.message : '장부를 만들지 못했습니다.' },
       { status: 500 },
     )
   }

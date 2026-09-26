@@ -7,6 +7,7 @@ import {
   MAX_TRADE_FILE_BYTES,
   MAX_TRADE_FILES,
   exchangeLabel,
+  exchangeLogo,
   formatKrw,
   formatPct,
   formatQty,
@@ -16,6 +17,8 @@ import {
   runningLedger,
   num,
   todayIso,
+  tradeAmount,
+  type CoinHolding,
   type CoinPerson,
   type CoinTrade,
   type CoinTradeFile,
@@ -36,6 +39,19 @@ function logoUrl(symbol: string) {
   return `https://static.upbit.com/logos/${symbol.toUpperCase()}.png`
 }
 
+function ExchangeMark({ id, className }: { id: string; className?: string }) {
+  const label = exchangeLabel(id)
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={exchangeLogo(id)}
+      alt={label}
+      title={label}
+      className={cn('h-6 w-6 rounded-md bg-white object-contain p-0.5', className)}
+    />
+  )
+}
+
 function LivePrice({ price, change }: { price: number; change: number }) {
   const prev = useRef(price)
   const [flash, setFlash] = useState<'up' | 'down' | null>(null)
@@ -54,18 +70,18 @@ function LivePrice({ price, change }: { price: number; change: number }) {
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-2 rounded-lg px-2 py-1',
+        'inline-flex max-w-full flex-nowrap items-center gap-1.5 rounded-lg px-2 py-1',
         flash === 'up' && 'coin-price-flash-up',
         flash === 'down' && 'coin-price-flash-down',
       )}
     >
-      <span className="coin-live-dot h-2 w-2 rounded-full bg-[#25a750]" />
-      <span className="text-[11px] font-semibold tracking-wide text-white/45">LIVE</span>
-      <span key={price || 'empty'} className="coin-price-tick text-base font-bold text-white">
+      <span className="coin-live-dot h-2 w-2 shrink-0 rounded-full bg-[#25a750]" />
+      <span className="shrink-0 text-xs font-semibold tracking-wide text-white/45">LIVE</span>
+      <span key={price || 'empty'} className="coin-price-tick whitespace-nowrap text-lg font-bold text-white">
         {price ? formatKrw(price) : '불러오는 중'}
       </span>
       {price ? (
-        <span className={cn('text-sm font-bold', change >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+        <span className={cn('whitespace-nowrap text-sm font-bold', change >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
           {formatPct(change)}
         </span>
       ) : null}
@@ -105,18 +121,17 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
 
   const person = people.find((item) => item.id === personId) ?? people[0]
   const holdings = useMemo(() => holdingsFromTrades(person?.trades ?? []), [person])
-  const selected = holdings.find((item) => item.symbol === openSymbol) ?? holdings[0]
   const symbolKey = holdings.map((item) => item.symbol).join(',')
 
   useEffect(() => {
-    if (!holdings.length) {
+    setOpenSymbol('')
+  }, [personId])
+
+  useEffect(() => {
+    if (openSymbol && !holdings.some((item) => item.symbol === openSymbol)) {
       setOpenSymbol('')
-      return
     }
-    if (!holdings.some((item) => item.symbol === openSymbol)) {
-      setOpenSymbol(holdings[0].symbol)
-    }
-  }, [personId, symbolKey, holdings, openSymbol])
+  }, [openSymbol, symbolKey, holdings])
 
   useEffect(() => {
     const symbols = symbolKey ? symbolKey.split(',') : []
@@ -178,7 +193,7 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
   }
 
   async function addPerson() {
-    const name = window.prompt('사람 이름')
+    const name = window.prompt('장부 이름 (예: 업비트, 임옥환)')
     if (!name?.trim()) return
     setSaving(true)
     const res = await fetch('/api/coins', {
@@ -189,7 +204,7 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
     const data = await res.json().catch(() => ({}))
     setSaving(false)
     if (!res.ok) {
-      setMessage(data.error || '사람을 만들지 못했습니다.')
+      setMessage(data.error || '장부를 만들지 못했습니다.')
       return
     }
     if (Array.isArray(data.people)) applyPeople(data.people)
@@ -198,10 +213,6 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
 
   async function removePerson() {
     if (!person) return
-    if (people.length <= 1) {
-      setMessage('사람은 한 명 이상 있어야 합니다.')
-      return
-    }
     if (!window.confirm(`「${person.name}」 장부를 삭제할까요? 거래도 같이 지워집니다.`)) return
     setSaving(true)
     const res = await fetch(`/api/coins/${person.id}`, { method: 'DELETE' })
@@ -241,55 +252,59 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[960px] space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">코인 장부</h1>
-          <p className="mt-1 text-sm text-white/45">사람별 매수·매도, 평단과 총자산이 자동으로 맞춰집니다.</p>
+    <div className="mx-auto w-full max-w-[960px] space-y-3 sm:space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-bold text-white sm:text-2xl">코인 장부</h1>
+          <p className="mt-1 hidden text-sm text-white/45 sm:block">거래소별·대상별로 나눠 두고, 평단과 총자산이 자동으로 맞춰집니다.</p>
         </div>
         <button
           type="button"
           disabled={saving || !person}
           onClick={() => setSheet({ side: 'buy', symbol: '', coinName: '', lockCoin: false })}
-          className="inline-flex items-center gap-1 rounded-xl bg-gold px-3 py-2 text-sm font-semibold text-black disabled:opacity-40"
+          className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl bg-gold px-3 text-[15px] font-semibold text-black disabled:opacity-40 sm:h-auto sm:w-auto sm:py-2 sm:text-sm"
         >
           <Plus className="h-4 w-4" />
           코인 추가
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {people.map((item) => (
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {people.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setPersonId(item.id)}
+              className={cn(
+                'rounded-full px-3.5 py-2 text-[15px] font-semibold sm:py-1.5 sm:text-sm',
+                item.id === person?.id ? 'bg-gold text-black' : 'bg-white/8 text-white/70 hover:bg-white/12',
+              )}
+            >
+              {item.name}
+            </button>
+          ))}
           <button
-            key={item.id}
             type="button"
-            onClick={() => setPersonId(item.id)}
-            className={cn(
-              'rounded-full px-3 py-1.5 text-sm font-semibold',
-              item.id === person?.id ? 'bg-gold text-black' : 'bg-white/8 text-white/70 hover:bg-white/12',
-            )}
+            onClick={() => void addPerson()}
+            className="rounded-full border border-dashed border-white/20 px-3.5 py-2 text-[15px] text-white/50 hover:text-white sm:py-1.5 sm:text-sm"
           >
-            {item.name}
+            + 장부
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => void addPerson()}
-          className="rounded-full border border-dashed border-white/20 px-3 py-1.5 text-sm text-white/50 hover:text-white"
-        >
-          + 사람
-        </button>
-        {people.length > 1 ? (
-          <button type="button" onClick={() => void removePerson()} className="ml-auto text-xs text-white/35 hover:text-red-300">
-            이 사람 삭제
+        </div>
+        {person ? (
+          <button type="button" onClick={() => void removePerson()} className="text-sm text-white/40 hover:text-red-300">
+            이 장부 삭제
           </button>
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-[#141418] p-5">
-        <p className="text-xs font-semibold text-white/40">총 자산</p>
-        <p className="mt-1 text-3xl font-bold tracking-tight text-white">{formatKrw(totals.value)}</p>
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+      <div className="rounded-2xl border border-white/10 bg-[#141418] p-4 sm:p-5">
+        <p className="text-sm font-semibold text-white/50">총 자산</p>
+        <p className="mt-1 break-keep text-[28px] font-bold leading-tight tracking-tight text-white sm:text-3xl">
+          {formatKrw(totals.value)}
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-1.5 text-[15px] sm:flex sm:flex-wrap sm:gap-x-5 sm:gap-y-1 sm:text-sm">
           <span className="text-white/50">
             원금 <b className="ml-1 font-semibold text-white">{formatKrw(totals.principal)}</b>
           </span>
@@ -304,189 +319,40 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
 
       {holdings.length ? (
         <div className="space-y-3">
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#16161b]">
-            {holdings.map((item) => {
-              const quote = prices[item.symbol]
-              const price = quote?.krw ?? 0
-              const value = item.qty * price
-              const pnl = value - item.principal
-              const pct = item.principal > 0 ? (pnl / item.principal) * 100 : 0
-              const active = selected?.symbol === item.symbol
-              return (
-                <button
-                  key={item.symbol}
-                  type="button"
-                  onClick={() => setOpenSymbol(item.symbol)}
-                  className={cn(
-                    'flex w-full items-center gap-3 border-t border-white/6 px-4 py-3 text-left first:border-t-0',
-                    active ? 'bg-gold/10' : 'hover:bg-white/4',
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={logoUrl(item.symbol)} alt="" className="h-8 w-8 rounded-full bg-white/5 object-cover" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-white">
-                      {item.coinName} <span className="text-white/35">{item.symbol}</span>
-                    </p>
-                    <p className="text-[11px] text-white/40">{formatQty(item.qty)}개 · 평단 {formatKrw(item.avg)}</p>
-                  </div>
-                  <div className="hidden text-right sm:block">
-                    <p className="text-[11px] text-white/40">현재가</p>
-                    <p className="text-xs font-semibold text-white">{price ? formatKrw(price) : '-'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-white">{price ? formatKrw(value) : '-'}</p>
-                    <p className={cn('text-[11px] font-semibold', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                      {formatPct(pct)}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {selected ? (
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#16161b]">
-              <div className="flex flex-wrap items-start justify-between gap-4 px-4 py-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logoUrl(selected.symbol)} alt="" className="h-10 w-10 rounded-full bg-white/5 object-cover" />
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-bold text-white">
-                        {selected.coinName} <span className="text-white/35">{selected.symbol}</span>
-                      </p>
-                      <LivePrice price={prices[selected.symbol]?.krw ?? 0} change={prices[selected.symbol]?.change ?? 0} />
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <div className="rounded-xl bg-white/6 px-3 py-2">
-                      <p className="text-[11px] font-semibold text-white/45">최종 수량</p>
-                      <p className="mt-0.5 text-sm font-bold text-white">{formatQty(selected.qty)}</p>
-                    </div>
-                    <div className="rounded-xl bg-white/6 px-3 py-2">
-                      <p className="text-[11px] font-semibold text-white/45">최종 평단</p>
-                      <p className="mt-0.5 text-sm font-bold text-white">{formatKrw(selected.avg)}</p>
-                    </div>
-                    <div className="rounded-xl bg-white/6 px-3 py-2">
-                      <p className="text-[11px] font-semibold text-white/45">최종 원금</p>
-                      <p className="mt-0.5 text-sm font-bold text-white">{formatKrw(selected.principal)}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="ml-auto text-right">
-                  <p className="text-xs font-semibold text-white/40">평가금액</p>
-                  <p className="mt-0.5 text-3xl font-bold tracking-tight text-white">
-                    {prices[selected.symbol]?.krw ? formatKrw(selected.qty * prices[selected.symbol].krw) : '시세 없음'}
-                  </p>
-                  <p
-                    className={cn(
-                      'mt-1 text-base font-bold',
-                      selected.qty * (prices[selected.symbol]?.krw ?? 0) - selected.principal >= 0
-                        ? 'text-[#25a750]'
-                        : 'text-[#ca3f64]',
-                    )}
-                  >
-                    {formatKrw(selected.qty * (prices[selected.symbol]?.krw ?? 0) - selected.principal)}{' '}
-                    {formatPct(
-                      selected.principal > 0
-                        ? ((selected.qty * (prices[selected.symbol]?.krw ?? 0) - selected.principal) / selected.principal) * 100
-                        : 0,
-                    )}
-                  </p>
-                  <div className="mt-3 flex justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSheet({ side: 'buy', symbol: selected.symbol, coinName: selected.coinName, lockCoin: true })
-                      }
-                      className="rounded-lg bg-[#25a750]/20 px-3 py-1.5 text-xs font-semibold text-[#25a750]"
-                    >
-                      매수
-                    </button>
-                    <button
-                      type="button"
-                      disabled={selected.qty <= 0}
-                      onClick={() =>
-                        setSheet({ side: 'sell', symbol: selected.symbol, coinName: selected.coinName, lockCoin: true })
-                      }
-                      className="rounded-lg bg-[#ca3f64]/20 px-3 py-1.5 text-xs font-semibold text-[#ca3f64] disabled:opacity-30"
-                    >
-                      매도
-                    </button>
-                  </div>
-                </div>
+          {holdings.map((item) => {
+            const open = openSymbol === item.symbol
+            return (
+              <div
+                key={item.symbol}
+                className={cn('overflow-hidden rounded-2xl border bg-[#16161b]', open ? 'border-gold/30' : 'border-white/10')}
+              >
+                <CoinCard
+                  item={item}
+                  prices={prices}
+                  open={open}
+                  onToggle={() => setOpenSymbol(open ? '' : item.symbol)}
+                  onBuy={() => setSheet({ side: 'buy', symbol: item.symbol, coinName: item.coinName, lockCoin: true })}
+                  onSell={() => setSheet({ side: 'sell', symbol: item.symbol, coinName: item.coinName, lockCoin: true })}
+                />
+                {open ? (
+                  <TradeHistory
+                    item={item}
+                    onEdit={(trade) =>
+                      setSheet({
+                        side: trade.side,
+                        symbol: trade.symbol,
+                        coinName: trade.coinName,
+                        lockCoin: true,
+                        edit: trade,
+                      })
+                    }
+                    onRemove={(trade) => void removeTrade(trade)}
+                    onOpenFile={(trade, file) => void openFile(trade, file)}
+                  />
+                ) : null}
               </div>
-              <div className="overflow-x-auto border-t border-white/8">
-                <table className="w-full min-w-[720px] text-left text-[11px]">
-                  <thead className="text-white/35">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">날짜</th>
-                      <th className="px-3 py-2 font-medium">수량</th>
-                      <th className="px-3 py-2 font-medium">평단</th>
-                      <th className="px-3 py-2 font-medium">투자금</th>
-                      <th className="px-3 py-2 font-medium">누적수량</th>
-                      <th className="px-3 py-2 font-medium">누적원금</th>
-                      <th className="px-3 py-2 font-medium">최종평단</th>
-                      <th className="px-3 py-2 font-medium">메모</th>
-                      <th className="px-3 py-2 font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runningLedger(selected.trades).map((row) => (
-                      <tr key={row.trade.id} className="border-t border-white/5 text-white/75 hover:bg-white/4">
-                        <td className="whitespace-nowrap px-3 py-2 text-white/45">{row.trade.tradedAt}</td>
-                        <td className={cn('px-3 py-2 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                          {formatSignedQty(row.signedQty)}
-                        </td>
-                        <td className="px-3 py-2 text-white">{formatKrw(row.trade.unitPrice)}</td>
-                        <td className={cn('px-3 py-2 font-semibold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                          {formatSignedKrw(row.signedAmount)}
-                        </td>
-                        <td className="px-3 py-2">{formatQty(row.afterQty)}</td>
-                        <td className="px-3 py-2">{formatKrw(row.afterPrincipal)}</td>
-                        <td className="px-3 py-2 font-semibold text-white">{formatKrw(row.afterAvg)}</td>
-                        <td className="max-w-[180px] truncate px-3 py-2 text-white/50" title={row.trade.memo}>
-                          {row.trade.memo || '—'}
-                          {row.trade.files.length ? (
-                            <span className="ml-1 inline-flex items-center gap-1">
-                              <Paperclip className="h-3 w-3" />
-                              {row.trade.files.map((file) => (
-                                <button key={file.id} type="button" className="underline" onClick={() => void openFile(row.trade, file)}>
-                                  {file.name}
-                                </button>
-                              ))}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right">
-                          <span className="text-white/30">{exchangeLabel(row.trade.exchange)}</span>
-                          <button
-                            type="button"
-                            className="ml-2 text-white/35 hover:text-white"
-                            onClick={() =>
-                              setSheet({
-                                side: row.trade.side,
-                                symbol: row.trade.symbol,
-                                coinName: row.trade.coinName,
-                                lockCoin: true,
-                                edit: row.trade,
-                              })
-                            }
-                          >
-                            수정
-                          </button>
-                          <button type="button" className="ml-2 text-white/25 hover:text-red-300" onClick={() => void removeTrade(row.trade)}>
-                            삭제
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
+            )
+          })}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-white/12 px-4 py-10 text-center text-sm text-white/40">
@@ -543,6 +409,213 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
   )
 }
 
+function CoinCard({
+  item,
+  prices,
+  open,
+  onToggle,
+  onBuy,
+  onSell,
+}: {
+  item: CoinHolding
+  prices: CoinPriceMap
+  open: boolean
+  onToggle: () => void
+  onBuy: () => void
+  onSell: () => void
+}) {
+  const price = prices[item.symbol]?.krw ?? 0
+  const value = item.qty * price
+  const pnl = value - item.principal
+  const pct = item.principal > 0 ? (pnl / item.principal) * 100 : 0
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onToggle()
+        }
+      }}
+      className={cn('cursor-pointer px-3 py-4 text-left sm:px-4', open ? 'bg-gold/5' : 'hover:bg-white/3')}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl(item.symbol)} alt="" className="h-10 w-10 shrink-0 rounded-full bg-white/5 object-cover" />
+            <div className="min-w-0">
+              <p className="break-keep text-[15px] font-bold text-white">
+                {item.coinName} <span className="text-white/40">{item.symbol}</span>
+              </p>
+              <LivePrice price={price} change={prices[item.symbol]?.change ?? 0} />
+            </div>
+          </div>
+          <div className="mt-3 space-y-2 sm:grid sm:grid-cols-3 sm:gap-2 sm:space-y-0">
+            {[
+              ['최종 수량', formatQty(item.qty)],
+              ['최종 평단', formatKrw(item.avg)],
+              ['최종 원금', formatKrw(item.principal)],
+            ].map(([label, val]) => (
+              <div key={label} className="flex items-center justify-between rounded-xl bg-white/6 px-3 py-2.5 sm:block sm:py-2">
+                <p className="text-sm font-semibold text-white/50 sm:text-[11px] sm:text-white/45">{label}</p>
+                <p className="text-[15px] font-bold text-white sm:mt-0.5 sm:text-sm">{val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="sm:ml-auto sm:text-right">
+          <p className="text-sm font-semibold text-white/50 sm:text-xs sm:text-white/40">평가금액</p>
+          <p className="mt-0.5 break-keep text-[26px] font-bold leading-tight tracking-tight text-white sm:text-3xl">
+            {price ? formatKrw(value) : '시세 없음'}
+          </p>
+          <p className={cn('mt-1 text-[15px] font-bold sm:text-base', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+            {formatKrw(pnl)} {formatPct(pct)}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-1.5">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onBuy()
+              }}
+              className="h-11 rounded-xl bg-[#25a750]/20 text-[15px] font-semibold text-[#25a750] sm:h-auto sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
+            >
+              매수
+            </button>
+            <button
+              type="button"
+              disabled={item.qty <= 0}
+              onClick={(event) => {
+                event.stopPropagation()
+                onSell()
+              }}
+              className="h-11 rounded-xl bg-[#ca3f64]/20 text-[15px] font-semibold text-[#ca3f64] disabled:opacity-30 sm:h-auto sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
+            >
+              매도
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TradeHistory({
+  item,
+  onEdit,
+  onRemove,
+  onOpenFile,
+}: {
+  item: CoinHolding
+  onEdit: (trade: CoinTrade) => void
+  onRemove: (trade: CoinTrade) => void
+  onOpenFile: (trade: CoinTrade, file: CoinTradeFile) => void
+}) {
+  return (
+    <div className="border-t border-white/8 bg-black/20">
+      <div className="space-y-2 px-3 py-3 sm:hidden">
+        {runningLedger(item.trades).map((row) => (
+          <div key={row.trade.id} className="rounded-xl bg-white/6 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-white/50">{row.trade.tradedAt}</p>
+              <ExchangeMark id={row.trade.exchange} />
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between gap-3">
+              <span className={cn('text-[17px] font-bold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                {formatSignedQty(row.signedQty)}개
+              </span>
+              <span className={cn('text-[15px] font-bold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                {formatSignedKrw(row.signedAmount)}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-white/60">
+              평단 {formatKrw(row.trade.unitPrice)} · 누적 {formatQty(row.afterQty)} · {formatKrw(row.afterAvg)}
+            </p>
+            {row.trade.memo ? <p className="mt-1 text-sm text-white/45">{row.trade.memo}</p> : null}
+            {row.trade.files.length ? (
+              <div className="mt-1 flex flex-wrap gap-2 text-sm text-white/55">
+                {row.trade.files.map((file) => (
+                  <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
+                    {file.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-2 flex gap-4 text-[15px]">
+              <button type="button" className="text-white/60" onClick={() => onEdit(row.trade)}>
+                수정
+              </button>
+              <button type="button" className="text-red-300/80" onClick={() => onRemove(row.trade)}>
+                삭제
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto border-t border-white/8 sm:block">
+        <table className="w-full min-w-[760px] text-left text-[13px]">
+          <thead className="text-white/40">
+            <tr>
+              <th className="px-3 py-2.5 font-medium">날짜</th>
+              <th className="px-3 py-2.5 font-medium">수량</th>
+              <th className="px-3 py-2.5 font-medium">평단</th>
+              <th className="px-3 py-2.5 font-medium">투자금</th>
+              <th className="px-3 py-2.5 font-medium">누적수량</th>
+              <th className="px-3 py-2.5 font-medium">누적원금</th>
+              <th className="px-3 py-2.5 font-medium">최종평단</th>
+              <th className="px-3 py-2.5 font-medium">메모</th>
+              <th className="px-3 py-2.5 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {runningLedger(item.trades).map((row) => (
+              <tr key={row.trade.id} className="border-t border-white/5 text-white/80 hover:bg-white/4">
+                <td className="whitespace-nowrap px-3 py-2.5 text-white/50">{row.trade.tradedAt}</td>
+                <td className={cn('px-3 py-2.5 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                  {formatSignedQty(row.signedQty)}
+                </td>
+                <td className="px-3 py-2.5 text-white">{formatKrw(row.trade.unitPrice)}</td>
+                <td className={cn('px-3 py-2.5 font-semibold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                  {formatSignedKrw(row.signedAmount)}
+                </td>
+                <td className="px-3 py-2.5">{formatQty(row.afterQty)}</td>
+                <td className="px-3 py-2.5">{formatKrw(row.afterPrincipal)}</td>
+                <td className="px-3 py-2.5 font-semibold text-white">{formatKrw(row.afterAvg)}</td>
+                <td className="max-w-[180px] truncate px-3 py-2.5 text-white/55" title={row.trade.memo}>
+                  {row.trade.memo || '—'}
+                  {row.trade.files.length ? (
+                    <span className="ml-1 inline-flex items-center gap-1">
+                      <Paperclip className="h-3.5 w-3.5" />
+                      {row.trade.files.map((file) => (
+                        <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
+                          {file.name}
+                        </button>
+                      ))}
+                    </span>
+                  ) : null}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                  <ExchangeMark id={row.trade.exchange} className="inline-block align-middle" />
+                  <button type="button" className="ml-2 text-white/40 hover:text-white" onClick={() => onEdit(row.trade)}>
+                    수정
+                  </button>
+                  <button type="button" className="ml-2 text-white/30 hover:text-red-300" onClick={() => onRemove(row.trade)}>
+                    삭제
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function TradeSheet({
   holdingQty,
   sheet,
@@ -565,7 +638,7 @@ function TradeSheet({
   const [unitPrice, setUnitPrice] = useState(edit ? String(edit.unitPrice) : '')
   const [fee, setFee] = useState(edit ? String(edit.fee || '') : '')
   const [amount, setAmount] = useState(edit ? String(edit.amount) : '')
-  const [amountTouched, setAmountTouched] = useState(Boolean(edit))
+  const [amountTouched, setAmountTouched] = useState(false)
   const [exchange, setExchange] = useState(edit?.exchange ?? 'upbit')
   const [memo, setMemo] = useState(edit?.memo ?? '')
   const [files, setFiles] = useState<CoinTradeFile[]>(edit?.files ?? [])
@@ -574,8 +647,8 @@ function TradeSheet({
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const auto = num(qty) * num(unitPrice) + (side === 'buy' ? num(fee) : 0)
-    if (!amountTouched && auto > 0) setAmount(String(Math.round(auto)))
+    const auto = tradeAmount(num(qty), num(unitPrice), num(fee), side)
+    if (!amountTouched && auto > 0) setAmount(String(auto))
   }, [qty, unitPrice, fee, side, amountTouched])
 
   useEffect(() => {
@@ -622,7 +695,7 @@ function TradeSheet({
         tradedAt,
         qty: num(qty),
         unitPrice: num(unitPrice),
-        amount: num(amount),
+        amount: amountTouched ? num(amount) : tradeAmount(num(qty), num(unitPrice), num(fee), side),
         fee: num(fee),
         exchange,
         memo,
@@ -635,11 +708,11 @@ function TradeSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-3 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-[420px] rounded-2xl border border-white/10 bg-[#141418] p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="max-h-[90dvh] w-full max-w-[420px] overflow-y-auto rounded-2xl border border-white/10 bg-[#141418] p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-bold text-white">{edit ? '거래 수정' : side === 'buy' ? '매수 추가' : '매도 추가'}</p>
+          <p className="text-base font-bold text-white">{edit ? '거래 수정' : side === 'buy' ? '매수 추가' : '매도 추가'}</p>
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-white/40 hover:text-white">
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -650,7 +723,7 @@ function TradeSheet({
               type="button"
               onClick={() => setSide(item)}
               className={cn(
-                'rounded-lg py-1.5 text-sm font-semibold',
+                'rounded-lg py-2.5 text-[15px] font-semibold',
                 side === item ? (item === 'buy' ? 'bg-[#25a750] text-white' : 'bg-[#ca3f64] text-white') : 'text-white/50',
               )}
             >
@@ -660,9 +733,9 @@ function TradeSheet({
         </div>
 
         {sheet.lockCoin ? (
-          <p className="mb-3 text-sm font-semibold text-white">
+          <p className="mb-3 text-[15px] font-semibold text-white">
             {coinName} <span className="text-white/40">{symbol}</span>
-            {side === 'sell' ? <span className="ml-2 text-[11px] text-white/40">보유 {formatQty(holdingQty)}</span> : null}
+            {side === 'sell' ? <span className="ml-2 text-sm text-white/40">보유 {formatQty(holdingQty)}</span> : null}
           </p>
         ) : (
           <div className="relative mb-3">
@@ -700,58 +773,73 @@ function TradeSheet({
           </div>
         )}
 
+        <div className="mb-2 text-sm text-white/50">
+          거래소
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {COIN_EXCHANGES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                title={item.label}
+                onClick={() => setExchange(item.id)}
+                className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-xl border',
+                  exchange === item.id ? 'border-gold bg-white' : 'border-white/10 bg-white/90 hover:bg-white',
+                )}
+              >
+                <ExchangeMark id={item.id} className="h-7 w-7 bg-transparent p-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
-          <label className="text-[11px] text-white/40">
+          <label className="col-span-2 text-sm text-white/50">
             날짜
             <input
               type="date"
               value={tradedAt}
               onChange={(event) => setTradedAt(event.target.value)}
-              className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none"
+              className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[15px] text-white outline-none"
             />
           </label>
-          <label className="text-[11px] text-white/40">
-            거래소
-            <select
-              value={exchange}
-              onChange={(event) => setExchange(event.target.value)}
-              className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none"
-            >
-              {COIN_EXCHANGES.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-[11px] text-white/40">
+          <label className="text-sm text-white/50">
             수량
             <input
               inputMode="decimal"
               value={qty}
-              onChange={(event) => setQty(event.target.value)}
-              className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none"
+              onChange={(event) => {
+                setAmountTouched(false)
+                setQty(event.target.value)
+              }}
+              className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[15px] text-white outline-none"
             />
           </label>
-          <label className="text-[11px] text-white/40">
+          <label className="text-sm text-white/50">
             단가
             <input
               inputMode="decimal"
               value={unitPrice}
-              onChange={(event) => setUnitPrice(event.target.value)}
-              className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none"
+              onChange={(event) => {
+                setAmountTouched(false)
+                setUnitPrice(event.target.value)
+              }}
+              className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[15px] text-white outline-none"
             />
           </label>
-          <label className="text-[11px] text-white/40">
+          <label className="text-sm text-white/50">
             수수료
             <input
               inputMode="decimal"
               value={fee}
-              onChange={(event) => setFee(event.target.value)}
-              className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none"
+              onChange={(event) => {
+                setAmountTouched(false)
+                setFee(event.target.value)
+              }}
+              className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[15px] text-white outline-none"
             />
           </label>
-          <label className="text-[11px] text-white/40">
+          <label className="text-sm text-white/50">
             투자금액
             <input
               inputMode="decimal"
@@ -760,7 +848,7 @@ function TradeSheet({
                 setAmountTouched(true)
                 setAmount(event.target.value)
               }}
-              className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none"
+              className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[15px] text-white outline-none"
             />
           </label>
         </div>
@@ -769,7 +857,7 @@ function TradeSheet({
           value={memo}
           onChange={(event) => setMemo(event.target.value)}
           placeholder="메모 (선택)"
-          className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none"
+          className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[15px] text-white outline-none"
         />
 
         <div
@@ -817,7 +905,7 @@ function TradeSheet({
         <button
           type="button"
           onClick={save}
-          className="mt-4 h-11 w-full rounded-xl bg-gold text-sm font-bold text-black"
+          className="mt-4 h-12 w-full rounded-xl bg-gold text-[15px] font-bold text-black"
         >
           저장
         </button>
