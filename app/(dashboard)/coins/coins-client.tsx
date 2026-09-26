@@ -110,11 +110,11 @@ async function readFiles(list: FileList | File[]) {
   return out
 }
 
-export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
+export function CoinsClient({ initial, initialPrices }: { initial: CoinPerson[]; initialPrices: CoinPriceMap }) {
   const [people, setPeople] = useState(initial)
   const [personId, setPersonId] = useState(initial[0]?.id ?? '')
-  const [prices, setPrices] = useState<CoinPriceMap>({})
-  const [openSymbol, setOpenSymbol] = useState(initial[0] ? '' : '')
+  const [prices, setPrices] = useState<CoinPriceMap>(initialPrices)
+  const [openSymbol, setOpenSymbol] = useState('')
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -141,11 +141,12 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
       void fetch(`/api/coins/markets?symbols=${symbols.join(',')}`, { cache: 'no-store', signal: ctrl.signal })
         .then((res) => res.json())
         .then((data) => {
-          if (data.prices) setPrices(data.prices)
+          if (data.prices) setPrices((prev) => ({ ...prev, ...data.prices }))
         })
         .catch(() => undefined)
     }
-    load()
+    const missing = symbols.some((symbol) => !initialPrices[symbol]?.krw)
+    if (missing) load()
     const id = window.setInterval(load, 20000)
     return () => {
       ctrl.abort()
@@ -155,18 +156,21 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
 
   const totals = holdings.reduce(
     (acc, item) => {
-      const price = prices[item.symbol]?.krw ?? 0
-      const value = item.qty * price
-      acc.value += value
+      const price = prices[item.symbol]?.krw
       acc.principal += item.principal
       acc.realized += item.realized
+      if (!price) return acc
+      const value = item.qty * price
+      acc.value += value
       acc.unrealized += value - item.principal
+      acc.priced += 1
       return acc
     },
-    { value: 0, principal: 0, realized: 0, unrealized: 0 },
+    { value: 0, principal: 0, realized: 0, unrealized: 0, priced: 0 },
   )
+  const pricesReady = holdings.length === 0 || totals.priced === holdings.length
   const totalPnl = totals.unrealized + totals.realized
-  const totalPct = totals.principal > 0 ? (totals.unrealized / totals.principal) * 100 : 0
+  const totalPct = totals.principal > 0 && pricesReady ? (totals.unrealized / totals.principal) * 100 : 0
 
   function applyPeople(next: CoinPerson[]) {
     setPeople(next)
@@ -302,15 +306,17 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
       <div className="rounded-2xl border border-white/10 bg-[#141418] p-4 sm:p-5">
         <p className="text-sm font-semibold text-white/50">총 자산</p>
         <p className="mt-1 break-keep text-[28px] font-bold leading-tight tracking-tight text-white sm:text-3xl">
-          {formatKrw(totals.value)}
+          {pricesReady ? formatKrw(totals.value) : '시세 확인 중'}
         </p>
         <div className="mt-3 grid grid-cols-1 gap-1.5 text-[15px] sm:flex sm:flex-wrap sm:gap-x-5 sm:gap-y-1 sm:text-sm">
           <span className="text-white/50">
             원금 <b className="ml-1 font-semibold text-white">{formatKrw(totals.principal)}</b>
           </span>
-          <span className={totalPnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]'}>
-            평가손익 <b className="ml-1">{formatKrw(totals.unrealized)}</b> {formatPct(totalPct)}
-          </span>
+          {pricesReady ? (
+            <span className={totalPnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]'}>
+              평가손익 <b className="ml-1">{formatKrw(totals.unrealized)}</b> {formatPct(totalPct)}
+            </span>
+          ) : null}
           <span className="text-white/50">
             실현손익 <b className="ml-1 text-white">{formatKrw(totals.realized)}</b>
           </span>
@@ -424,10 +430,12 @@ function CoinCard({
   onBuy: () => void
   onSell: () => void
 }) {
-  const price = prices[item.symbol]?.krw ?? 0
-  const value = item.qty * price
-  const pnl = value - item.principal
-  const pct = item.principal > 0 ? (pnl / item.principal) * 100 : 0
+  const quote = prices[item.symbol]
+  const price = quote?.krw ?? 0
+  const ready = Boolean(quote?.krw)
+  const value = ready ? item.qty * price : 0
+  const pnl = ready ? value - item.principal : 0
+  const pct = ready && item.principal > 0 ? (pnl / item.principal) * 100 : 0
 
   return (
     <div
@@ -451,7 +459,7 @@ function CoinCard({
               <p className="break-keep text-[15px] font-bold text-white">
                 {item.coinName} <span className="text-white/40">{item.symbol}</span>
               </p>
-              <LivePrice price={price} change={prices[item.symbol]?.change ?? 0} />
+              <LivePrice price={price} change={quote?.change ?? 0} />
             </div>
           </div>
           <div className="mt-3 space-y-2 sm:grid sm:grid-cols-3 sm:gap-2 sm:space-y-0">
@@ -470,11 +478,13 @@ function CoinCard({
         <div className="sm:ml-auto sm:text-right">
           <p className="text-sm font-semibold text-white/50 sm:text-xs sm:text-white/40">평가금액</p>
           <p className="mt-0.5 break-keep text-[26px] font-bold leading-tight tracking-tight text-white sm:text-3xl">
-            {price ? formatKrw(value) : '시세 없음'}
+            {ready ? formatKrw(value) : '시세 확인 중'}
           </p>
-          <p className={cn('mt-1 text-[15px] font-bold sm:text-base', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-            {formatKrw(pnl)} {formatPct(pct)}
-          </p>
+          {ready ? (
+            <p className={cn('mt-1 text-[15px] font-bold sm:text-base', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+              {formatKrw(pnl)} {formatPct(pct)}
+            </p>
+          ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-1.5">
             <button
               type="button"

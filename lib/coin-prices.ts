@@ -84,5 +84,10 @@ export async function fetchCoinPrices(symbols: string[]): Promise<CoinPriceMap> 
   } catch {
     /* keep whatever we already have */
   }
+  for (const symbol of unique) {
+    if (fresh[symbol]) continue
+    const stale = pricesCache.get(symbol)
+    if (stale) fresh[symbol] = stale.price
+  }
   return fresh
 }
