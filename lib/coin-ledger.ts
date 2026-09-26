@@ -54,6 +54,15 @@ export type CoinHolding = {
   trades: CoinTrade[]
 }
 
+export type CoinLedgerRow = {
+  trade: CoinTrade
+  signedQty: number
+  signedAmount: number
+  afterQty: number
+  afterPrincipal: number
+  afterAvg: number
+}
+
 export function exchangeLabel(id: string) {
   return COIN_EXCHANGES.find((item) => item.id === id)?.label ?? id
 }
@@ -74,6 +83,42 @@ export function stripPersonFiles(person: CoinPerson): CoinPerson {
   }
 }
 
+function sortTrades(trades: CoinTrade[]) {
+  return [...trades].sort((a, b) => {
+    const byDate = a.tradedAt.localeCompare(b.tradedAt)
+    return byDate || a.createdAt.localeCompare(b.createdAt)
+  })
+}
+
+export function runningLedger(trades: CoinTrade[]): CoinLedgerRow[] {
+  const sorted = sortTrades(trades)
+  let qty = 0
+  let principal = 0
+  return sorted.map((trade) => {
+    if (trade.side === 'buy') {
+      qty += trade.qty
+      principal += trade.amount
+    } else {
+      const sold = qty > 0 ? Math.min(trade.qty, qty) : 0
+      const avg = qty > 0 ? principal / qty : 0
+      principal -= avg * sold
+      qty -= sold
+    }
+    if (qty < 1e-12) {
+      qty = 0
+      principal = 0
+    }
+    return {
+      trade,
+      signedQty: trade.side === 'buy' ? trade.qty : -trade.qty,
+      signedAmount: trade.side === 'buy' ? trade.amount : -trade.amount,
+      afterQty: qty,
+      afterPrincipal: principal,
+      afterAvg: qty > 0 ? principal / qty : 0,
+    }
+  })
+}
+
 export function holdingsFromTrades(trades: CoinTrade[]): CoinHolding[] {
   const groups = new Map<string, CoinTrade[]>()
   for (const trade of trades) {
@@ -88,10 +133,7 @@ export function holdingsFromTrades(trades: CoinTrade[]): CoinHolding[] {
 }
 
 export function summarizeCoin(symbol: string, trades: CoinTrade[]): CoinHolding {
-  const sorted = [...trades].sort((a, b) => {
-    const byDate = a.tradedAt.localeCompare(b.tradedAt)
-    return byDate || a.createdAt.localeCompare(b.createdAt)
-  })
+  const sorted = sortTrades(trades)
   let qty = 0
   let principal = 0
   let realized = 0
@@ -157,6 +199,20 @@ export function formatQty(value: number) {
     maximumFractionDigits: digits,
     minimumFractionDigits: 0,
   }).format(value)
+}
+
+export function formatSignedKrw(value: number) {
+  const text = formatKrw(Math.abs(value))
+  if (value > 0) return `+${text}`
+  if (value < 0) return `-${text}`
+  return text
+}
+
+export function formatSignedQty(value: number) {
+  const text = formatQty(Math.abs(value))
+  if (value > 0) return `+${text}`
+  if (value < 0) return `-${text}`
+  return text
 }
 
 export function formatPct(value: number) {

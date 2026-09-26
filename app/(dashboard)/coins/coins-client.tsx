@@ -10,7 +10,10 @@ import {
   formatKrw,
   formatPct,
   formatQty,
+  formatSignedKrw,
+  formatSignedQty,
   holdingsFromTrades,
+  runningLedger,
   num,
   todayIso,
   type CoinPerson,
@@ -58,7 +61,6 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
   const [people, setPeople] = useState(initial)
   const [personId, setPersonId] = useState(initial[0]?.id ?? '')
   const [prices, setPrices] = useState<CoinPriceMap>({})
-  const [expanded, setExpanded] = useState<string | null>(null)
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -188,10 +190,7 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
           <button
             key={item.id}
             type="button"
-            onClick={() => {
-              setPersonId(item.id)
-              setExpanded(null)
-            }}
+            onClick={() => setPersonId(item.id)}
             className={cn(
               'rounded-full px-3 py-1.5 text-sm font-semibold',
               item.id === person?.id ? 'bg-gold text-black' : 'bg-white/8 text-white/70 hover:bg-white/12',
@@ -237,11 +236,11 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
             const value = item.qty * price
             const pnl = value - item.principal
             const pct = item.principal > 0 ? (pnl / item.principal) * 100 : 0
-            const open = expanded === item.symbol
+            const rows = runningLedger(item.trades)
             return (
               <div key={item.symbol} className="overflow-hidden rounded-2xl border border-white/10 bg-[#16161b]">
                 <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <button type="button" onClick={() => setExpanded(open ? null : item.symbol)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={logoUrl(item.symbol)} alt="" className="h-9 w-9 rounded-full bg-white/5 object-cover" />
                     <div className="min-w-0">
@@ -249,10 +248,10 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
                         {item.coinName} <span className="text-white/35">{item.symbol}</span>
                       </p>
                       <p className="text-[11px] text-white/40">
-                        {formatQty(item.qty)}개 · 평단 {formatKrw(item.avg)} · 원금 {formatKrw(item.principal)}
+                        최종 {formatQty(item.qty)}개 · 최종평단 {formatKrw(item.avg)} · 최종원금 {formatKrw(item.principal)}
                       </p>
                     </div>
-                  </button>
+                  </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-white">{price ? formatKrw(value) : '시세 없음'}</p>
                     <p className={cn('text-[11px]', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
@@ -277,52 +276,72 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
                     </button>
                   </div>
                 </div>
-                {open ? (
-                  <div className="border-t border-white/8 px-3 py-2">
-                    {item.trades.map((trade) => (
-                      <div key={trade.id} className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 text-xs text-white/75 hover:bg-white/4">
-                        <span className={trade.side === 'buy' ? 'text-[#25a750]' : 'text-[#ca3f64]'}>
-                          {trade.side === 'buy' ? '매수' : '매도'}
-                        </span>
-                        <span className="text-white/40">{trade.tradedAt}</span>
-                        <span>{formatQty(trade.qty)}</span>
-                        <span>{formatKrw(trade.unitPrice)}</span>
-                        <span className="font-semibold text-white">{formatKrw(trade.amount)}</span>
-                        <span className="text-white/40">{exchangeLabel(trade.exchange)}</span>
-                        {trade.files.length ? (
-                          <span className="flex items-center gap-1 text-white/40">
-                            <Paperclip className="h-3 w-3" />
-                            {trade.files.map((file) => (
-                              <button key={file.id} type="button" className="underline" onClick={() => void openFile(trade, file)}>
-                                {file.name}
-                              </button>
-                            ))}
-                          </span>
-                        ) : null}
-                        <span className="ml-auto flex gap-2">
-                          <button
-                            type="button"
-                            className="text-white/40 hover:text-white"
-                            onClick={() =>
-                              setSheet({
-                                side: trade.side,
-                                symbol: trade.symbol,
-                                coinName: trade.coinName,
-                                lockCoin: true,
-                                edit: trade,
-                              })
-                            }
-                          >
-                            수정
-                          </button>
-                          <button type="button" className="text-white/30 hover:text-red-300" onClick={() => void removeTrade(trade)}>
-                            삭제
-                          </button>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                <div className="overflow-x-auto border-t border-white/8">
+                  <table className="w-full min-w-[720px] text-left text-[11px]">
+                    <thead className="text-white/35">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">날짜</th>
+                        <th className="px-3 py-2 font-medium">수량</th>
+                        <th className="px-3 py-2 font-medium">투자금</th>
+                        <th className="px-3 py-2 font-medium">누적수량</th>
+                        <th className="px-3 py-2 font-medium">누적원금</th>
+                        <th className="px-3 py-2 font-medium">평단가</th>
+                        <th className="px-3 py-2 font-medium">메모</th>
+                        <th className="px-3 py-2 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.trade.id} className="border-t border-white/5 text-white/75 hover:bg-white/4">
+                          <td className="whitespace-nowrap px-3 py-2 text-white/45">{row.trade.tradedAt}</td>
+                          <td className={cn('px-3 py-2 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                            {formatSignedQty(row.signedQty)}
+                          </td>
+                          <td className={cn('px-3 py-2 font-semibold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                            {formatSignedKrw(row.signedAmount)}
+                          </td>
+                          <td className="px-3 py-2">{formatQty(row.afterQty)}</td>
+                          <td className="px-3 py-2">{formatKrw(row.afterPrincipal)}</td>
+                          <td className="px-3 py-2 font-semibold text-white">{formatKrw(row.afterAvg)}</td>
+                          <td className="max-w-[180px] truncate px-3 py-2 text-white/50" title={row.trade.memo}>
+                            {row.trade.memo || '—'}
+                            {row.trade.files.length ? (
+                              <span className="ml-1 inline-flex items-center gap-1">
+                                <Paperclip className="h-3 w-3" />
+                                {row.trade.files.map((file) => (
+                                  <button key={file.id} type="button" className="underline" onClick={() => void openFile(row.trade, file)}>
+                                    {file.name}
+                                  </button>
+                                ))}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right">
+                            <span className="text-white/30">{exchangeLabel(row.trade.exchange)}</span>
+                            <button
+                              type="button"
+                              className="ml-2 text-white/35 hover:text-white"
+                              onClick={() =>
+                                setSheet({
+                                  side: row.trade.side,
+                                  symbol: row.trade.symbol,
+                                  coinName: row.trade.coinName,
+                                  lockCoin: true,
+                                  edit: row.trade,
+                                })
+                              }
+                            >
+                              수정
+                            </button>
+                            <button type="button" className="ml-2 text-white/25 hover:text-red-300" onClick={() => void removeTrade(row.trade)}>
+                              삭제
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )
           })
