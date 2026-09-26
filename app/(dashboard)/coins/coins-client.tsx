@@ -71,23 +71,29 @@ function LivePrice({ price, change }: { price: number; change: number }) {
   return (
     <div
       className={cn(
-        'inline-flex max-w-full flex-nowrap items-center gap-1.5 rounded-lg px-2 py-1',
+        'inline-flex max-w-full flex-nowrap items-center gap-1',
         flash === 'up' && 'coin-price-flash-up',
         flash === 'down' && 'coin-price-flash-down',
       )}
     >
-      <span className="coin-live-dot h-2 w-2 shrink-0 rounded-full bg-[#25a750]" />
-      <span className="shrink-0 text-xs font-semibold tracking-wide text-white/45">LIVE</span>
-      <span key={price || 'empty'} className="coin-price-tick whitespace-nowrap text-lg font-bold text-white">
-        {price ? formatKrw(price) : '불러오는 중'}
+      <span className="coin-live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#25a750]" />
+      <span key={price || 'empty'} className="coin-price-tick whitespace-nowrap text-[13px] font-bold text-white sm:text-sm">
+        {price ? formatKrw(price) : '시세 확인 중'}
       </span>
       {price ? (
-        <span className={cn('whitespace-nowrap text-sm font-bold', change >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+        <span className={cn('whitespace-nowrap text-[12px] font-bold', change >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
           {formatPct(change)}
         </span>
       ) : null}
     </div>
   )
+}
+
+function formatKrwShort(value: number) {
+  const abs = Math.abs(value)
+  if (abs >= 100_000_000) return `${(value / 100_000_000).toFixed(2).replace(/\.?0+$/, '')}억`
+  if (abs >= 10_000_000) return `${Math.round(value / 10_000)}만`
+  return formatKrw(value)
 }
 
 async function readFiles(list: FileList | File[]) {
@@ -449,67 +455,68 @@ function CoinCard({
           onToggle()
         }
       }}
-      className={cn('cursor-pointer px-3 py-4 text-left sm:px-4', open ? 'bg-gold/5' : 'hover:bg-white/3')}
+      className={cn('cursor-pointer px-3 py-3 text-left sm:px-4', open ? 'bg-gold/5' : 'hover:bg-white/3')}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex items-start gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoUrl(item.symbol)} alt="" className="mt-0.5 h-9 w-9 shrink-0 rounded-full bg-white/5 object-cover" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl(item.symbol)} alt="" className="h-10 w-10 shrink-0 rounded-full bg-white/5 object-cover" />
-            <div className="min-w-0">
-              <p className="break-keep text-[15px] font-bold text-white">
-                {item.coinName} <span className="text-white/40">{item.symbol}</span>
-              </p>
-              <LivePrice price={price} change={quote?.change ?? 0} />
-            </div>
-          </div>
-          <div className="mt-3 space-y-2 sm:grid sm:grid-cols-3 sm:gap-2 sm:space-y-0">
-            {[
-              ['최종 수량', formatQty(item.qty)],
-              ['최종 평단', formatKrw(item.avg)],
-              ['최종 원금', formatKrw(item.principal)],
-            ].map(([label, val]) => (
-              <div key={label} className="flex items-center justify-between rounded-xl bg-white/6 px-3 py-2.5 sm:block sm:py-2">
-                <p className="text-sm font-semibold text-white/50 sm:text-[11px] sm:text-white/45">{label}</p>
-                <p className="text-[15px] font-bold text-white sm:mt-0.5 sm:text-sm">{val}</p>
-              </div>
-            ))}
-          </div>
+          <p className="truncate text-[15px] font-bold text-white">
+            {item.coinName} <span className="font-semibold text-white/35">{item.symbol}</span>
+          </p>
+          <LivePrice price={price} change={quote?.change ?? 0} />
         </div>
-        <div className="sm:ml-auto sm:text-right">
-          <p className="text-sm font-semibold text-white/50 sm:text-xs sm:text-white/40">평가금액</p>
-          <p className="mt-0.5 break-keep text-[26px] font-bold leading-tight tracking-tight text-white sm:text-3xl">
+        <div className="shrink-0 text-right">
+          <p className="whitespace-nowrap text-[17px] font-bold leading-tight text-white">
             {ready ? formatKrw(value) : '시세 확인 중'}
           </p>
           {ready ? (
-            <p className={cn('mt-1 text-[15px] font-bold sm:text-base', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-              {formatKrw(pnl)} {formatPct(pct)}
+            <p className={cn('mt-0.5 text-[13px] font-bold', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+              {formatPct(pct)} <span className="font-semibold opacity-80">{formatKrw(pnl)}</span>
             </p>
           ) : null}
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-1.5">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation()
-                onBuy()
-              }}
-              className="h-11 rounded-xl bg-[#25a750]/20 text-[15px] font-semibold text-[#25a750] sm:h-auto sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
-            >
-              매수
-            </button>
-            <button
-              type="button"
-              disabled={item.qty <= 0}
-              onClick={(event) => {
-                event.stopPropagation()
-                onSell()
-              }}
-              className="h-11 rounded-xl bg-[#ca3f64]/20 text-[15px] font-semibold text-[#ca3f64] disabled:opacity-30 sm:h-auto sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
-            >
-              매도
-            </button>
-          </div>
         </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl bg-white/[0.04]">
+        {[
+          { label: '수량', value: formatQty(item.qty), tone: 'border-white/35 text-white' },
+          { label: '평단', value: formatKrw(item.avg), tone: 'border-gold text-gold' },
+          { label: '원금', value: formatKrwShort(item.principal), tone: 'border-sky-300/70 text-sky-200', title: formatKrw(item.principal) },
+        ].map((stat, index) => (
+          <div
+            key={stat.label}
+            title={stat.title}
+            className={cn('border-t-2 px-2 py-2 text-center', stat.tone, index > 0 && 'border-l border-l-white/10')}
+          >
+            <p className="text-[15px] font-bold leading-tight tracking-tight">{stat.value}</p>
+            <p className="mt-0.5 text-[11px] font-semibold text-white/40">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onBuy()
+          }}
+          className="rounded-lg bg-[#25a750]/15 px-3 py-1.5 text-[13px] font-bold text-[#25a750]"
+        >
+          매수
+        </button>
+        <button
+          type="button"
+          disabled={item.qty <= 0}
+          onClick={(event) => {
+            event.stopPropagation()
+            onSell()
+          }}
+          className="rounded-lg bg-[#ca3f64]/15 px-3 py-1.5 text-[13px] font-bold text-[#ca3f64] disabled:opacity-30"
+        >
+          매도
+        </button>
       </div>
     </div>
   )
