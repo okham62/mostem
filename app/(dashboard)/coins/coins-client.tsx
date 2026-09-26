@@ -601,45 +601,60 @@ function TradeHistory({
                   </span>
                 </button>
               ) : null}
-              {open
-                ? monthRows.map((row) => (
-                    <div key={row.trade.id} className="mb-2 rounded-xl bg-white/6 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm text-white/50">{row.trade.tradedAt}</p>
-                        <ExchangeMark id={row.trade.exchange} />
-                      </div>
-                      <div className="mt-1.5 flex items-baseline justify-between gap-3">
-                        <span className={cn('text-[17px] font-bold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                          {formatSignedQty(row.signedQty)}개
-                        </span>
-                        <span className={cn('text-[15px] font-bold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                          {formatSignedKrw(row.signedAmount)}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-white/60">
-                        평단 {formatKrw(row.trade.unitPrice)} · 누적 {formatQty(row.afterQty)} · {formatKrw(row.afterAvg)}
-                      </p>
-                      {row.trade.memo ? <p className="mt-1 text-sm text-white/45">{row.trade.memo}</p> : null}
-                      {row.trade.files.length ? (
-                        <div className="mt-1 flex flex-wrap gap-2 text-sm text-white/55">
-                          {row.trade.files.map((file) => (
-                            <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
-                              {file.name}
-                            </button>
-                          ))}
+              {open ? (
+                <div className="overflow-hidden rounded-xl border border-white/10 bg-[#101014]">
+                  {monthRows.map((row, index) => {
+                    const buy = row.signedQty >= 0
+                    return (
+                      <div
+                        key={row.trade.id}
+                        className={cn(
+                          'border-l-[3px] px-3 py-2.5',
+                          buy ? 'border-l-[#25a750]' : 'border-l-[#ca3f64]',
+                          index > 0 && 'border-t border-t-white/10',
+                          index % 2 === 1 && 'bg-white/[0.03]',
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <p className="text-[12px] text-white/40">{row.trade.tradedAt.slice(5)}</p>
+                          <ExchangeMark id={row.trade.exchange} className="h-4 w-4 rounded p-0" />
+                          <span className={cn('ml-auto text-[15px] font-bold', buy ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                            {formatSignedQty(row.signedQty)}개
+                          </span>
                         </div>
-                      ) : null}
-                      <div className="mt-2 flex gap-4 text-[15px]">
-                        <button type="button" className="text-white/60" onClick={() => onEdit(row.trade)}>
-                          수정
-                        </button>
-                        <button type="button" className="text-red-300/80" onClick={() => onRemove(row.trade)}>
-                          삭제
-                        </button>
+                        <div className="mt-1 flex items-baseline justify-between gap-2">
+                          <p className="text-[12px] text-white/45">
+                            평단 {formatKrw(row.trade.unitPrice)}
+                            <span className="mx-1 text-white/20">·</span>
+                            누적 {formatQty(row.afterQty)}
+                          </p>
+                          <p className={cn('text-[13px] font-bold', buy ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                            {formatSignedKrw(row.signedAmount)}
+                          </p>
+                        </div>
+                        {row.trade.memo ? <p className="mt-1 text-[12px] text-white/40">{row.trade.memo}</p> : null}
+                        {row.trade.files.length ? (
+                          <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/50">
+                            {row.trade.files.map((file) => (
+                              <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
+                                {file.name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className="mt-1 flex gap-3 text-[12px]">
+                          <button type="button" className="text-white/35" onClick={() => onEdit(row.trade)}>
+                            수정
+                          </button>
+                          <button type="button" className="text-red-300/70" onClick={() => onRemove(row.trade)}>
+                            삭제
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))
-                : null}
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
           )
         })}
@@ -681,7 +696,7 @@ function TradeHistory({
                     </thead>
                     <tbody>
                       {monthRows.map((row) => (
-                        <tr key={row.trade.id} className="border-t border-white/5 text-white/80 hover:bg-white/4">
+                        <tr key={row.trade.id} className="border-t border-white/10 text-white/80 hover:bg-white/4">
                           <td className="whitespace-nowrap px-3 py-2.5 text-white/50">{row.trade.tradedAt}</td>
                           <td className={cn('px-3 py-2.5 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
                             {formatSignedQty(row.signedQty)}
