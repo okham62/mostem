@@ -5,6 +5,7 @@ import { MobileNav } from '@/components/layout/mobile-nav'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import { MarketTicker } from '@/components/layout/market-ticker'
 import { ActivityTracker } from '@/components/layout/activity-tracker'
+import { LastScreenTracker } from '@/components/layout/last-screen-tracker'
 import { AppSessionProvider } from '@/components/session-provider'
 import { ExtensionStatusBanner } from '@/components/layout/extension-status-banner'
 
@@ -29,7 +30,10 @@ export default async function DashboardLayout({
         <div className="hidden md:block">
           <MarketTicker />
         </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
+        <div
+          id="mostem-scroll"
+          className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0"
+        >
           <div className="sticky top-0 z-20 md:hidden">
             <MarketTicker />
           </div>
@@ -38,6 +42,7 @@ export default async function DashboardLayout({
       </main>
 
       <MobileNav session={session} />
+      <LastScreenTracker />
       <ActivityTracker />
     </AppChrome>
     </AppSessionProvider>

@@ -26,6 +26,7 @@ import {
   type CoinTradeSide,
 } from '@/lib/coin-ledger'
 import type { CoinMarket, CoinPriceMap } from '@/lib/coin-prices'
+import { readCoinsView, writeCoinsView } from '@/lib/last-screen'
 import { cn } from '@/lib/utils'
 
 type SheetState = {
@@ -125,14 +126,25 @@ export function CoinsClient({ initial, initialPrices }: { initial: CoinPerson[];
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [viewReady, setViewReady] = useState(false)
 
   const person = people.find((item) => item.id === personId) ?? people[0]
   const holdings = useMemo(() => holdingsFromTrades(person?.trades ?? []), [person])
   const symbolKey = holdings.map((item) => item.symbol).join(',')
 
   useEffect(() => {
-    setOpenSymbol('')
-  }, [personId])
+    const saved = readCoinsView()
+    if (saved?.personId && initial.some((item) => item.id === saved.personId)) {
+      setPersonId(saved.personId)
+    }
+    if (saved?.openSymbol) setOpenSymbol(saved.openSymbol)
+    setViewReady(true)
+  }, [initial])
+
+  useEffect(() => {
+    if (!viewReady) return
+    writeCoinsView({ personId, openSymbol })
+  }, [viewReady, personId, openSymbol])
 
   useEffect(() => {
     if (openSymbol && !holdings.some((item) => item.symbol === openSymbol)) {
@@ -286,7 +298,11 @@ export function CoinsClient({ initial, initialPrices }: { initial: CoinPerson[];
             <button
               key={item.id}
               type="button"
-              onClick={() => setPersonId(item.id)}
+              onClick={() => {
+                if (item.id === personId) return
+                setPersonId(item.id)
+                setOpenSymbol('')
+              }}
               className={cn(
                 'rounded-full px-3.5 py-2 text-[15px] font-semibold sm:py-1.5 sm:text-sm',
                 item.id === person?.id ? 'bg-gold text-black' : 'bg-white/8 text-white/70 hover:bg-white/12',
