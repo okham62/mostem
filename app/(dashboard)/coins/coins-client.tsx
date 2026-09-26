@@ -616,7 +616,7 @@ function TradeHistory({
                 >
                   <span className="text-[15px] font-bold text-white">{monthLabel(key)}</span>
                   <span className="flex items-center gap-2 text-sm text-white/50">
-                    {monthRows.length}건 · 누적 {formatQty(last.afterQty)}
+                    {monthRows.length}건
                     <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
                   </span>
                 </button>
@@ -644,9 +644,9 @@ function TradeHistory({
                         </div>
                         <div className="mt-1 flex items-baseline justify-between gap-2">
                           <p className="text-[12px] text-white/45">
-                            평단 {formatKrw(row.trade.unitPrice)}
+                            수량 {formatQty(row.trade.qty)}
                             <span className="mx-1 text-white/20">·</span>
-                            누적 {formatQty(row.afterQty)}
+                            평단 {formatKrw(row.trade.unitPrice)}
                           </p>
                           <p className={cn('text-[13px] font-bold', buy ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
                             {formatSignedKrw(row.signedAmount)}
