@@ -97,6 +97,10 @@ function formatKrwShort(value: number) {
   return formatKrw(value)
 }
 
+function formatPnl(amount: number, pct: number) {
+  return `${formatKrw(amount)} (${formatPct(pct)})`
+}
+
 async function readFiles(list: FileList | File[]) {
   const out: CoinTradeFile[] = []
   for (const file of [...list].slice(0, MAX_TRADE_FILES)) {
@@ -331,13 +335,13 @@ export function CoinsClient({ initial, initialPrices }: { initial: CoinPerson[];
         <p className="mt-1 break-keep text-[28px] font-bold leading-tight tracking-tight text-white sm:text-3xl">
           {pricesReady ? formatKrw(totals.value) : '시세 확인 중'}
         </p>
-        <div className="mt-3 grid grid-cols-1 gap-1.5 text-[15px] sm:flex sm:flex-wrap sm:gap-x-5 sm:gap-y-1 sm:text-sm">
+        <div className="mt-3 grid grid-cols-1 gap-1.5 text-[15px] sm:flex sm:flex-wrap sm:gap-x-7 sm:gap-y-1 sm:text-sm">
           <span className="text-white/50">
             원금 <b className="ml-1 font-semibold text-white">{formatKrw(totals.principal)}</b>
           </span>
           {pricesReady ? (
             <span className={totalPnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]'}>
-              평가손익 <b className="ml-1">{formatKrw(totals.unrealized)}</b> {formatPct(totalPct)}
+              평가손익 <b className="ml-1.5 font-semibold tracking-wide">{formatPnl(totals.unrealized, totalPct)}</b>
             </span>
           ) : null}
           <span className="text-white/50">
@@ -487,8 +491,8 @@ function CoinCard({
             {ready ? formatKrw(value) : '시세 확인 중'}
           </p>
           {ready ? (
-            <p className={cn('mt-0.5 text-[13px] font-bold', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-              {formatPct(pct)} <span className="font-semibold opacity-80">{formatKrw(pnl)}</span>
+            <p className={cn('mt-0.5 text-[13px] font-bold tracking-wide', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+              {formatPnl(pnl, pct)}
             </p>
           ) : null}
         </div>
