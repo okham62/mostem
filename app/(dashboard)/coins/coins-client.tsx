@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { Paperclip, Plus, X } from 'lucide-react'
+import { ChevronDown, Paperclip, Plus, X } from 'lucide-react'
 import {
   COIN_EXCHANGES,
   MAX_TRADE_FILE_BYTES,
@@ -19,6 +19,7 @@ import {
   todayIso,
   tradeAmount,
   type CoinHolding,
+  type CoinLedgerRow,
   type CoinPerson,
   type CoinTrade,
   type CoinTradeFile,
@@ -514,6 +515,26 @@ function CoinCard({
   )
 }
 
+function monthKey(date: string) {
+  return date.slice(0, 7)
+}
+
+function monthLabel(key: string) {
+  const [year, month] = key.split('-')
+  return `${year}년 ${Number(month)}월`
+}
+
+function groupLedgerByMonth(rows: CoinLedgerRow[]) {
+  const groups = new Map<string, CoinLedgerRow[]>()
+  for (const row of rows) {
+    const key = monthKey(row.trade.tradedAt)
+    const list = groups.get(key) ?? []
+    list.push(row)
+    groups.set(key, list)
+  }
+  return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a))
+}
+
 function TradeHistory({
   item,
   onEdit,
@@ -525,102 +546,177 @@ function TradeHistory({
   onRemove: (trade: CoinTrade) => void
   onOpenFile: (trade: CoinTrade, file: CoinTradeFile) => void
 }) {
+  const rows = useMemo(() => runningLedger(item.trades), [item.trades])
+  const groups = useMemo(() => groupLedgerByMonth(rows), [rows])
+  const latest = groups[0]?.[0] ?? ''
+  const [openMonths, setOpenMonths] = useState<string[]>(latest ? [latest] : [])
+
+  useEffect(() => {
+    setOpenMonths((prev) => (prev.includes(latest) || !latest ? prev : [latest, ...prev]))
+  }, [latest])
+
+  function toggleMonth(key: string) {
+    setOpenMonths((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
+  }
+
   return (
     <div className="border-t border-white/8 bg-black/20">
-      <div className="space-y-2 px-3 py-3 sm:hidden">
-        {runningLedger(item.trades).map((row) => (
-          <div key={row.trade.id} className="rounded-xl bg-white/6 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm text-white/50">{row.trade.tradedAt}</p>
-              <ExchangeMark id={row.trade.exchange} />
-            </div>
-            <div className="mt-1.5 flex items-baseline justify-between gap-3">
-              <span className={cn('text-[17px] font-bold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                {formatSignedQty(row.signedQty)}개
-              </span>
-              <span className={cn('text-[15px] font-bold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                {formatSignedKrw(row.signedAmount)}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-white/60">
-              평단 {formatKrw(row.trade.unitPrice)} · 누적 {formatQty(row.afterQty)} · {formatKrw(row.afterAvg)}
-            </p>
-            {row.trade.memo ? <p className="mt-1 text-sm text-white/45">{row.trade.memo}</p> : null}
-            {row.trade.files.length ? (
-              <div className="mt-1 flex flex-wrap gap-2 text-sm text-white/55">
-                {row.trade.files.map((file) => (
-                  <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
-                    {file.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <div className="mt-2 flex gap-4 text-[15px]">
-              <button type="button" className="text-white/60" onClick={() => onEdit(row.trade)}>
-                수정
-              </button>
-              <button type="button" className="text-red-300/80" onClick={() => onRemove(row.trade)}>
-                삭제
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="hidden overflow-x-auto border-t border-white/8 sm:block">
-        <table className="w-full min-w-[760px] text-left text-[13px]">
-          <thead className="text-white/40">
-            <tr>
-              <th className="px-3 py-2.5 font-medium">날짜</th>
-              <th className="px-3 py-2.5 font-medium">수량</th>
-              <th className="px-3 py-2.5 font-medium">평단</th>
-              <th className="px-3 py-2.5 font-medium">투자금</th>
-              <th className="px-3 py-2.5 font-medium">누적수량</th>
-              <th className="px-3 py-2.5 font-medium">누적원금</th>
-              <th className="px-3 py-2.5 font-medium">최종평단</th>
-              <th className="px-3 py-2.5 font-medium">메모</th>
-              <th className="px-3 py-2.5 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {runningLedger(item.trades).map((row) => (
-              <tr key={row.trade.id} className="border-t border-white/5 text-white/80 hover:bg-white/4">
-                <td className="whitespace-nowrap px-3 py-2.5 text-white/50">{row.trade.tradedAt}</td>
-                <td className={cn('px-3 py-2.5 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                  {formatSignedQty(row.signedQty)}
-                </td>
-                <td className="px-3 py-2.5 text-white">{formatKrw(row.trade.unitPrice)}</td>
-                <td className={cn('px-3 py-2.5 font-semibold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
-                  {formatSignedKrw(row.signedAmount)}
-                </td>
-                <td className="px-3 py-2.5">{formatQty(row.afterQty)}</td>
-                <td className="px-3 py-2.5">{formatKrw(row.afterPrincipal)}</td>
-                <td className="px-3 py-2.5 font-semibold text-white">{formatKrw(row.afterAvg)}</td>
-                <td className="max-w-[180px] truncate px-3 py-2.5 text-white/55" title={row.trade.memo}>
-                  {row.trade.memo || '—'}
-                  {row.trade.files.length ? (
-                    <span className="ml-1 inline-flex items-center gap-1">
-                      <Paperclip className="h-3.5 w-3.5" />
-                      {row.trade.files.map((file) => (
-                        <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
-                          {file.name}
+      {groups.length > 1 ? (
+        <div className="flex items-center justify-between px-3 py-2 sm:px-4">
+          <p className="text-xs text-white/40">최근 달만 열어 두었습니다. 이전 달은 눌러서 보세요.</p>
+          <button
+            type="button"
+            className="text-xs text-white/50 hover:text-white"
+            onClick={() =>
+              setOpenMonths((prev) => (prev.length === groups.length ? [latest] : groups.map(([key]) => key)))
+            }
+          >
+            {openMonths.length === groups.length ? '최근 달만' : '전체 펼치기'}
+          </button>
+        </div>
+      ) : null}
+      <div className="space-y-1 px-3 py-3 sm:hidden">
+        {groups.map(([key, monthRows]) => {
+          const open = openMonths.includes(key) || groups.length === 1
+          const last = monthRows[monthRows.length - 1]
+          return (
+            <div key={key}>
+              {groups.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => toggleMonth(key)}
+                  className="mb-2 flex w-full items-center justify-between rounded-xl bg-white/8 px-3 py-3 text-left"
+                >
+                  <span className="text-[15px] font-bold text-white">{monthLabel(key)}</span>
+                  <span className="flex items-center gap-2 text-sm text-white/50">
+                    {monthRows.length}건 · 누적 {formatQty(last.afterQty)}
+                    <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
+                  </span>
+                </button>
+              ) : null}
+              {open
+                ? monthRows.map((row) => (
+                    <div key={row.trade.id} className="mb-2 rounded-xl bg-white/6 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-white/50">{row.trade.tradedAt}</p>
+                        <ExchangeMark id={row.trade.exchange} />
+                      </div>
+                      <div className="mt-1.5 flex items-baseline justify-between gap-3">
+                        <span className={cn('text-[17px] font-bold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                          {formatSignedQty(row.signedQty)}개
+                        </span>
+                        <span className={cn('text-[15px] font-bold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                          {formatSignedKrw(row.signedAmount)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-white/60">
+                        평단 {formatKrw(row.trade.unitPrice)} · 누적 {formatQty(row.afterQty)} · {formatKrw(row.afterAvg)}
+                      </p>
+                      {row.trade.memo ? <p className="mt-1 text-sm text-white/45">{row.trade.memo}</p> : null}
+                      {row.trade.files.length ? (
+                        <div className="mt-1 flex flex-wrap gap-2 text-sm text-white/55">
+                          {row.trade.files.map((file) => (
+                            <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
+                              {file.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="mt-2 flex gap-4 text-[15px]">
+                        <button type="button" className="text-white/60" onClick={() => onEdit(row.trade)}>
+                          수정
                         </button>
+                        <button type="button" className="text-red-300/80" onClick={() => onRemove(row.trade)}>
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                : null}
+            </div>
+          )
+        })}
+      </div>
+      <div className="hidden sm:block">
+        {groups.map(([key, monthRows]) => {
+          const open = openMonths.includes(key) || groups.length === 1
+          const last = monthRows[monthRows.length - 1]
+          return (
+            <div key={key}>
+              {groups.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => toggleMonth(key)}
+                  className="flex w-full items-center justify-between border-t border-white/8 px-4 py-2.5 text-left hover:bg-white/4"
+                >
+                  <span className="text-sm font-bold text-white">{monthLabel(key)}</span>
+                  <span className="flex items-center gap-2 text-xs text-white/45">
+                    {monthRows.length}건 · 누적 {formatQty(last.afterQty)} · 평단 {formatKrw(last.afterAvg)}
+                    <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
+                  </span>
+                </button>
+              ) : null}
+              {open ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left text-[13px]">
+                    <thead className="text-white/40">
+                      <tr>
+                        <th className="px-3 py-2.5 font-medium">날짜</th>
+                        <th className="px-3 py-2.5 font-medium">수량</th>
+                        <th className="px-3 py-2.5 font-medium">평단</th>
+                        <th className="px-3 py-2.5 font-medium">투자금</th>
+                        <th className="px-3 py-2.5 font-medium">누적수량</th>
+                        <th className="px-3 py-2.5 font-medium">누적원금</th>
+                        <th className="px-3 py-2.5 font-medium">최종평단</th>
+                        <th className="px-3 py-2.5 font-medium">메모</th>
+                        <th className="px-3 py-2.5 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthRows.map((row) => (
+                        <tr key={row.trade.id} className="border-t border-white/5 text-white/80 hover:bg-white/4">
+                          <td className="whitespace-nowrap px-3 py-2.5 text-white/50">{row.trade.tradedAt}</td>
+                          <td className={cn('px-3 py-2.5 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                            {formatSignedQty(row.signedQty)}
+                          </td>
+                          <td className="px-3 py-2.5 text-white">{formatKrw(row.trade.unitPrice)}</td>
+                          <td className={cn('px-3 py-2.5 font-semibold', row.signedAmount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                            {formatSignedKrw(row.signedAmount)}
+                          </td>
+                          <td className="px-3 py-2.5">{formatQty(row.afterQty)}</td>
+                          <td className="px-3 py-2.5">{formatKrw(row.afterPrincipal)}</td>
+                          <td className="px-3 py-2.5 font-semibold text-white">{formatKrw(row.afterAvg)}</td>
+                          <td className="max-w-[180px] truncate px-3 py-2.5 text-white/55" title={row.trade.memo}>
+                            {row.trade.memo || '—'}
+                            {row.trade.files.length ? (
+                              <span className="ml-1 inline-flex items-center gap-1">
+                                <Paperclip className="h-3.5 w-3.5" />
+                                {row.trade.files.map((file) => (
+                                  <button key={file.id} type="button" className="underline" onClick={() => onOpenFile(row.trade, file)}>
+                                    {file.name}
+                                  </button>
+                                ))}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                            <ExchangeMark id={row.trade.exchange} className="inline-block align-middle" />
+                            <button type="button" className="ml-2 text-white/40 hover:text-white" onClick={() => onEdit(row.trade)}>
+                              수정
+                            </button>
+                            <button type="button" className="ml-2 text-white/30 hover:text-red-300" onClick={() => onRemove(row.trade)}>
+                              삭제
+                            </button>
+                          </td>
+                        </tr>
                       ))}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                  <ExchangeMark id={row.trade.exchange} className="inline-block align-middle" />
-                  <button type="button" className="ml-2 text-white/40 hover:text-white" onClick={() => onEdit(row.trade)}>
-                    수정
-                  </button>
-                  <button type="button" className="ml-2 text-white/30 hover:text-red-300" onClick={() => onRemove(row.trade)}>
-                    삭제
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
