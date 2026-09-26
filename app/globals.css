@@ -1103,3 +1103,31 @@ html[data-theme='dark'] .mostem-brand-mark {
     drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
 }
 
+@keyframes coin-live-dot {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 167, 80, 0.55); }
+  50% { opacity: 0.55; transform: scale(0.85); box-shadow: 0 0 0 5px rgba(37, 167, 80, 0); }
+}
+
+@keyframes coin-price-tick {
+  0% { transform: translateY(3px); opacity: 0.35; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.coin-live-dot {
+  animation: coin-live-dot 1.2s ease-in-out infinite;
+}
+
+.coin-price-tick {
+  animation: coin-price-tick 280ms ease-out;
+}
+
+.coin-price-flash-up {
+  animation: coin-price-tick 280ms ease-out;
+  background: rgba(37, 167, 80, 0.18);
+}
+
+.coin-price-flash-down {
+  animation: coin-price-tick 280ms ease-out;
+  background: rgba(202, 63, 100, 0.18);
+}
+

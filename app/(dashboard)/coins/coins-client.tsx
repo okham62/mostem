@@ -36,6 +36,43 @@ function logoUrl(symbol: string) {
   return `https://static.upbit.com/logos/${symbol.toUpperCase()}.png`
 }
 
+function LivePrice({ price, change }: { price: number; change: number }) {
+  const prev = useRef(price)
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null)
+
+  useEffect(() => {
+    if (!price || prev.current === price) {
+      if (price) prev.current = price
+      return
+    }
+    setFlash(price > prev.current ? 'up' : 'down')
+    prev.current = price
+    const id = window.setTimeout(() => setFlash(null), 800)
+    return () => window.clearTimeout(id)
+  }, [price])
+
+  return (
+    <div
+      className={cn(
+        'inline-flex items-center gap-2 rounded-lg px-2 py-1',
+        flash === 'up' && 'coin-price-flash-up',
+        flash === 'down' && 'coin-price-flash-down',
+      )}
+    >
+      <span className="coin-live-dot h-2 w-2 rounded-full bg-[#25a750]" />
+      <span className="text-[11px] font-semibold tracking-wide text-white/45">LIVE</span>
+      <span key={price || 'empty'} className="coin-price-tick text-base font-bold text-white">
+        {price ? formatKrw(price) : '불러오는 중'}
+      </span>
+      {price ? (
+        <span className={cn('text-sm font-bold', change >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+          {formatPct(change)}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 async function readFiles(list: FileList | File[]) {
   const out: CoinTradeFile[] = []
   for (const file of [...list].slice(0, MAX_TRADE_FILES)) {
@@ -265,52 +302,58 @@ export function CoinsClient({ initial }: { initial: CoinPerson[] }) {
             const rows = runningLedger(item.trades)
             return (
               <div key={item.symbol} className="overflow-hidden rounded-2xl border border-white/10 bg-[#16161b]">
-                <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logoUrl(item.symbol)} alt="" className="h-9 w-9 rounded-full bg-white/5 object-cover" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-white">
-                        {item.coinName} <span className="text-white/35">{item.symbol}</span>
-                      </p>
-                      <p className="text-[11px] text-white/40">
-                        최종 {formatQty(item.qty)}개 · 최종평단 {formatKrw(item.avg)} · 최종원금 {formatKrw(item.principal)}
-                      </p>
-                      <p className="mt-0.5 text-[12px] font-semibold text-white">
-                        업비트 현재가{' '}
-                        {price ? (
-                          <>
-                            {formatKrw(price)}{' '}
-                            <span className={change >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]'}>{formatPct(change)}</span>
-                          </>
-                        ) : (
-                          <span className="text-white/35">불러오는 중</span>
-                        )}
-                      </p>
+                <div className="flex flex-wrap items-start justify-between gap-4 px-4 py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={logoUrl(item.symbol)} alt="" className="h-10 w-10 rounded-full bg-white/5 object-cover" />
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-bold text-white">
+                          {item.coinName} <span className="text-white/35">{item.symbol}</span>
+                        </p>
+                        <LivePrice price={price} change={change} />
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="rounded-xl bg-white/6 px-3 py-2">
+                        <p className="text-[11px] font-semibold text-white/45">최종 수량</p>
+                        <p className="mt-0.5 text-sm font-bold text-white">{formatQty(item.qty)}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/6 px-3 py-2">
+                        <p className="text-[11px] font-semibold text-white/45">최종 평단</p>
+                        <p className="mt-0.5 text-sm font-bold text-white">{formatKrw(item.avg)}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/6 px-3 py-2">
+                        <p className="text-[11px] font-semibold text-white/45">최종 원금</p>
+                        <p className="mt-0.5 text-sm font-bold text-white">{formatKrw(item.principal)}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-white">{price ? formatKrw(value) : '시세 없음'}</p>
-                    <p className={cn('text-[11px]', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+                  <div className="ml-auto text-right">
+                    <p className="text-xs font-semibold text-white/40">평가금액</p>
+                    <p className="mt-0.5 text-3xl font-bold tracking-tight text-white">
+                      {price ? formatKrw(value) : '시세 없음'}
+                    </p>
+                    <p className={cn('mt-1 text-base font-bold', pnl >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
                       {formatKrw(pnl)} {formatPct(pct)}
                     </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setSheet({ side: 'buy', symbol: item.symbol, coinName: item.coinName, lockCoin: true })}
-                      className="rounded-lg bg-white/8 px-2.5 py-1.5 text-[11px] font-semibold text-white"
-                    >
-                      매수
-                    </button>
-                    <button
-                      type="button"
-                      disabled={item.qty <= 0}
-                      onClick={() => setSheet({ side: 'sell', symbol: item.symbol, coinName: item.coinName, lockCoin: true })}
-                      className="rounded-lg bg-white/8 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-30"
-                    >
-                      매도
-                    </button>
+                    <div className="mt-3 flex justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSheet({ side: 'buy', symbol: item.symbol, coinName: item.coinName, lockCoin: true })}
+                        className="rounded-lg bg-[#25a750]/20 px-3 py-1.5 text-xs font-semibold text-[#25a750]"
+                      >
+                        매수
+                      </button>
+                      <button
+                        type="button"
+                        disabled={item.qty <= 0}
+                        onClick={() => setSheet({ side: 'sell', symbol: item.symbol, coinName: item.coinName, lockCoin: true })}
+                        className="rounded-lg bg-[#ca3f64]/20 px-3 py-1.5 text-xs font-semibold text-[#ca3f64] disabled:opacity-30"
+                      >
+                        매도
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="overflow-x-auto border-t border-white/8">
