@@ -94,7 +94,7 @@ async function viaGemini(
 
   if (!res.ok) {
     const raw = await res.text().catch(() => '')
-    throw new AiError(`Gemini 오류 ${res.status}: ${geminiErrorMessage(raw)}`)
+    throw new AiError(geminiErrorMessage(res.status, raw))
   }
 
   const text = geminiText(await res.json())
@@ -118,13 +118,29 @@ function geminiText(payload: unknown) {
   return chunks.join('').trim()
 }
 
-function geminiErrorMessage(raw: string) {
-  let message = raw
+function geminiErrorMessage(status: number, raw: string) {
+  const text = scrubSecrets(raw)
+  const lower = text.toLowerCase()
+  if (
+    status === 402 ||
+    lower.includes('prepaid credits') ||
+    lower.includes('resource_exhausted') ||
+    lower.includes('quota')
+  ) {
+    return 'Gemini 크레딧이 소진되었습니다. Google AI Studio에서 결제·크레딧을 충전한 뒤 다시 생성해 주세요.'
+  }
+  if (status === 429) {
+    return 'Gemini 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'
+  }
+  if (status === 401 || status === 403) {
+    return 'Gemini 키가 거부되었습니다. 서버의 GEMINI_API_KEY를 확인해 주세요.'
+  }
   try {
     const parsed = JSON.parse(raw) as { error?: { message?: string; status?: string } }
-    message = parsed.error?.message || parsed.error?.status || raw
+    const message = parsed.error?.message || parsed.error?.status
+    if (message) return `Gemini 오류: ${scrubSecrets(message).slice(0, 160)}`
   } catch {
-    /* fall through to the raw body */
+    /* fall through */
   }
-  return scrubSecrets(message).slice(0, 200) || '자세한 사유가 없습니다.'
+  return `Gemini 오류 ${status}`
 }
