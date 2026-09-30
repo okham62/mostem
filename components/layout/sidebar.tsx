@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
   BookOpen,
@@ -49,11 +49,26 @@ function BlogIcon() {
   return <BrandMark id="blog" className="h-6 w-6" />
 }
 
-export const publish = [
+export type NavItem = {
+  href: string
+  label: string
+  icon: React.ElementType
+  children?: { href: string; label: string }[]
+}
+
+export const publish: NavItem[] = [
   { href: '/threads?status=collected', label: 'Threads', icon: ThreadsIcon },
   { href: '/instagram?status=collected', label: 'Instagram', icon: InstagramIcon },
   { href: '/tiktok?status=collected', label: 'TikTok', icon: TiktokIcon },
-  { href: '/blog?view=write', label: 'Blog', icon: BlogIcon },
+  {
+    href: '/blog?view=write',
+    label: 'Blog',
+    icon: BlogIcon,
+    children: [
+      { href: '/blog?view=write&lane=upload', label: '자동업로드' },
+      { href: '/blog?view=write&lane=write', label: '홈판글 / 일반글' },
+    ],
+  },
 ]
 
 export const tools = [
@@ -72,10 +87,12 @@ function NavGroup({
   items,
 }: {
   title: string
-  items: { href: string; label: string; icon: React.ElementType }[]
+  items: NavItem[]
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { activePath, mark } = useInstantNav()
+  const [openHref, setOpenHref] = useState<string | null>(null)
   return (
     <div className="mostem-sidebar-group">
       <div className="mostem-sidebar-group-head mb-2 flex items-center gap-2 px-3">
@@ -88,13 +105,23 @@ function NavGroup({
           const Icon = item.icon
           const itemPath = pathOf(item.href)
           const isActive = isNavActive(activePath, item.href)
+          const childOpen = Boolean(item.children) && (openHref === item.href || pathname === itemPath)
           return (
             <li key={item.href}>
               <Link
                 href={item.href}
                 prefetch
                 title={item.label}
-                onClick={() => {
+                onClick={(event) => {
+                  if (item.children) {
+                    const expanded =
+                      (event.currentTarget.closest('[data-expanded]') as HTMLElement | null)?.dataset.expanded === '1'
+                    if (expanded) {
+                      event.preventDefault()
+                      setOpenHref((cur) => (cur === item.href ? null : item.href))
+                      return
+                    }
+                  }
                   mark(item.href)
                   previewHideMarketTicker(itemPath === '/markets')
                   if (itemPath === '/keywords' || itemPath === '/news') warmRealtimeCache()
@@ -129,6 +156,23 @@ function NavGroup({
                 <Icon className="h-5 w-5 shrink-0" />
                 <span className="mostem-sidebar-label">{item.label}</span>
               </Link>
+              {childOpen && item.children ? (
+                <ul className="mostem-blog-sub mb-1 mt-0.5 space-y-0.5 pl-8">
+                  {item.children.map((child) => (
+                    <li key={child.href}>
+                      <Link
+                        href={child.href}
+                        prefetch
+                        title={child.label}
+                        onClick={() => mark(child.href)}
+                        className="mostem-sidebar-label block rounded-lg px-2 py-1.5 text-[13px] font-semibold text-white/70 hover:bg-white/10 hover:text-white"
+                      >
+                        {child.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </li>
           )
         })}

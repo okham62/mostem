@@ -23,7 +23,7 @@ import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
 import { warmTrendCache } from '@/lib/trend-cache'
 import { previewHideMarketTicker } from '@/components/layout/market-ticker'
-import { explore, publish, tools } from '@/components/layout/sidebar'
+import { explore, publish, tools, type NavItem } from '@/components/layout/sidebar'
 import type { Session } from 'next-auth'
 
 const PRIMARY = [
@@ -138,7 +138,11 @@ export function MobileNav({ session }: { session: Session | null }) {
                     <span className="h-px min-w-4 flex-1 bg-white/12" />
                   </div>
                   <ul className="grid grid-cols-2 gap-1.5">
-                    {group.items.map((item) => {
+                    {(group.items as NavItem[]).flatMap((item) =>
+                      item.children?.length
+                        ? item.children.map((child) => ({ ...item, href: child.href, label: child.label }))
+                        : [item]
+                    ).map((item) => {
                       const Icon = item.icon
                       const active = isNavActive(activePath, item.href)
                       return (

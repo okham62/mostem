@@ -166,6 +166,14 @@ html {
   pointer-events: auto;
 }
 
+.mostem-blog-sub {
+  display: none;
+}
+
+.mostem-sidebar-rail[data-expanded='1'] .mostem-blog-sub {
+  display: block;
+}
+
 .mostem-sidebar-rail[data-expanded='1'] .mostem-sidebar-link,
 .mostem-sidebar-rail[data-expanded='1'] .mostem-sidebar-user,
 .mostem-sidebar-rail[data-expanded='1'] .mostem-sidebar-signout {
