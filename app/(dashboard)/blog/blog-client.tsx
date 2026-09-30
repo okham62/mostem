@@ -52,6 +52,7 @@ type Preview = {
 }
 
 type WriteMode = 'seo' | 'home' | 'product'
+type BlogLane = 'write' | 'shop'
 type SubTab = 'write' | 'drafts' | 'folders' | 'ops'
 type HubView = 'dashboard' | 'write' | 'drafts' | 'folders' | 'ops'
 
@@ -89,9 +90,9 @@ const MODES: Array<{
   },
   {
     id: 'product',
-    title: '네이버블로그 쇼핑글 쓰기',
-    subtitle: '리뷰 · 상품',
-    hint: '쇼핑 베스트 상품을 골라 리뷰/추천 글을 만들거나, 상품 폴더 이미지로 작성합니다.',
+    title: '블로그 쇼핑글 자동업로드',
+    subtitle: '리뷰 · 상품 · 자동작성',
+    hint: '쇼핑 베스트 상품을 골라 리뷰글을 만들거나, 상품 폴더 이미지로 자동 업로드합니다.',
     icon: ShoppingBag,
     accent: 'from-amber-500/20 to-orange-600/10 border-amber-400/30',
   },
@@ -111,6 +112,9 @@ export function BlogClient() {
   const modeParam = searchParams.get('mode')
   const urlMode: WriteMode | null =
     modeParam === 'seo' || modeParam === 'home' || modeParam === 'product' ? modeParam : null
+  const laneParam = searchParams.get('lane')
+  const urlLane: BlogLane | null =
+    laneParam === 'shop' || urlMode === 'product' ? 'shop' : laneParam === 'write' ? 'write' : null
   const viewParam = searchParams.get('view')
   const urlView: HubView =
     viewParam === 'write' ||
@@ -168,13 +172,37 @@ export function BlogClient() {
     window.setTimeout(() => setToast(''), 2500)
   }
 
+  const selectLane = (next: BlogLane | null) => {
+    setPreview(null)
+    setSubTab('write')
+    setHubView('write')
+    if (next === 'shop') {
+      setMode('product')
+      startView(() => {
+        router.push('/blog?view=write&lane=shop&mode=product', { scroll: false })
+      })
+      return
+    }
+    setMode(null)
+    startView(() => {
+      router.push(next ? '/blog?view=write&lane=write' : '/blog?view=write', { scroll: false })
+    })
+  }
+
   const selectMode = (next: WriteMode | null) => {
     setPreview(null)
     setSubTab('write')
     setMode(next)
     setHubView('write')
+    if (!next) {
+      startView(() => {
+        router.push(urlLane === 'shop' ? '/blog?view=write' : '/blog?view=write&lane=write', { scroll: false })
+      })
+      return
+    }
+    const lane: BlogLane = next === 'product' ? 'shop' : 'write'
     startView(() => {
-      router.push(next ? `/blog?mode=${next}` : '/blog?view=write', { scroll: false })
+      router.push(`/blog?view=write&lane=${lane}&mode=${next}`, { scroll: false })
     })
   }
 
@@ -698,34 +726,80 @@ export function BlogClient() {
               </section>
 
               <div>
-                <h2 className="mb-3 text-sm font-semibold text-white/70">글감 · 글쓰기 방식</h2>
-                <div className="grid gap-4 md:grid-cols-3">
-                  {MODES.map((item) => {
-                    const Icon = item.icon
-                    const count = posts.filter((p) =>
-                      item.id === 'seo' ? p.mode === 'seo' || p.mode === 'folder' : p.mode === item.id
-                    ).length
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => selectMode(item.id)}
-                        className={cn(
-                          'flex min-h-[180px] flex-col rounded-3xl border bg-gradient-to-br p-5 text-left transition hover:scale-[1.01]',
-                          item.accent
-                        )}
-                      >
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                          <Icon className="h-6 w-6 text-white" />
-                        </div>
-                        <h3 className="text-lg font-bold text-white">{item.title}</h3>
-                        <p className="mt-1 text-xs font-semibold text-white/55">{item.subtitle}</p>
-                        <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">{item.hint}</p>
-                        <p className="mt-4 text-[11px] text-white/40">초안 {count}개 · 시작하기 →</p>
-                      </button>
-                    )
-                  })}
-                </div>
+                <h2 className="mb-3 text-sm font-semibold text-white/70">
+                  {urlLane === 'write' ? '블로그 글쓰기' : '시작'}
+                </h2>
+                {!urlLane ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => selectLane('write')}
+                      className="flex min-h-[180px] flex-col rounded-3xl border border-sky-400/30 bg-gradient-to-br from-sky-500/20 to-blue-600/10 p-5 text-left transition hover:scale-[1.01]"
+                    >
+                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                        <PenLine className="h-6 w-6 text-white" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">블로그 글쓰기</h3>
+                      <p className="mt-1 text-xs font-semibold text-white/55">일반글 · 홈판글</p>
+                      <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">
+                        키워드로 일반 검색글과 홈판 추천글을 씁니다.
+                      </p>
+                      <p className="mt-4 text-[11px] text-white/40">시작하기 →</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => selectLane('shop')}
+                      className="flex min-h-[180px] flex-col rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 to-orange-600/10 p-5 text-left transition hover:scale-[1.01]"
+                    >
+                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                        <ShoppingBag className="h-6 w-6 text-white" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">블로그 쇼핑글 자동업로드</h3>
+                      <p className="mt-1 text-xs font-semibold text-white/55">상품 리뷰 · 폴더 자동작성</p>
+                      <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">
+                        쇼핑 상품을 골라 리뷰글을 만들고, 폴더 이미지로 자동 업로드합니다.
+                      </p>
+                      <p className="mt-4 text-[11px] text-white/40">시작하기 →</p>
+                    </button>
+                  </div>
+                ) : urlLane === 'write' ? (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => selectLane(null)}
+                      className="inline-flex items-center gap-1 text-xs text-white/45 hover:text-white"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" /> 처음으로
+                    </button>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {MODES.filter((item) => item.id !== 'product').map((item) => {
+                        const Icon = item.icon
+                        const count = posts.filter((p) =>
+                          item.id === 'seo' ? p.mode === 'seo' || p.mode === 'folder' : p.mode === item.id
+                        ).length
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => selectMode(item.id)}
+                            className={cn(
+                              'flex min-h-[180px] flex-col rounded-3xl border bg-gradient-to-br p-5 text-left transition hover:scale-[1.01]',
+                              item.accent
+                            )}
+                          >
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                              <Icon className="h-6 w-6 text-white" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white">{item.title}</h3>
+                            <p className="mt-1 text-xs font-semibold text-white/55">{item.subtitle}</p>
+                            <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">{item.hint}</p>
+                            <p className="mt-4 text-[11px] text-white/40">초안 {count}개 · 시작하기 →</p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}

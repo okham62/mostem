@@ -53,7 +53,7 @@ export const publish = [
   { href: '/threads?status=collected', label: 'Threads', icon: ThreadsIcon },
   { href: '/instagram?status=collected', label: 'Instagram', icon: InstagramIcon },
   { href: '/tiktok?status=collected', label: 'TikTok', icon: TiktokIcon },
-  { href: '/blog', label: 'Blog', icon: BlogIcon },
+  { href: '/blog?view=write', label: 'Blog', icon: BlogIcon },
 ]
 
 export const tools = [
