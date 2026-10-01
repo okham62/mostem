@@ -1446,9 +1446,6 @@ export function BlogClient() {
                             className="w-full text-left"
                           >
                             <p className="text-sm font-semibold">{account.username || accountBlogId(account)}</p>
-                            <div className="mt-1">
-                              <NaverLinkMark status={linkStatus[account.id]} />
-                            </div>
                           </button>
                           <button
                             type="button"
