@@ -102,6 +102,7 @@ export async function POST(req: Request) {
       post,
       persistError,
       folderId: folderId || null,
+      files: images.map((image) => image.filename),
     })
   } catch (error) {
     return NextResponse.json(

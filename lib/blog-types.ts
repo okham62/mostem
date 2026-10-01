@@ -26,6 +26,7 @@ export type BlogImage = {
   url: string
   alt?: string
   source?: string
+  filename?: string
 }
 
 export type BlogTrendCard = {

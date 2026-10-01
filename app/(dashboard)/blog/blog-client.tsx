@@ -90,9 +90,9 @@ const MODES: Array<{
   },
   {
     id: 'product',
-    title: '네이버블로그 쇼핑글 쓰기',
-    subtitle: '리뷰 · 상품',
-    hint: '쇼핑 베스트 상품을 골라 리뷰/추천 글을 만들거나, 상품 폴더 이미지로 작성합니다.',
+    title: '네이버블로그 자동글쓰기',
+    subtitle: '폴더 · 제목 · 카테고리',
+    hint: '폴더, 제목 목록, 카테고리 공개 시간을 정한 뒤 이미지를 10장씩 올립니다.',
     icon: ShoppingBag,
     accent: 'from-amber-500/20 to-orange-600/10 border-amber-400/30',
   },
@@ -501,6 +501,26 @@ export function BlogClient() {
     ping(data.message || '큐에 등록됨')
   }
 
+  async function reuploadToAccount(folderId: string, uploadId: string, accountId: string) {
+    setBusyKey(`reupload:${uploadId}:${accountId}`)
+    setError('')
+    try {
+      const res = await fetch('/api/blog/reupload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId, uploadId, accountId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '재업로드 실패')
+      await loadFolders()
+      ping(data.message || '같은 글을 다른 계정으로 넣었습니다')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '재업로드 실패')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   async function addSchedule() {
     if (!catName.trim()) {
       setError('카테고리명을 입력하세요')
@@ -557,7 +577,7 @@ export function BlogClient() {
       .map((line) => line.trim())
       .filter(Boolean)
     if (mode === 'product' && titles.length === 0) {
-      setError('쇼핑글 제목 목록을 한 줄에 하나씩 입력하세요')
+      setError('제목 목록을 한 줄에 하나씩 입력하세요')
       return
     }
     setBusyKey('folder')
@@ -765,10 +785,10 @@ export function BlogClient() {
                       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
                         <ShoppingBag className="h-6 w-6 text-white" />
                       </div>
-                      <h3 className="text-lg font-bold text-white">네이버블로그 쇼핑글 쓰기</h3>
-                      <p className="mt-1 text-xs font-semibold text-white/55">리뷰 · 상품</p>
+                      <h3 className="text-lg font-bold text-white">네이버블로그 자동글쓰기</h3>
+                      <p className="mt-1 text-xs font-semibold text-white/55">폴더 · 상품</p>
                       <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">
-                        쇼핑 상품 글과 폴더 이미지 작성을 이 안에서 이어서 합니다.
+                        폴더 이미지를 올리고, 제목 목록과 카테고리 예약으로 글을 만듭니다.
                       </p>
                       <p className="mt-4 text-[11px] text-white/40">선택하면 상세 작업 →</p>
                     </button>
@@ -1011,14 +1031,15 @@ export function BlogClient() {
         )}
       </div>
 
+      {mode !== 'product' ? (
       <div className="flex flex-wrap gap-2">
         {(
           [
-            ['write', mode === 'product' ? '쇼핑에서 쓰기' : '키워드로 쓰기'],
-            ['drafts', '초안'],
-            ['folders', '폴더 이미지'],
-            ['ops', mode === 'product' ? '카테고리 On/Off' : '운영'],
-          ] as const
+            ['write', '키워드로 쓰기'] as const,
+            ['drafts', '초안'] as const,
+            ['folders', '폴더 이미지'] as const,
+            ['ops', '운영'] as const,
+          ]
         ).map(([id, label]) => (
           <button
             key={id}
@@ -1033,6 +1054,7 @@ export function BlogClient() {
           </button>
         ))}
       </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -1105,24 +1127,6 @@ export function BlogClient() {
             })}
           </div>
         )
-      ) : null}
-
-      {subTab === 'write' && mode === 'product' ? (
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6">
-          <h3 className="text-base font-bold text-white">쇼핑 베스트에서 상품 고르기</h3>
-          <p className="mt-2 text-sm text-white/50">
-            네이버 쇼핑 급상승·인기 상품을 보고 「블로그 초안」을 누르면 쇼핑글 모드로 초안이 만들어집니다.
-          </p>
-          <Link
-            href="/shopping"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/30"
-          >
-            <ShoppingBag className="h-4 w-4" /> 쇼핑 베스트 열기
-          </Link>
-          <p className="mt-4 text-xs text-white/35">
-            상품 사진만으로 쓰고 싶다면 「폴더 이미지」 탭에 로컬 경로를 등록하세요.
-          </p>
-        </div>
       ) : null}
 
       {subTab === 'drafts' ? (
@@ -1217,12 +1221,12 @@ export function BlogClient() {
         </div>
       ) : null}
 
-      {subTab === 'folders' ? (
+      {subTab === 'folders' || mode === 'product' ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                <FolderOpen className="h-4 w-4" /> 로컬 폴더 이미지 → AI 글
+                <FolderOpen className="h-4 w-4" /> {mode === 'product' ? '1. 폴더 선택' : '로컬 폴더 이미지 → AI 글'}
               </div>
               <span
                 className={cn(
@@ -1270,6 +1274,8 @@ export function BlogClient() {
               className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
             />
             {mode === 'product' ? (
+              <>
+              <p className="text-sm font-semibold text-white">2. 제목 선택</p>
               <textarea
                 value={folderTitles}
                 onChange={(e) => setFolderTitles(e.target.value)}
@@ -1277,6 +1283,8 @@ export function BlogClient() {
                 rows={8}
                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
+              <p className="text-[11px] text-white/35">한 번 쓴 제목과 이미지는 다음 자동 업로드에서 다시 고르지 않습니다.</p>
+              </>
             ) : null}
           </div>
           <div className="space-y-2">
@@ -1326,11 +1334,11 @@ export function BlogClient() {
         </div>
       ) : null}
 
-      {subTab === 'ops' ? (
+      {subTab === 'ops' || mode === 'product' ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <CalendarClock className="h-4 w-4" /> 네이버 카테고리 On/Off
+              <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '3. 카테고리 On/Off' : '네이버 카테고리 On/Off'}
             </div>
             <p className="text-xs text-white/40">
               예: 금 17:00 공개 → 일 21:00 비공개. 예약 시각에 PC + 로컬 에이전트가 켜져 있어야 합니다.
@@ -1444,6 +1452,7 @@ export function BlogClient() {
             </div>
           </div>
 
+          {mode === 'product' ? null : (
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <Settings2 className="h-4 w-4" /> 계정 · 로컬 에이전트
@@ -1559,7 +1568,78 @@ export function BlogClient() {
               개인정보처리방침 <ExternalLink className="h-3 w-3" />
             </a>
           </div>
+          )}
         </div>
+      ) : null}
+
+      {mode === 'product' ? (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-white">업로드 기록</h2>
+          {modeFolders.flatMap((folder) => {
+            const uploads = Array.isArray(folder.meta?.uploads) ? folder.meta.uploads : []
+            return uploads.map((item) => ({ folder, item: item as Record<string, unknown> }))
+          }).length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
+              아직 올린 글이 없습니다. 폴더를 등록하면 사용한 제목과 이미지가 여기에 남습니다.
+            </div>
+          ) : (
+            modeFolders.flatMap((folder) => {
+              const uploads = Array.isArray(folder.meta?.uploads) ? folder.meta.uploads : []
+              return uploads.map((raw) => {
+                const item = raw as Record<string, unknown>
+                const uploadId = String(item.id || '')
+                const files = Array.isArray(item.files) ? item.files.map((name) => String(name)) : []
+                const sent = Array.isArray(item.accounts) ? item.accounts : []
+                const sentIds = new Set(
+                  sent.map((account) => String((account as Record<string, unknown>).accountId || ''))
+                )
+                return (
+                  <article
+                    key={`${folder.id}:${uploadId}`}
+                    className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h3 className="text-sm font-bold text-white">{String(item.title || '제목 없음')}</h3>
+                      <p className="text-[11px] text-white/35">
+                        {item.at ? new Date(String(item.at)).toLocaleString('ko-KR') : ''}
+                      </p>
+                    </div>
+                    {item.excerpt ? (
+                      <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-white/55">{String(item.excerpt)}</p>
+                    ) : null}
+                    <p className="mt-2 text-[11px] text-white/40">이미지 {files.length}장 · {files.join(', ') || '기록 없음'}</p>
+                    <p className="mt-1 text-[11px] text-white/40">
+                      올린 계정:{' '}
+                      {sent.length
+                        ? sent.map((account) => String((account as Record<string, unknown>).name || '')).join(', ')
+                        : '아직 없음'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {naverAccounts.length === 0 ? (
+                        <p className="text-[11px] text-white/35">네이버 계정을 추가하면 그 계정으로 다시 올릴 수 있습니다.</p>
+                      ) : (
+                        naverAccounts.map((account) => {
+                          const done = sentIds.has(account.id)
+                          return (
+                            <button
+                              key={account.id}
+                              type="button"
+                              disabled={done || Boolean(busyKey)}
+                              onClick={() => void reuploadToAccount(folder.id, uploadId, account.id)}
+                              className="rounded-lg bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
+                            >
+                              {done ? `${account.username}에 올림` : `${account.username}으로 재업로드`}
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </article>
+                )
+              })
+            })
+          )}
+        </section>
       ) : null}
     </div>
   )

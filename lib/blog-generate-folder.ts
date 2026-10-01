@@ -249,6 +249,7 @@ export async function generateFolderArticle(input: {
     url,
     alt: descriptions[index]?.slice(0, 80) || `이미지 ${index + 1}`,
     source: 'folder',
+    filename: input.images[index]?.filename,
   }))
 
   const parsed = parseArticle(raw, input.fixedTitle || input.topic)

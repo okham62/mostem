@@ -141,18 +141,29 @@ async function processFolders(
     const files = listStableImages(dir)
     if (files.length < 1) continue
     const shopping = folder.mode === 'product'
+    const usedFiles = new Set(
+      Array.isArray(folder.meta?.usedFiles) ? folder.meta.usedFiles.map((name) => String(name)) : []
+    )
     const offset = shopping ? Math.max(0, Number(folder.meta?.imageOffset) || 0) : 0
-    const slice = shopping ? files.slice(offset, offset + SHOP_BATCH) : files
+    if (shopping && usedFiles.size === 0 && offset > 0) {
+      files.slice(0, offset).forEach((file) => usedFiles.add(file.name))
+    }
+    const usedTitles = new Set(
+      Array.isArray(folder.meta?.usedTitles) ? folder.meta.usedTitles.map((title) => String(title)) : []
+    )
+    const titles = titleLines(folder.meta).filter((title) => !usedTitles.has(title))
+    if (shopping && titleLines(folder.meta).length > 0 && titles.length === 0) continue
+    const remaining = shopping ? files.filter((file) => !usedFiles.has(file.name)) : files
+    const slice = shopping ? remaining.slice(0, SHOP_BATCH) : files
     if (!slice.length) continue
-    const key = shopping ? `${offset}:${batchKey(slice)}` : batchKey(files)
+    const key = shopping ? batchKey(slice) : batchKey(files)
     if (folder.last_batch_key && folder.last_batch_key === key) continue
 
-    console.log(`[folder] ${dir} → ${slice.length} images @ ${offset}`)
+    console.log(`[folder] ${dir} → ${slice.length} new images`)
     const form = new FormData()
     form.set('topic', folder.label || path.basename(dir))
     form.set('mode', folder.mode || 'folder')
     form.set('folderId', folder.id)
-    const titles = titleLines(folder.meta)
     if (titles.length) form.set('titles', titles.join('\n'))
     for (const file of slice) {
       const buf = fs.readFileSync(file.abs)
@@ -179,7 +190,11 @@ async function processFolders(
           action: 'folder-ack',
           folderId: folder.id,
           batchKey: key,
-          imageOffset: shopping ? offset + slice.length : undefined,
+          imageOffset: shopping ? usedFiles.size + slice.length : undefined,
+          usedFiles: shopping ? [...usedFiles, ...slice.map((file) => file.name)] : undefined,
+          usedTitle: shopping ? String(data.article?.title || '') : undefined,
+          excerpt: shopping ? String(data.article?.bodyMarkdown || '').replace(/!\[[^\]]*\]\([^)]+\)/g, '').slice(0, 240) : undefined,
+          postId: shopping ? data.post?.id || null : undefined,
         }),
       })
     } catch (error) {

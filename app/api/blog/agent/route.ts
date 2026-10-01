@@ -100,6 +100,27 @@ export async function POST(req: Request) {
       if (typeof body.imageOffset === 'number' && Number.isFinite(body.imageOffset)) {
         meta.imageOffset = Math.max(0, Math.floor(body.imageOffset))
       }
+      if (Array.isArray(body.usedFiles) && body.usedFiles.length > 0) {
+        const files = body.usedFiles.map((name) => String(name).trim()).filter(Boolean)
+        const prevFiles = Array.isArray(meta.usedFiles) ? meta.usedFiles.map((name) => String(name)) : []
+        meta.usedFiles = [...new Set([...prevFiles, ...files])]
+        const title = typeof body.usedTitle === 'string' ? body.usedTitle.trim() : ''
+        if (title) {
+          const prevTitles = Array.isArray(meta.usedTitles) ? meta.usedTitles.map((item) => String(item)) : []
+          if (!prevTitles.includes(title)) meta.usedTitles = [...prevTitles, title]
+        }
+        const uploads = Array.isArray(meta.uploads) ? [...meta.uploads] : []
+        uploads.unshift({
+          id: crypto.randomUUID(),
+          at: new Date().toISOString(),
+          title,
+          excerpt: typeof body.excerpt === 'string' ? body.excerpt.slice(0, 240) : '',
+          files,
+          postId: typeof body.postId === 'string' ? body.postId : null,
+          accounts: [],
+        })
+        meta.uploads = uploads.slice(0, 100)
+      }
       await updateFolderWatcher(userId, folderId, {
         last_scan_at: new Date().toISOString(),
         last_batch_key: typeof body.batchKey === 'string' ? body.batchKey : null,
