@@ -1433,9 +1433,7 @@ export function BlogClient() {
                             onClick={() => setUploadAccountId(account.id)}
                             className="w-full text-left"
                           >
-                            <p className="text-sm font-semibold">{account.username || account.site_url}</p>
-                            <p className="text-[11px] opacity-70">{account.site_url}</p>
-                            <p className="text-[11px] opacity-70">{account.hasPassword ? '비밀번호 저장됨' : '비밀번호 없음'}</p>
+                            <p className="text-sm font-semibold">{account.username || accountBlogId(account)}</p>
                             <div className="mt-1">
                               <NaverLinkMark status={linkStatus[account.id]} />
                             </div>
