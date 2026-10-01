@@ -801,7 +801,12 @@ export function BlogClient() {
                     value={naverLoginId}
                     onChange={(e) => setNaverLoginId(e.target.value)}
                     placeholder="네이버 아이디"
-                    autoComplete="username"
+                    name="mostem-naver-login-id"
+                    autoComplete="off"
+                    readOnly
+                    onFocus={(e) => {
+                      e.currentTarget.readOnly = false
+                    }}
                     className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
                   />
                   <input
@@ -809,7 +814,12 @@ export function BlogClient() {
                     onChange={(e) => setNaverPassword(e.target.value)}
                     placeholder="비밀번호"
                     type="password"
-                    autoComplete="current-password"
+                    name="mostem-naver-login-secret"
+                    autoComplete="new-password"
+                    readOnly
+                    onFocus={(e) => {
+                      e.currentTarget.readOnly = false
+                    }}
                     className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
                   />
                   <input
@@ -1343,7 +1353,12 @@ export function BlogClient() {
                       value={naverLoginId}
                       onChange={(e) => setNaverLoginId(e.target.value)}
                       placeholder="네이버 아이디"
-                      autoComplete="username"
+                      name="mostem-naver-login-id"
+                      autoComplete="off"
+                      readOnly
+                      onFocus={(e) => {
+                        e.currentTarget.readOnly = false
+                      }}
                       className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
                     />
                     <input
@@ -1351,7 +1366,12 @@ export function BlogClient() {
                       onChange={(e) => setNaverPassword(e.target.value)}
                       placeholder="비밀번호"
                       type="password"
-                      autoComplete="current-password"
+                      name="mostem-naver-login-secret"
+                      autoComplete="new-password"
+                      readOnly
+                      onFocus={(e) => {
+                        e.currentTarget.readOnly = false
+                      }}
                       className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
                     />
                     <input
@@ -1375,24 +1395,35 @@ export function BlogClient() {
                     {naverAccounts.map((account) => {
                       const selected = account.id === uploadAccountId
                       return (
-                        <button
+                        <div
                           key={account.id}
-                          type="button"
-                          onClick={() => setUploadAccountId(account.id)}
                           className={cn(
-                            'rounded-xl border px-3 py-2 text-left',
+                            'min-w-[180px] rounded-xl border px-3 py-2 text-left',
                             selected
                               ? 'border-gold/50 bg-gold/15 text-gold'
-                              : 'border-white/10 bg-black/20 text-white/70 hover:bg-white/5'
+                              : 'border-white/10 bg-black/20 text-white/70'
                           )}
                         >
-                          <p className="text-sm font-semibold">{account.username || account.site_url}</p>
-                          <p className="text-[11px] opacity-70">{account.site_url}</p>
-                          <p className="text-[11px] opacity-70">{account.hasPassword ? '비밀번호 저장됨' : '비밀번호 없음'}</p>
-                          <div className="mt-1">
-                            <NaverLinkMark status={linkStatus[account.id]} />
-                          </div>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setUploadAccountId(account.id)}
+                            className="w-full text-left"
+                          >
+                            <p className="text-sm font-semibold">{account.username || account.site_url}</p>
+                            <p className="text-[11px] opacity-70">{account.site_url}</p>
+                            <p className="text-[11px] opacity-70">{account.hasPassword ? '비밀번호 저장됨' : '비밀번호 없음'}</p>
+                            <div className="mt-1">
+                              <NaverLinkMark status={linkStatus[account.id]} />
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void removeAccount(account.id)}
+                            className="mt-2 rounded-lg px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/15"
+                          >
+                            연동 삭제
+                          </button>
+                        </div>
                       )
                     })}
                   </div>
@@ -1659,7 +1690,12 @@ export function BlogClient() {
                 value={naverLoginId}
                 onChange={(e) => setNaverLoginId(e.target.value)}
                 placeholder="네이버 아이디"
-                autoComplete="username"
+                name="mostem-naver-login-id"
+                autoComplete="off"
+                readOnly
+                onFocus={(e) => {
+                  e.currentTarget.readOnly = false
+                }}
                 className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
               <input
@@ -1667,7 +1703,12 @@ export function BlogClient() {
                 onChange={(e) => setNaverPassword(e.target.value)}
                 placeholder="비밀번호"
                 type="password"
-                autoComplete="current-password"
+                name="mostem-naver-login-secret"
+                autoComplete="new-password"
+                readOnly
+                onFocus={(e) => {
+                  e.currentTarget.readOnly = false
+                }}
                 className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
               <input
