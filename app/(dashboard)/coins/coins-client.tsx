@@ -605,7 +605,6 @@ function TradeHistory({
       <div className="space-y-1 px-3 py-3 lg:hidden">
         {groups.map(([key, monthRows]) => {
           const open = openMonths.includes(key) || groups.length === 1
-          const last = monthRows[monthRows.length - 1]
           return (
             <div key={key}>
               {groups.length > 1 ? (
