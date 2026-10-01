@@ -178,7 +178,6 @@ export function BlogClient() {
   const [folderPath, setFolderPath] = useState('')
   const [folderLabel, setFolderLabel] = useState('')
   const [pickingFolder, setPickingFolder] = useState(false)
-  const [agentOnline, setAgentOnline] = useState<boolean | null>(null)
 
   const ping = (msg: string) => {
     setToast(msg)
@@ -303,25 +302,6 @@ export function BlogClient() {
     void loadFolders()
   }, [loadTrends, loadPosts, loadAccounts, loadSchedules, loadFolders])
 
-  useEffect(() => {
-    let alive = true
-    async function pingAgent() {
-      try {
-        const res = await fetch('http://127.0.0.1:39217/health', { cache: 'no-store' })
-        if (!alive) return
-        setAgentOnline(res.ok)
-      } catch {
-        if (alive) setAgentOnline(false)
-      }
-    }
-    void pingAgent()
-    const timer = window.setInterval(() => void pingAgent(), 8000)
-    return () => {
-      alive = false
-      window.clearInterval(timer)
-    }
-  }, [])
-
   const AGENT_PICKER = 'http://127.0.0.1:39217/pick-folder'
 
   async function pickLocalFolder() {
@@ -340,13 +320,9 @@ export function BlogClient() {
         const parts = String(data.path).replace(/[\\/]+$/, '').split(/[\\/]/)
         setFolderLabel(parts[parts.length - 1] || '')
       }
-      setAgentOnline(true)
       ping('폴더가 선택되었습니다')
     } catch {
-      setAgentOnline(false)
-      setError(
-        '로컬 에이전트가 꺼져 있습니다. PC에서 workers/blog-agent 를 실행한 뒤 「폴더 찾아보기」를 다시 눌러 주세요.'
-      )
+      setError('')
     } finally {
       setPickingFolder(false)
     }
@@ -1227,14 +1203,6 @@ export function BlogClient() {
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
                 <FolderOpen className="h-4 w-4" /> {mode === 'product' ? '1. 폴더 선택' : '로컬 폴더 이미지 → AI 글'}
               </div>
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                  agentOnline ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/8 text-white/40'
-                )}
-              >
-                {agentOnline == null ? '에이전트 확인 중' : agentOnline ? '에이전트 연결됨' : '에이전트 꺼짐'}
-              </span>
             </div>
             <p className="text-xs text-white/40">
               {mode === 'product'
