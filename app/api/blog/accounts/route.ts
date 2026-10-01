@@ -95,12 +95,16 @@ export async function POST(req: Request) {
   }
 
   // Naver / Tistory: unlimited accounts — always insert a new row per blogId
-  const blogId = normalizeNaverBlogId(blogIdRaw || site_url || username)
+  const loginId = username
+  const blogId = normalizeNaverBlogId(blogIdRaw || site_url || loginId)
+  if (provider === 'naver' && (!loginId || !app_password)) {
+    return NextResponse.json({ error: '네이버 아이디와 비밀번호가 필요합니다' }, { status: 400 })
+  }
   if (!blogId) {
-    return NextResponse.json({ error: 'blogId(블로그 아이디)가 필요합니다' }, { status: 400 })
+    return NextResponse.json({ error: '블로그 아이디가 필요합니다' }, { status: 400 })
   }
   site_url = provider === 'naver' ? `https://blog.naver.com/${blogId}` : site_url || `https://${blogId}`
-  const displayName = username || blogId
+  const displayName = loginId || blogId
 
   try {
     const account = await insertBlogAccount({
@@ -109,7 +113,7 @@ export async function POST(req: Request) {
       site_url,
       username: displayName,
       app_password: app_password || '',
-      meta: { blogId },
+      meta: { blogId, loginId },
     })
     return NextResponse.json({
       ok: true,
@@ -123,6 +127,12 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : '저장 실패'
+    if (/schema cache|Could not find the table/i.test(message)) {
+      return NextResponse.json(
+        { error: '계정 저장 테이블이 아직 없습니다. Supabase에서 blog_hub.sql을 실행해 주세요.' },
+        { status: 500 }
+      )
+    }
     const status = message.includes('이미 등록') ? 409 : 500
     return NextResponse.json({ error: message }, { status })
   }

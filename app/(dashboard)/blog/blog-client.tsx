@@ -197,7 +197,8 @@ export function BlogClient() {
   const [wpUrl, setWpUrl] = useState('')
   const [wpUser, setWpUser] = useState('')
   const [wpPass, setWpPass] = useState('')
-  const [naverUser, setNaverUser] = useState('')
+  const [naverLoginId, setNaverLoginId] = useState('')
+  const [naverPassword, setNaverPassword] = useState('')
   const [naverBlogId, setNaverBlogId] = useState('')
   const [savingAccount, setSavingAccount] = useState(false)
 
@@ -471,9 +472,11 @@ export function BlogClient() {
   }
 
   async function saveNaverAccount() {
-    const blogId = naverBlogId.trim()
-    if (!blogId) {
-      setError('네이버 blogId를 입력하세요 (계정 개수 제한 없음)')
+    const loginId = naverLoginId.trim()
+    const password = naverPassword
+    const blogId = naverBlogId.trim() || loginId
+    if (!loginId || !password) {
+      setError('네이버 아이디와 비밀번호를 입력하세요')
       return
     }
     setSavingAccount(true)
@@ -485,13 +488,15 @@ export function BlogClient() {
         body: JSON.stringify({
           provider: 'naver',
           blogId,
-          username: naverUser.trim() || blogId,
+          username: loginId,
+          app_password: password,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '저장 실패')
+      setNaverLoginId('')
+      setNaverPassword('')
       setNaverBlogId('')
-      setNaverUser('')
       await loadAccounts()
       ping(`네이버 계정 추가됨 (총 ${accounts.filter((a) => a.provider === 'naver').length + 1}개)`)
     } catch (e) {
@@ -773,7 +778,7 @@ export function BlogClient() {
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h2 className="text-base font-bold text-white">네이버 블로그 계정</h2>
-                    <p className="mt-1 text-xs text-white/45">개수 제한 없음 · blogId마다 추가</p>
+                    <p className="mt-1 text-xs text-white/45">네이버 아이디와 비밀번호로 등록합니다.</p>
                   </div>
                   <div
                     className={cn(
@@ -791,17 +796,26 @@ export function BlogClient() {
                       : `${naverAccounts.filter((account) => linkStatus[account.id]?.state === 'linked').length}/${naverAccounts.length} 연동됨`}
                   </div>
                 </div>
-                <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <div className="mb-4 grid gap-2 sm:grid-cols-2">
                   <input
-                    value={naverBlogId}
-                    onChange={(e) => setNaverBlogId(e.target.value)}
-                    placeholder="blogId (필수)"
+                    value={naverLoginId}
+                    onChange={(e) => setNaverLoginId(e.target.value)}
+                    placeholder="네이버 아이디"
+                    autoComplete="username"
                     className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
                   />
                   <input
-                    value={naverUser}
-                    onChange={(e) => setNaverUser(e.target.value)}
-                    placeholder="표시 이름 (선택)"
+                    value={naverPassword}
+                    onChange={(e) => setNaverPassword(e.target.value)}
+                    placeholder="비밀번호"
+                    type="password"
+                    autoComplete="current-password"
+                    className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={naverBlogId}
+                    onChange={(e) => setNaverBlogId(e.target.value)}
+                    placeholder="블로그 아이디 (로그인 아이디와 같으면 비움)"
                     className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
                   />
                   <button
@@ -810,7 +824,7 @@ export function BlogClient() {
                     onClick={() => void saveNaverAccount()}
                     className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/30 disabled:opacity-50"
                   >
-                    {savingAccount ? '추가 중…' : '계정 추가'}
+                    {savingAccount ? '등록 중…' : '계정 등록'}
                   </button>
                 </div>
                 {naverAccounts.length === 0 ? (
@@ -1320,33 +1334,43 @@ export function BlogClient() {
                     </div>
                   ) : null}
                 </div>
-                {naverAccounts.length === 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-white/40">연결된 네이버 블로그가 없습니다. blogId를 추가하세요.</p>
-                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                      <input
-                        value={naverBlogId}
-                        onChange={(e) => setNaverBlogId(e.target.value)}
-                        placeholder="blogId (필수)"
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-                      />
-                      <input
-                        value={naverUser}
-                        onChange={(e) => setNaverUser(e.target.value)}
-                        placeholder="표시 이름 (선택)"
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={savingAccount}
-                        onClick={() => void saveNaverAccount()}
-                        className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold disabled:opacity-50"
-                      >
-                        {savingAccount ? '추가 중…' : '계정 추가'}
-                      </button>
-                    </div>
+                <div className="space-y-2">
+                  <p className="text-xs text-white/40">
+                    네이버 아이디와 비밀번호를 입력해 업로드 계정을 등록합니다. 블로그 주소 아이디가 로그인 아이디와 같으면 비워 두세요.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      value={naverLoginId}
+                      onChange={(e) => setNaverLoginId(e.target.value)}
+                      placeholder="네이버 아이디"
+                      autoComplete="username"
+                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                    />
+                    <input
+                      value={naverPassword}
+                      onChange={(e) => setNaverPassword(e.target.value)}
+                      placeholder="비밀번호"
+                      type="password"
+                      autoComplete="current-password"
+                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                    />
+                    <input
+                      value={naverBlogId}
+                      onChange={(e) => setNaverBlogId(e.target.value)}
+                      placeholder="블로그 아이디 (로그인 아이디와 같으면 비움)"
+                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm sm:col-span-2"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingAccount}
+                      onClick={() => void saveNaverAccount()}
+                      className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold disabled:opacity-50 sm:col-span-2"
+                    >
+                      {savingAccount ? '등록 중…' : '계정 등록'}
+                    </button>
                   </div>
-                ) : (
+                </div>
+                {naverAccounts.length === 0 ? null : (
                   <div className="flex flex-wrap gap-2">
                     {naverAccounts.map((account) => {
                       const selected = account.id === uploadAccountId
@@ -1364,6 +1388,7 @@ export function BlogClient() {
                         >
                           <p className="text-sm font-semibold">{account.username || account.site_url}</p>
                           <p className="text-[11px] opacity-70">{account.site_url}</p>
+                          <p className="text-[11px] opacity-70">{account.hasPassword ? '비밀번호 저장됨' : '비밀번호 없음'}</p>
                           <div className="mt-1">
                             <NaverLinkMark status={linkStatus[account.id]} />
                           </div>
@@ -1629,17 +1654,26 @@ export function BlogClient() {
 
             <div className="border-t border-white/10 pt-3">
               <p className="mb-1 text-sm font-semibold text-white">네이버 블로그 계정</p>
-              <p className="mb-2 text-[11px] text-white/40">개수 제한 없음 · blogId마다 추가</p>
+              <p className="mb-2 text-[11px] text-white/40">아이디와 비밀번호로 등록합니다.</p>
               <input
-                value={naverBlogId}
-                onChange={(e) => setNaverBlogId(e.target.value)}
-                placeholder="네이버 blogId (필수)"
+                value={naverLoginId}
+                onChange={(e) => setNaverLoginId(e.target.value)}
+                placeholder="네이버 아이디"
+                autoComplete="username"
                 className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
               <input
-                value={naverUser}
-                onChange={(e) => setNaverUser(e.target.value)}
-                placeholder="표시 이름 (선택)"
+                value={naverPassword}
+                onChange={(e) => setNaverPassword(e.target.value)}
+                placeholder="비밀번호"
+                type="password"
+                autoComplete="current-password"
+                className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              />
+              <input
+                value={naverBlogId}
+                onChange={(e) => setNaverBlogId(e.target.value)}
+                placeholder="블로그 아이디 (로그인 아이디와 같으면 비움)"
                 className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
               <button
