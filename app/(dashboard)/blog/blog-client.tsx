@@ -41,6 +41,41 @@ type AccountRow = {
   meta?: Record<string, unknown>
 }
 
+type NaverLinkStatus = {
+  state: 'checking' | 'linked' | 'missing' | 'error'
+  blogName?: string
+}
+
+function accountBlogId(account: AccountRow) {
+  const metaId = account.meta && typeof account.meta.blogId === 'string' ? account.meta.blogId : ''
+  if (metaId) return metaId
+  return account.site_url.replace(/^https?:\/\/(m\.)?blog\.naver\.com\//i, '').split('/')[0] || ''
+}
+
+function NaverLinkMark({ status }: { status?: NaverLinkStatus }) {
+  if (!status || status.state === 'checking') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-white/45">
+        <Loader2 className="h-3 w-3 animate-spin" /> 확인 중
+      </span>
+    )
+  }
+  if (status.state === 'linked') {
+    return (
+      <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+        <span className="truncate">연동됨{status.blogName ? ` · ${status.blogName}` : ''}</span>
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-300">
+      <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+      {status.state === 'error' ? '확인 실패' : '연동 안 됨'}
+    </span>
+  )
+}
+
 type Preview = {
   title: string
   bodyHtml: string
@@ -309,7 +344,16 @@ export function BlogClient() {
     setPickingFolder(true)
     setError('')
     try {
-      const res = await fetch(AGENT_PICKER, { method: 'POST' })
+      const startPath =
+        folderPath.trim() ||
+        folders.find((folder) => folder.mode === 'product')?.local_path ||
+        folders[0]?.local_path ||
+        ''
+      const res = await fetch(AGENT_PICKER, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: startPath }),
+      })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || '폴더 선택 실패')
       if (!data.path) {
@@ -603,6 +647,39 @@ export function BlogClient() {
 
   const dowOptions = WEEKDAY_LABELS.map((label, value) => ({ label, value: value as Weekday }))
   const naverAccounts = accounts.filter((a) => a.provider === 'naver')
+  const [linkStatus, setLinkStatus] = useState<Record<string, NaverLinkStatus>>({})
+
+  const verifyAccount = useCallback(async (account: AccountRow) => {
+    const blogId = accountBlogId(account)
+    setLinkStatus((prev) => ({ ...prev, [account.id]: { state: 'checking' } }))
+    try {
+      const res = await fetch('/api/blog/accounts/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blogId }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { linked?: boolean; blogName?: string }
+      if (res.ok && data.linked) {
+        setLinkStatus((prev) => ({
+          ...prev,
+          [account.id]: { state: 'linked', blogName: String(data.blogName || '') },
+        }))
+        return
+      }
+      setLinkStatus((prev) => ({
+        ...prev,
+        [account.id]: { state: res.ok ? 'missing' : 'error' },
+      }))
+    } catch {
+      setLinkStatus((prev) => ({ ...prev, [account.id]: { state: 'error' } }))
+    }
+  }, [])
+
+  const naverIds = naverAccounts.map((account) => account.id).join('|')
+  useEffect(() => {
+    const list = accounts.filter((account) => account.provider === 'naver')
+    for (const account of list) void verifyAccount(account)
+  }, [naverIds, accounts, verifyAccount])
 
   useEffect(() => {
     const list = accounts.filter((account) => account.provider === 'naver')
@@ -701,12 +778,17 @@ export function BlogClient() {
                   <div
                     className={cn(
                       'rounded-full px-3 py-1 text-[11px] font-semibold',
-                      naverAccounts.length > 0
+                      naverAccounts.length > 0 &&
+                        naverAccounts.every((account) => linkStatus[account.id]?.state === 'linked')
                         ? 'bg-emerald-500/15 text-emerald-300'
-                        : 'bg-white/8 text-white/45'
+                        : naverAccounts.some((account) => linkStatus[account.id]?.state === 'linked')
+                          ? 'bg-amber-500/15 text-amber-200'
+                          : 'bg-white/8 text-white/45'
                     )}
                   >
-                    {naverAccounts.length > 0 ? `연결됨 ${naverAccounts.length}개` : '연결 안 됨'}
+                    {naverAccounts.length === 0
+                      ? '연결 안 됨'
+                      : `${naverAccounts.filter((account) => linkStatus[account.id]?.state === 'linked').length}/${naverAccounts.length} 연동됨`}
                   </div>
                 </div>
                 <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
@@ -743,11 +825,11 @@ export function BlogClient() {
                         className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
                       >
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-                            <p className="truncate text-sm font-semibold text-white">{a.username}</p>
-                          </div>
+                          <p className="truncate text-sm font-semibold text-white">{a.username}</p>
                           <p className="mt-0.5 truncate text-[11px] text-white/40">{a.site_url}</p>
+                          <div className="mt-1.5">
+                            <NaverLinkMark status={linkStatus[a.id]} />
+                          </div>
                         </div>
                         <button
                           type="button"
@@ -1218,7 +1300,26 @@ export function BlogClient() {
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
             {mode === 'product' ? (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-white">업로드 계정</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-white">업로드 계정</p>
+                  {naverAccounts.length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-white/45">
+                        {naverAccounts.filter((account) => linkStatus[account.id]?.state === 'linked').length}/
+                        {naverAccounts.length} 연동됨
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          for (const account of naverAccounts) void verifyAccount(account)
+                        }}
+                        className="rounded-lg bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/70 hover:bg-white/15"
+                      >
+                        다시 확인
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
                 {naverAccounts.length === 0 ? (
                   <div className="space-y-2">
                     <p className="text-xs text-white/40">연결된 네이버 블로그가 없습니다. blogId를 추가하세요.</p>
@@ -1263,6 +1364,9 @@ export function BlogClient() {
                         >
                           <p className="text-sm font-semibold">{account.username || account.site_url}</p>
                           <p className="text-[11px] opacity-70">{account.site_url}</p>
+                          <div className="mt-1">
+                            <NaverLinkMark status={linkStatus[account.id]} />
+                          </div>
                         </button>
                       )
                     })}
@@ -1557,9 +1661,14 @@ export function BlogClient() {
                         key={a.id}
                         className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2 text-[11px] text-white/70"
                       >
-                        <span className="min-w-0 truncate">
-                          <span className="font-semibold text-white">{a.username}</span>
-                          <span className="text-white/35"> · {a.site_url}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate">
+                            <span className="font-semibold text-white">{a.username}</span>
+                            <span className="text-white/35"> · {a.site_url}</span>
+                          </span>
+                          <span className="mt-1 block">
+                            <NaverLinkMark status={linkStatus[a.id]} />
+                          </span>
                         </span>
                         <button
                           type="button"

@@ -7,7 +7,7 @@ const execFileAsync = promisify(execFile)
  * Opens a native Windows folder picker and returns the absolute path.
  * Falls back to null on cancel / non-Windows.
  */
-export async function pickFolderNative(): Promise<string | null> {
+export async function pickFolderNative(startPath = ''): Promise<string | null> {
   if (process.platform !== 'win32') {
     throw new Error('폴더 선택은 현재 Windows에서만 지원됩니다.')
   }
@@ -18,6 +18,11 @@ $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
 $dialog.Description = '블로그 이미지 폴더를 선택하세요'
 $dialog.ShowNewFolderButton = $true
 $dialog.UseDescriptionForTitle = $true
+$dialog.RootFolder = [System.Environment+SpecialFolder]::MyComputer
+$start = $env:MOSTEM_START_FOLDER
+if ($start -and (Test-Path -LiteralPath $start)) {
+  $dialog.SelectedPath = (Resolve-Path -LiteralPath $start).Path
+}
 $r = $dialog.ShowDialog()
 if ($r -eq [System.Windows.Forms.DialogResult]::OK) {
   [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -27,7 +32,12 @@ if ($r -eq [System.Windows.Forms.DialogResult]::OK) {
   const { stdout } = await execFileAsync(
     'powershell.exe',
     ['-NoProfile', '-STA', '-Command', script],
-    { encoding: 'utf8', windowsHide: false, maxBuffer: 1024 * 1024 }
+    {
+      encoding: 'utf8',
+      windowsHide: false,
+      maxBuffer: 1024 * 1024,
+      env: { ...process.env, MOSTEM_START_FOLDER: startPath || '' },
+    }
   )
   const path = String(stdout || '').trim()
   return path || null

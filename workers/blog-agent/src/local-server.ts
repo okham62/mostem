@@ -36,7 +36,16 @@ export function startLocalPickerServer(port = Number(process.env.AGENT_LOCAL_POR
 
     if (url.pathname === '/pick-folder' && (req.method === 'GET' || req.method === 'POST')) {
       try {
-        const selected = await pickFolderNative()
+        const chunks: Buffer[] = []
+        for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        let requested = ''
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as { path?: string }
+          requested = typeof body.path === 'string' ? body.path.trim() : ''
+        } catch {
+          requested = ''
+        }
+        const selected = await pickFolderNative(requested)
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
         res.end(JSON.stringify({ ok: true, path: selected }))
       } catch (error) {
