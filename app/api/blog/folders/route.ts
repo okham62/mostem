@@ -55,10 +55,15 @@ export async function POST(req: Request) {
       enabled: body.enabled !== false,
     })
     const titles = parseTitles(body.titles)
-    if (titles) {
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : ''
+    if (titles || accountId) {
       const prev = (folder.meta && typeof folder.meta === 'object' ? folder.meta : {}) as Record<string, unknown>
       const saved = await updateFolderWatcher(session.user.id, folder.id, {
-        meta: { ...prev, titles },
+        meta: {
+          ...prev,
+          ...(titles ? { titles } : {}),
+          ...(accountId ? { accountId } : {}),
+        },
       })
       return NextResponse.json({ ok: true, folder: saved })
     }

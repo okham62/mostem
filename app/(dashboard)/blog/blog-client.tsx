@@ -175,6 +175,7 @@ export function BlogClient() {
   const [closeTime, setCloseTime] = useState('21:00')
 
   const [folderTitles, setFolderTitles] = useState('')
+  const [uploadAccountId, setUploadAccountId] = useState('')
   const [folderPath, setFolderPath] = useState('')
   const [folderLabel, setFolderLabel] = useState('')
   const [pickingFolder, setPickingFolder] = useState(false)
@@ -555,6 +556,10 @@ export function BlogClient() {
       setError('제목 목록을 한 줄에 하나씩 입력하세요')
       return
     }
+    if (mode === 'product' && !uploadAccountId) {
+      setError('업로드할 블로그 계정을 선택하세요')
+      return
+    }
     setBusyKey('folder')
     try {
       const folderMode: BlogMode = mode && mode !== 'seo' ? mode : 'folder'
@@ -566,6 +571,7 @@ export function BlogClient() {
           label: folderLabel || activeMeta?.title || '',
           mode: folderMode,
           titles,
+          accountId: mode === 'product' ? uploadAccountId : undefined,
         }),
       })
       const data = await res.json()
@@ -597,6 +603,17 @@ export function BlogClient() {
 
   const dowOptions = WEEKDAY_LABELS.map((label, value) => ({ label, value: value as Weekday }))
   const naverAccounts = accounts.filter((a) => a.provider === 'naver')
+
+  useEffect(() => {
+    const list = accounts.filter((account) => account.provider === 'naver')
+    if (list.length === 0) {
+      if (uploadAccountId) setUploadAccountId('')
+      return
+    }
+    if (!list.some((account) => account.id === uploadAccountId)) {
+      setUploadAccountId(list[0].id)
+    }
+  }, [accounts, uploadAccountId])
 
   if (!mode) {
     return (
@@ -1199,6 +1216,60 @@ export function BlogClient() {
       {subTab === 'folders' || mode === 'product' ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+            {mode === 'product' ? (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-white">업로드 계정</p>
+                {naverAccounts.length === 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/40">연결된 네이버 블로그가 없습니다. blogId를 추가하세요.</p>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                      <input
+                        value={naverBlogId}
+                        onChange={(e) => setNaverBlogId(e.target.value)}
+                        placeholder="blogId (필수)"
+                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                      />
+                      <input
+                        value={naverUser}
+                        onChange={(e) => setNaverUser(e.target.value)}
+                        placeholder="표시 이름 (선택)"
+                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={savingAccount}
+                        onClick={() => void saveNaverAccount()}
+                        className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold disabled:opacity-50"
+                      >
+                        {savingAccount ? '추가 중…' : '계정 추가'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {naverAccounts.map((account) => {
+                      const selected = account.id === uploadAccountId
+                      return (
+                        <button
+                          key={account.id}
+                          type="button"
+                          onClick={() => setUploadAccountId(account.id)}
+                          className={cn(
+                            'rounded-xl border px-3 py-2 text-left',
+                            selected
+                              ? 'border-gold/50 bg-gold/15 text-gold'
+                              : 'border-white/10 bg-black/20 text-white/70 hover:bg-white/5'
+                          )}
+                        >
+                          <p className="text-sm font-semibold">{account.username || account.site_url}</p>
+                          <p className="text-[11px] opacity-70">{account.site_url}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
                 <FolderOpen className="h-4 w-4" /> {mode === 'product' ? '1. 폴더 선택' : '로컬 폴더 이미지 → AI 글'}
@@ -1234,12 +1305,6 @@ export function BlogClient() {
                 {folderPath || '아직 선택하지 않았습니다'}
               </p>
             </div>
-            <input
-              value={folderLabel}
-              onChange={(e) => setFolderLabel(e.target.value)}
-              placeholder="표시 이름 (선택 · 자동 채움)"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-            />
             {mode === 'product' ? (
               <>
               <p className="text-sm font-semibold text-white">2. 제목 선택</p>
@@ -1272,6 +1337,12 @@ export function BlogClient() {
                     </span>
                   </div>
                   <p className="break-all text-[11px] text-white/45">{f.local_path}</p>
+                  {mode === 'product' && typeof f.meta?.accountId === 'string' ? (
+                    <p className="mt-1 text-[11px] text-white/40">
+                      업로드 계정{' '}
+                      {naverAccounts.find((account) => account.id === f.meta.accountId)?.username || '선택됨'}
+                    </p>
+                  ) : null}
                   {mode === 'product' ? (
                     <p className="mt-1 text-[11px] text-white/40">
                       제목 {Array.isArray(f.meta?.titles) ? f.meta.titles.length : 0}개 · 다음 이미지{' '}
