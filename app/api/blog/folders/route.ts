@@ -14,9 +14,17 @@ function parseTitles(value: unknown) {
   const raw = Array.isArray(value)
     ? value.map(String)
     : typeof value === 'string'
-      ? value.split(/\r?\n/)
+      ? [value]
       : []
-  const titles = raw.map((line) => line.trim()).filter(Boolean).slice(0, 200)
+  const lines = raw
+    .join('\n')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const titles = (lines.length <= 1 ? lines.flatMap((line) => line.split(/\s+/)) : lines)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 200)
   return titles.length ? titles : null
 }
 
@@ -88,6 +96,12 @@ export async function PATCH(req: Request) {
   if (typeof body.label === 'string') patch.label = body.label.trim()
   if (body.mode !== undefined) patch.mode = parseMode(body.mode)
   if (typeof body.enabled === 'boolean') patch.enabled = body.enabled
+  if ('titles' in body) {
+    const titles = parseTitles(body.titles) ?? []
+    const existing = (await listFolderWatchers(session.user.id)).find((folder) => folder.id === id)
+    const prev = (existing?.meta && typeof existing.meta === 'object' ? existing.meta : {}) as Record<string, unknown>
+    patch.meta = { ...prev, titles }
+  }
 
   try {
     const folder = await updateFolderWatcher(session.user.id, id, patch as never)

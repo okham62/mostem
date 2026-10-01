@@ -322,7 +322,17 @@ export function BlogClient() {
   const loadFolders = useCallback(async () => {
     const res = await fetch('/api/blog/folders', { cache: 'no-store' })
     const data = await res.json()
-    setFolders(data.folders ?? [])
+    const nextFolders = (data.folders ?? []) as BlogFolderWatcherRow[]
+    setFolders(nextFolders)
+    const product = nextFolders.find((folder) => folder.mode === 'product')
+    if (product) {
+      setFolderPath((prev) => prev.trim() || product.local_path)
+      setFolderTitles((prev) => {
+        if (prev.trim()) return prev
+        const saved = Array.isArray(product.meta?.titles) ? product.meta.titles.map((title) => String(title)).filter(Boolean) : []
+        return saved.join('\n')
+      })
+    }
     if (data.error && /schema cache|Could not find the table|blog_folder/i.test(String(data.error))) {
       setSetupHint(
         '글 발행·초안 저장을 쓰려면 Supabase SQL에서 blog_hub.sql → blog_hub_agent.sql 을 실행해 주세요.'
@@ -599,8 +609,11 @@ export function BlogClient() {
       setError('로컬 폴더 경로를 입력하세요')
       return
     }
-    const titles = folderTitles
+    const lines = folderTitles
       .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    const titles = (lines.length <= 1 ? lines.flatMap((line) => line.split(/\s+/)) : lines)
       .map((line) => line.trim())
       .filter(Boolean)
     if (mode === 'product' && titles.length === 0) {
@@ -627,10 +640,9 @@ export function BlogClient() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '저장 실패')
-      setFolderPath('')
-      setFolderLabel('')
+      setFolderTitles(titles.join('\n'))
       await loadFolders()
-      ping('폴더 감시 등록됨')
+      ping(`폴더가 등록되었습니다. 제목 ${titles.length}개`)
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장 실패')
     } finally {
@@ -1497,7 +1509,9 @@ export function BlogClient() {
                 rows={8}
                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
-              <p className="text-[11px] text-white/35">한 번 쓴 제목과 이미지는 다음 자동 업로드에서 다시 고르지 않습니다.</p>
+              <p className="text-[11px] text-white/35">
+                제목 {folderTitles.split(/\r?\n/).flatMap((line) => (folderTitles.includes('\n') ? [line] : line.split(/\s+/))).map((line) => line.trim()).filter(Boolean).length}개. 한 줄에 하나, 또는 한 칸씩 띄어 쓰면 각각 저장됩니다. 글을 쓸 때 이 목록에서 아직 안 쓴 제목을 랜덤으로 고릅니다.
+              </p>
               </>
             ) : null}
           </div>
