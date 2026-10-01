@@ -94,10 +94,17 @@ export async function POST(req: Request) {
     if (action === 'folder-ack') {
       const folderId = typeof body.folderId === 'string' ? body.folderId : ''
       if (!folderId) return NextResponse.json({ error: 'folderId required' }, { status: 400 })
+      const folders = await listFolderWatchers(userId)
+      const current = folders.find((folder) => folder.id === folderId)
+      const meta = { ...(current?.meta && typeof current.meta === 'object' ? current.meta : {}) }
+      if (typeof body.imageOffset === 'number' && Number.isFinite(body.imageOffset)) {
+        meta.imageOffset = Math.max(0, Math.floor(body.imageOffset))
+      }
       await updateFolderWatcher(userId, folderId, {
         last_scan_at: new Date().toISOString(),
         last_batch_key: typeof body.batchKey === 'string' ? body.batchKey : null,
         last_error: typeof body.error === 'string' ? body.error : null,
+        meta,
       })
       return NextResponse.json({ ok: true })
     }

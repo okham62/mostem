@@ -373,6 +373,7 @@ export async function updateFolderWatcher(
     last_scan_at: string | null
     last_batch_key: string | null
     last_error: string | null
+    meta: Record<string, unknown>
   }>
 ) {
   const supabase = createAdminClient()

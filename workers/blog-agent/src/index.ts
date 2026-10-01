@@ -114,7 +114,16 @@ async function tickAndClaim() {
     label?: string
     mode?: string
     last_batch_key?: string | null
+    meta?: Record<string, unknown>
   }>
+}
+
+const SHOP_BATCH = 10
+
+function titleLines(meta: Record<string, unknown> | undefined) {
+  const raw = meta?.titles
+  if (!Array.isArray(raw)) return []
+  return raw.map((item) => String(item).trim()).filter(Boolean)
 }
 
 async function processFolders(
@@ -124,21 +133,28 @@ async function processFolders(
     label?: string
     mode?: string
     last_batch_key?: string | null
+    meta?: Record<string, unknown>
   }>
 ) {
   for (const folder of folders || []) {
     const dir = folder.local_path
     const files = listStableImages(dir)
     if (files.length < 1) continue
-    const key = batchKey(files)
+    const shopping = folder.mode === 'product'
+    const offset = shopping ? Math.max(0, Number(folder.meta?.imageOffset) || 0) : 0
+    const slice = shopping ? files.slice(offset, offset + SHOP_BATCH) : files
+    if (!slice.length) continue
+    const key = shopping ? `${offset}:${batchKey(slice)}` : batchKey(files)
     if (folder.last_batch_key && folder.last_batch_key === key) continue
 
-    console.log(`[folder] ${dir} → ${files.length} images`)
+    console.log(`[folder] ${dir} → ${slice.length} images @ ${offset}`)
     const form = new FormData()
     form.set('topic', folder.label || path.basename(dir))
     form.set('mode', folder.mode || 'folder')
     form.set('folderId', folder.id)
-    for (const file of files) {
+    const titles = titleLines(folder.meta)
+    if (titles.length) form.set('titles', titles.join('\n'))
+    for (const file of slice) {
       const buf = fs.readFileSync(file.abs)
       form.append(
         'images',
@@ -159,7 +175,12 @@ async function processFolders(
       await api('/api/blog/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'folder-ack', folderId: folder.id, batchKey: key }),
+        body: JSON.stringify({
+          action: 'folder-ack',
+          folderId: folder.id,
+          batchKey: key,
+          imageOffset: shopping ? offset + slice.length : undefined,
+        }),
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

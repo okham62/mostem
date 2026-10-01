@@ -52,7 +52,7 @@ type Preview = {
 }
 
 type WriteMode = 'seo' | 'home' | 'product'
-type BlogLane = 'write' | 'upload'
+type BlogLane = 'write' | 'shop'
 type SubTab = 'write' | 'drafts' | 'folders' | 'ops'
 type HubView = 'dashboard' | 'write' | 'drafts' | 'folders' | 'ops'
 
@@ -90,9 +90,9 @@ const MODES: Array<{
   },
   {
     id: 'product',
-    title: '블로그 쇼핑글 자동업로드',
-    subtitle: '리뷰 · 상품 · 자동작성',
-    hint: '쇼핑 베스트 상품을 골라 리뷰글을 만들거나, 상품 폴더 이미지로 자동 업로드합니다.',
+    title: '네이버블로그 쇼핑글 쓰기',
+    subtitle: '리뷰 · 상품',
+    hint: '쇼핑 베스트 상품을 골라 리뷰/추천 글을 만들거나, 상품 폴더 이미지로 작성합니다.',
     icon: ShoppingBag,
     accent: 'from-amber-500/20 to-orange-600/10 border-amber-400/30',
   },
@@ -114,7 +114,11 @@ export function BlogClient() {
     modeParam === 'seo' || modeParam === 'home' || modeParam === 'product' ? modeParam : null
   const laneParam = searchParams.get('lane')
   const urlLane: BlogLane | null =
-    laneParam === 'upload' || laneParam === 'shop' ? 'upload' : laneParam === 'write' ? 'write' : null
+    laneParam === 'shop' || laneParam === 'upload' || urlMode === 'product'
+      ? 'shop'
+      : laneParam === 'write'
+        ? 'write'
+        : null
   const viewParam = searchParams.get('view')
   const urlView: HubView =
     viewParam === 'write' ||
@@ -133,6 +137,15 @@ export function BlogClient() {
   useEffect(() => {
     setMode(urlMode)
   }, [urlMode])
+
+  useEffect(() => {
+    if (laneParam !== 'shop' && laneParam !== 'upload') return
+    if (urlMode === 'product') return
+    setMode('product')
+    setSubTab('folders')
+    setHubView('write')
+    router.replace('/blog?view=write&lane=shop&mode=product', { scroll: false })
+  }, [laneParam, urlMode, router])
 
   const [cards, setCards] = useState<BlogTrendCard[]>([])
   const [posts, setPosts] = useState<BlogPostRow[]>([])
@@ -162,6 +175,7 @@ export function BlogClient() {
   const [closeDow, setCloseDow] = useState<Weekday>(0)
   const [closeTime, setCloseTime] = useState('21:00')
 
+  const [folderTitles, setFolderTitles] = useState('')
   const [folderPath, setFolderPath] = useState('')
   const [folderLabel, setFolderLabel] = useState('')
   const [pickingFolder, setPickingFolder] = useState(false)
@@ -176,10 +190,11 @@ export function BlogClient() {
     setPreview(null)
     setSubTab('write')
     setHubView('write')
-    if (next === 'upload') {
-      setMode(null)
+    if (next === 'shop') {
+      setMode('product')
+      setSubTab('folders')
       startView(() => {
-        router.push('/blog?view=write&lane=upload', { scroll: false })
+        router.push('/blog?view=write&lane=shop&mode=product', { scroll: false })
       })
       return
     }
@@ -196,11 +211,11 @@ export function BlogClient() {
     setHubView('write')
     if (!next) {
       startView(() => {
-        router.push(urlLane === 'upload' ? '/blog?view=write' : '/blog?view=write&lane=write', { scroll: false })
+        router.push(urlLane === 'shop' ? '/blog?view=write' : '/blog?view=write&lane=write', { scroll: false })
       })
       return
     }
-    const lane: BlogLane = 'write'
+    const lane: BlogLane = next === 'product' ? 'shop' : 'write'
     startView(() => {
       router.push(`/blog?view=write&lane=${lane}&mode=${next}`, { scroll: false })
     })
@@ -537,6 +552,14 @@ export function BlogClient() {
       setError('로컬 폴더 경로를 입력하세요')
       return
     }
+    const titles = folderTitles
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    if (mode === 'product' && titles.length === 0) {
+      setError('쇼핑글 제목 목록을 한 줄에 하나씩 입력하세요')
+      return
+    }
     setBusyKey('folder')
     try {
       const folderMode: BlogMode = mode && mode !== 'seo' ? mode : 'folder'
@@ -547,6 +570,7 @@ export function BlogClient() {
           localPath: folderPath,
           label: folderLabel || activeMeta?.title || '',
           mode: folderMode,
+          titles,
         }),
       })
       const data = await res.json()
@@ -728,11 +752,26 @@ export function BlogClient() {
               ) : null}
 
               <div>
-                <h2 className="mb-3 text-sm font-semibold text-white/70">
-                  {urlLane === 'write' ? '홈판글 / 일반글' : urlLane === 'upload' ? '자동업로드' : '시작'}
-                </h2>
+                {urlLane === 'write' ? (
+                  <h2 className="mb-3 text-sm font-semibold text-white/70">네이버블로그 일반글 / 홈판글</h2>
+                ) : null}
                 {!urlLane ? (
                   <div className="grid gap-4 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => selectLane('shop')}
+                      className="flex min-h-[180px] flex-col rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 to-orange-600/10 p-5 text-left transition hover:scale-[1.01]"
+                    >
+                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                        <ShoppingBag className="h-6 w-6 text-white" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">네이버블로그 쇼핑글 쓰기</h3>
+                      <p className="mt-1 text-xs font-semibold text-white/55">리뷰 · 상품</p>
+                      <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">
+                        쇼핑 상품 글과 폴더 이미지 작성을 이 안에서 이어서 합니다.
+                      </p>
+                      <p className="mt-4 text-[11px] text-white/40">선택하면 상세 작업 →</p>
+                    </button>
                     <button
                       type="button"
                       onClick={() => selectLane('write')}
@@ -741,27 +780,12 @@ export function BlogClient() {
                       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
                         <PenLine className="h-6 w-6 text-white" />
                       </div>
-                      <h3 className="text-lg font-bold text-white">홈판글 / 일반글</h3>
-                      <p className="mt-1 text-xs font-semibold text-white/55">두 가지를 함께</p>
+                      <h3 className="text-lg font-bold text-white">네이버블로그 일반글 / 홈판글</h3>
+                      <p className="mt-1 text-xs font-semibold text-white/55">일반글 · 홈판글</p>
                       <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">
-                        홈판 추천글과 일반 검색글을 이 화면에서 이어서 씁니다.
+                        일반 검색글과 홈판 추천글을 고른 뒤 상세 작업을 진행합니다.
                       </p>
-                      <p className="mt-4 text-[11px] text-white/40">시작하기 →</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectLane('upload')}
-                      className="flex min-h-[180px] flex-col rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 to-orange-600/10 p-5 text-left transition hover:scale-[1.01]"
-                    >
-                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                        <FolderOpen className="h-6 w-6 text-white" />
-                      </div>
-                      <h3 className="text-lg font-bold text-white">자동업로드</h3>
-                      <p className="mt-1 text-xs font-semibold text-white/55">폴더 지정</p>
-                      <p className="mt-3 flex-1 text-sm leading-relaxed text-white/65">
-                        PC에서 이미지 폴더를 지정하면 그 폴더로 글을 자동 업로드합니다.
-                      </p>
-                      <p className="mt-4 text-[11px] text-white/40">시작하기 →</p>
+                      <p className="mt-4 text-[11px] text-white/40">선택하면 상세 작업 →</p>
                     </button>
                   </div>
                 ) : urlLane === 'write' ? (
@@ -801,100 +825,7 @@ export function BlogClient() {
                       })}
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => selectLane(null)}
-                      className="inline-flex items-center gap-1 text-xs text-white/45 hover:text-white"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5" /> 처음으로
-                    </button>
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                            <FolderOpen className="h-4 w-4" /> 폴더 지정
-                          </div>
-                          <span
-                            className={cn(
-                              'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                              agentOnline ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/8 text-white/40'
-                            )}
-                          >
-                            {agentOnline == null ? '에이전트 확인 중' : agentOnline ? '에이전트 연결됨' : '에이전트 꺼짐'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-white/40">
-                          「폴더 찾아보기」로 자동 업로드할 이미지 폴더를 지정합니다.
-                        </p>
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <button
-                            type="button"
-                            disabled={pickingFolder}
-                            onClick={() => void pickLocalFolder()}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
-                          >
-                            {pickingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
-                            폴더 찾아보기
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busyKey === 'folder' || !folderPath.trim()}
-                            onClick={() => void addFolder()}
-                            className="rounded-xl bg-gold/20 px-3 py-2.5 text-sm font-semibold text-gold disabled:opacity-50"
-                          >
-                            이 폴더로 자동업로드
-                          </button>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
-                          <p className="text-[10px] uppercase tracking-wide text-white/35">선택된 경로</p>
-                          <p className="mt-1 break-all text-sm text-white/85">
-                            {folderPath || '아직 선택하지 않았습니다'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {folders.length === 0 ? (
-                          <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-white/40">
-                            등록된 폴더가 없습니다.
-                          </div>
-                        ) : (
-                          folders.map((f) => (
-                            <div
-                              key={f.id}
-                              className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 text-sm"
-                            >
-                              <div className="mb-1 flex items-center justify-between gap-2">
-                                <span className="font-semibold text-white">{f.label || f.local_path}</span>
-                                <span className={cn('text-[10px]', f.enabled ? 'text-emerald-400' : 'text-white/35')}>
-                                  {f.enabled ? '감시중' : '중지'}
-                                </span>
-                              </div>
-                              <p className="break-all text-[11px] text-white/45">{f.local_path}</p>
-                              <div className="mt-2 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void toggleFolder(f.id, !f.enabled)}
-                                  className="rounded-lg bg-white/10 px-2 py-1 text-[11px]"
-                                >
-                                  {f.enabled ? '중지' : '시작'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void removeFolder(f.id)}
-                                  className="rounded-lg bg-red-500/15 px-2 py-1 text-[11px] text-red-200"
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -1086,7 +1017,7 @@ export function BlogClient() {
             ['write', mode === 'product' ? '쇼핑에서 쓰기' : '키워드로 쓰기'],
             ['drafts', '초안'],
             ['folders', '폴더 이미지'],
-            ['ops', '운영'],
+            ['ops', mode === 'product' ? '카테고리 On/Off' : '운영'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -1303,8 +1234,9 @@ export function BlogClient() {
               </span>
             </div>
             <p className="text-xs text-white/40">
-              「폴더 찾아보기」로 PC에서 직접 선택합니다. (브라우저 보안상 경로 타이핑 대신 로컬 에이전트 창을
-              사용합니다)
+              {mode === 'product'
+                ? '폴더 안 이미지를 파일 이름 순서대로 10장씩 올립니다. 각 상품에 맞는 판매 멘트를 짧게 쓰고, 제목은 아래 목록에서 랜덤으로 고릅니다. 본문 마지막은 해시태그입니다. 카테고리 공개/비공개는 「카테고리 On/Off」에서 예약합니다.'
+                : '「폴더 찾아보기」로 PC에서 직접 선택합니다. (브라우저 보안상 경로 타이핑 대신 로컬 에이전트 창을 사용합니다)'}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
@@ -1337,6 +1269,15 @@ export function BlogClient() {
               placeholder="표시 이름 (선택 · 자동 채움)"
               className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
             />
+            {mode === 'product' ? (
+              <textarea
+                value={folderTitles}
+                onChange={(e) => setFolderTitles(e.target.value)}
+                placeholder={'제목 목록. 한 줄에 하나.\n예) 여름 필수 라탄 가방 후기\n예) 출근룩에 딱인 미니 크로스백'}
+                rows={8}
+                className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              />
+            ) : null}
           </div>
           <div className="space-y-2">
             {modeFolders.length === 0 ? (
@@ -1356,6 +1297,12 @@ export function BlogClient() {
                     </span>
                   </div>
                   <p className="break-all text-[11px] text-white/45">{f.local_path}</p>
+                  {mode === 'product' ? (
+                    <p className="mt-1 text-[11px] text-white/40">
+                      제목 {Array.isArray(f.meta?.titles) ? f.meta.titles.length : 0}개 · 다음 이미지{' '}
+                      {Number(f.meta?.imageOffset) || 0}번부터 10장
+                    </p>
+                  ) : null}
                   <div className="mt-2 flex gap-2">
                     <button
                       type="button"

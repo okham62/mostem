@@ -37,6 +37,11 @@ export async function POST(req: Request) {
         ? modeRaw
         : 'folder'
     const folderId = String(form.get('folderId') || '')
+    const titlePool = String(form.get('titles') || '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    const fixedTitle = titlePool.length ? titlePool[Math.floor(Math.random() * titlePool.length)] : ''
 
     const files = form.getAll('images').filter((v): v is File => typeof File !== 'undefined' && v instanceof File)
     if (!files.length) {
@@ -61,6 +66,7 @@ export async function POST(req: Request) {
       mode,
       images,
       imageUrls,
+      fixedTitle: fixedTitle || null,
     })
 
     let post = null
@@ -69,7 +75,7 @@ export async function POST(req: Request) {
       post = await insertBlogPost({
         user_id: userId,
         keyword: topic,
-        mode: 'folder',
+        mode: mode === 'product' ? 'product' : 'folder',
         title: article.title,
         body_html: article.bodyHtml,
         body_markdown: article.bodyMarkdown,

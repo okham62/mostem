@@ -10,6 +10,16 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
+function parseTitles(value: unknown) {
+  const raw = Array.isArray(value)
+    ? value.map(String)
+    : typeof value === 'string'
+      ? value.split(/\r?\n/)
+      : []
+  const titles = raw.map((line) => line.trim()).filter(Boolean).slice(0, 200)
+  return titles.length ? titles : null
+}
+
 function parseMode(value: unknown): BlogMode {
   if (value === 'home' || value === 'product' || value === 'seo' || value === 'folder') return value
   return 'folder'
@@ -44,6 +54,14 @@ export async function POST(req: Request) {
       mode: parseMode(body.mode),
       enabled: body.enabled !== false,
     })
+    const titles = parseTitles(body.titles)
+    if (titles) {
+      const prev = (folder.meta && typeof folder.meta === 'object' ? folder.meta : {}) as Record<string, unknown>
+      const saved = await updateFolderWatcher(session.user.id, folder.id, {
+        meta: { ...prev, titles },
+      })
+      return NextResponse.json({ ok: true, folder: saved })
+    }
     return NextResponse.json({ ok: true, folder })
   } catch (error) {
     return NextResponse.json(

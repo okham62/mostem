@@ -116,11 +116,30 @@ async function describeImageGemini(image: FolderImageInput, index: number) {
   return text
 }
 
+function hashtagLine(tags: string[]) {
+  return tags
+    .map((tag) => {
+      const clean = tag.replace(/^#+/, '').replace(/\s+/g, '')
+      return clean ? `#${clean}` : ''
+    })
+    .filter(Boolean)
+    .join(' ')
+}
+
+function ensureHashtagEnding(body: string, tags: string[]) {
+  const line = hashtagLine(tags)
+  if (!line) return body.trim()
+  const tail = body.trim().split('\n').slice(-4).join('\n')
+  if (/#[^\s#]{2,}/.test(tail)) return body.trim()
+  return `${body.trim()}\n\n${line}`
+}
+
 async function writeFromDescriptions(input: {
   mode: BlogMode
   topic: string
   descriptions: string[]
   modelId?: string | null
+  fixedTitle?: string | null
 }) {
   const models = availableModels()
   const model = findAiModel(input.modelId) || models[0] || DEFAULT_AI_MODEL
@@ -129,10 +148,14 @@ async function writeFromDescriptions(input: {
     .map((_, i) => `[IMAGE_${i + 1}]`)
     .join(', ')
 
+  const shopping = input.mode === 'product'
+  const titleRule = input.fixedTitle
+    ? `- title 필드는 반드시 이 문장 그대로: ${input.fixedTitle}`
+    : '- title은 상품이 드러나는 짧은 한국어 제목'
   const prompt = `${blogSystemPrompt(input.mode === 'folder' ? 'seo' : input.mode)}
 
 주제/폴더: ${input.topic}
-아래는 폴더에 있는 이미지를 순서대로 인식한 결과입니다. **각 이미지마다 별도의 소제목+본문 단락**을 작성하고, 해당 단락 바로 위 또는 아래에 [IMAGE_n] 플레이스홀더를 넣으세요.
+아래는 폴더 이미지를 파일 이름 순서대로 인식한 결과입니다. 각 이미지 단락 위나 아래에 [IMAGE_n] 플레이스홀더를 넣으세요.
 이미지 개수: ${input.descriptions.length}
 플레이스홀더: ${placeholders}
 
@@ -141,9 +164,16 @@ ${digest}
 
 작성 규칙:
 - 한국어
-- 이미지 순서대로 1→N 모두 다루기 (빠짐없이)
-- Markdown (본문에 # 제목 금지, ## / ### 사용)
-- 태그 5개 이내
+- 이미지 순서대로 1→N 모두 다루기
+${titleRule}
+${
+  shopping
+    ? `- 각 이미지는 그 상품에 맞는 판매 멘트를 2~4문장으로 간략히. 과장된 장문 금지.
+- tags는 블로그 검색에 쓸 해시태그 단어 8~12개. # 없이 단어만.
+- body 마지막 줄은 그 태그를 #단어 형태로 한 줄에 모은 해시태그.`
+    : `- Markdown (본문에 # 제목 금지, ## / ### 사용)
+- 태그 5개 이내`
+}
 
 JSON만 반환:
 {"title":"제목","body":"마크다운 본문","tags":["태그1"]}`
@@ -192,6 +222,7 @@ export async function generateFolderArticle(input: {
   images: FolderImageInput[]
   imageUrls: string[]
   modelId?: string | null
+  fixedTitle?: string | null
 }): Promise<BlogGenerateResult & { descriptions: string[] }> {
   if (!input.images.length) throw new AiError('이미지가 없습니다.')
   if (input.images.length > 20) throw new AiError('이미지는 최대 20장입니다.')
@@ -210,6 +241,7 @@ export async function generateFolderArticle(input: {
     topic: input.topic,
     descriptions,
     modelId: input.modelId,
+    fixedTitle: input.fixedTitle,
   })
 
   const blogImages: BlogImage[] = input.imageUrls.map((url, index) => ({
@@ -219,12 +251,14 @@ export async function generateFolderArticle(input: {
     source: 'folder',
   }))
 
-  const parsed = parseArticle(raw, input.topic)
-  const bodyMarkdown = replaceImagePlaceholders(parsed.body, blogImages)
+  const parsed = parseArticle(raw, input.fixedTitle || input.topic)
+  const title = input.fixedTitle?.trim() || parsed.title
+  const tags = parsed.tags.length ? parsed.tags : []
+  const bodyMarkdown = ensureHashtagEnding(replaceImagePlaceholders(parsed.body, blogImages), tags)
   const bodyHtml = markdownToSimpleHtml(bodyMarkdown)
 
   return {
-    title: parsed.title,
+    title,
     bodyMarkdown,
     bodyHtml,
     tags: parsed.tags,

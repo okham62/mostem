@@ -65,8 +65,8 @@ export const publish: NavItem[] = [
     label: 'Blog',
     icon: BlogIcon,
     children: [
-      { href: '/blog?view=write&lane=upload', label: '자동업로드' },
-      { href: '/blog?view=write&lane=write', label: '홈판글 / 일반글' },
+      { href: '/blog?view=write&lane=shop&mode=product', label: '쇼핑글 쓰기' },
+      { href: '/blog?view=write&lane=write', label: '일반글 / 홈판글' },
     ],
   },
 ]
