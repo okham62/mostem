@@ -200,6 +200,7 @@ export function BlogClient() {
   const [naverLoginId, setNaverLoginId] = useState('')
   const [naverPassword, setNaverPassword] = useState('')
   const [naverBlogId, setNaverBlogId] = useState('')
+  const [showNaverAccountForm, setShowNaverAccountForm] = useState(false)
   const [savingAccount, setSavingAccount] = useState(false)
 
   const [catAccountId, setCatAccountId] = useState('')
@@ -497,6 +498,7 @@ export function BlogClient() {
       setNaverLoginId('')
       setNaverPassword('')
       setNaverBlogId('')
+      setShowNaverAccountForm(false)
       await loadAccounts()
       ping(`네이버 계정 추가됨 (총 ${accounts.filter((a) => a.provider === 'naver').length + 1}개)`)
     } catch (e) {
@@ -1344,52 +1346,74 @@ export function BlogClient() {
                     </div>
                   ) : null}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-xs text-white/40">
-                    네이버 아이디와 비밀번호를 입력해 업로드 계정을 등록합니다. 블로그 주소 아이디가 로그인 아이디와 같으면 비워 두세요.
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <input
-                      value={naverLoginId}
-                      onChange={(e) => setNaverLoginId(e.target.value)}
-                      placeholder="네이버 아이디"
-                      name="mostem-naver-login-id"
-                      autoComplete="off"
-                      readOnly
-                      onFocus={(e) => {
-                        e.currentTarget.readOnly = false
-                      }}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-                    />
-                    <input
-                      value={naverPassword}
-                      onChange={(e) => setNaverPassword(e.target.value)}
-                      placeholder="비밀번호"
-                      type="password"
-                      name="mostem-naver-login-secret"
-                      autoComplete="new-password"
-                      readOnly
-                      onFocus={(e) => {
-                        e.currentTarget.readOnly = false
-                      }}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-                    />
-                    <input
-                      value={naverBlogId}
-                      onChange={(e) => setNaverBlogId(e.target.value)}
-                      placeholder="블로그 아이디 (로그인 아이디와 같으면 비움)"
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm sm:col-span-2"
-                    />
-                    <button
-                      type="button"
-                      disabled={savingAccount}
-                      onClick={() => void saveNaverAccount()}
-                      className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold disabled:opacity-50 sm:col-span-2"
-                    >
-                      {savingAccount ? '등록 중…' : '계정 등록'}
-                    </button>
+                {showNaverAccountForm ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/40">
+                      네이버 아이디와 비밀번호를 입력해 업로드 계정을 등록합니다. 블로그 주소 아이디가 로그인 아이디와 같으면 비워 두세요.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <input
+                        value={naverLoginId}
+                        onChange={(e) => setNaverLoginId(e.target.value)}
+                        placeholder="네이버 아이디"
+                        name="mostem-naver-login-id"
+                        autoComplete="off"
+                        readOnly
+                        onFocus={(e) => {
+                          e.currentTarget.readOnly = false
+                        }}
+                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                      />
+                      <input
+                        value={naverPassword}
+                        onChange={(e) => setNaverPassword(e.target.value)}
+                        placeholder="비밀번호"
+                        type="password"
+                        name="mostem-naver-login-secret"
+                        autoComplete="new-password"
+                        readOnly
+                        onFocus={(e) => {
+                          e.currentTarget.readOnly = false
+                        }}
+                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                      />
+                      <input
+                        value={naverBlogId}
+                        onChange={(e) => setNaverBlogId(e.target.value)}
+                        placeholder="블로그 아이디 (로그인 아이디와 같으면 비움)"
+                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm sm:col-span-2"
+                      />
+                      <button
+                        type="button"
+                        disabled={savingAccount}
+                        onClick={() => void saveNaverAccount()}
+                        className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold disabled:opacity-50"
+                      >
+                        {savingAccount ? '등록 중…' : '계정 등록'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNaverAccountForm(false)
+                          setNaverLoginId('')
+                          setNaverPassword('')
+                          setNaverBlogId('')
+                        }}
+                        className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/70"
+                      >
+                        닫기
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowNaverAccountForm(true)}
+                    className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold"
+                  >
+                    블로그 계정추가
+                  </button>
+                )}
                 {naverAccounts.length === 0 ? null : (
                   <div className="flex flex-wrap gap-2">
                     {naverAccounts.map((account) => {
