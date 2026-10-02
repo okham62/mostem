@@ -1139,3 +1139,21 @@ html[data-theme='dark'] .mostem-brand-mark {
   background: rgba(202, 63, 100, 0.18);
 }
 
+@keyframes mostem-upload-glow {
+  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); }
+  50% { box-shadow: 0 18px 42px rgba(245, 197, 24, 0.42); }
+}
+
+@keyframes mostem-upload-sheen {
+  0% { transform: translateX(-180%); }
+  42%, 100% { transform: translateX(420%); }
+}
+
+.mostem-upload-btn:not(:disabled) {
+  animation: mostem-upload-glow 2.8s ease-in-out infinite;
+}
+
+.mostem-upload-sheen {
+  animation: mostem-upload-sheen 2.6s ease-in-out infinite;
+}
+

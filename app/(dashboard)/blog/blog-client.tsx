@@ -446,12 +446,12 @@ export function BlogClient() {
         ping('폴더 선택이 취소되었습니다')
         return
       }
-      setFolderPath(String(data.path))
-      if (!folderLabel) {
-        const parts = String(data.path).replace(/[\\/]+$/, '').split(/[\\/]/)
-        setFolderLabel(parts[parts.length - 1] || '')
-      }
-      ping('폴더가 선택되었습니다')
+      const nextPath = String(data.path)
+      setFolderPath(nextPath)
+      const parts = nextPath.replace(/[\\/]+$/, '').split(/[\\/]/)
+      const nextLabel = folderLabel || parts[parts.length - 1] || ''
+      if (!folderLabel) setFolderLabel(nextLabel)
+      await rememberFolder(nextPath, folderTitles, nextLabel)
     } catch {
       setError('')
     } finally {
@@ -678,51 +678,35 @@ export function BlogClient() {
     await loadSchedules()
   }
 
-  async function addFolder() {
-    if (!folderPath.trim()) {
-      setError('로컬 폴더 경로를 입력하세요')
-      return
-    }
-    const lines = folderTitles
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-    const titles = (lines.length <= 1 ? lines.flatMap((line) => line.split(/\s+/)) : lines)
-      .map((line) => line.trim())
-      .filter(Boolean)
-    if (mode === 'product' && titles.length === 0) {
-      setError('제목 목록을 한 줄에 하나씩 입력하세요')
-      return
-    }
-    if (mode === 'product' && !uploadAccountId) {
-      setError('업로드할 블로그 계정을 선택하세요')
-      return
-    }
-    setBusyKey('folder')
-    try {
+  const rememberFolder = useCallback(
+    async (path = folderPath, titlesText = folderTitles, label = folderLabel) => {
+      const localPath = path.trim()
+      if (!localPath) return
+      const titles = splitTitleText(titlesText)
       const folderMode: BlogMode = mode && mode !== 'seo' ? mode : 'folder'
-      const res = await fetch('/api/blog/folders', {
+      await fetch('/api/blog/folders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          localPath: folderPath,
-          label: folderLabel || activeMeta?.title || '',
+          localPath,
+          label: label || activeMeta?.title || '',
           mode: folderMode,
           titles,
           accountId: mode === 'product' ? uploadAccountId : undefined,
         }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '저장 실패')
-      setFolderTitles(titles.join('\n'))
+      }).catch(() => null)
       await loadFolders()
-      ping(`폴더가 등록되었습니다. 제목 ${titles.length}개`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '저장 실패')
-    } finally {
-      setBusyKey(null)
-    }
-  }
+    },
+    [folderPath, folderTitles, folderLabel, mode, uploadAccountId, activeMeta, loadFolders]
+  )
+
+  useEffect(() => {
+    if (mode !== 'product' || !folderPath.trim()) return
+    const handle = window.setTimeout(() => {
+      void rememberFolder()
+    }, 700)
+    return () => window.clearTimeout(handle)
+  }, [mode, folderPath, rememberFolder])
 
   async function startChromeWrite() {
     const titles = splitTitleText(folderTitles)
@@ -898,20 +882,6 @@ export function BlogClient() {
     } finally {
       setBusyKey(null)
     }
-  }
-
-  async function toggleFolder(id: string, enabled: boolean) {
-    await fetch('/api/blog/folders', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, enabled }),
-    })
-    await loadFolders()
-  }
-
-  async function removeFolder(id: string) {
-    await fetch(`/api/blog/folders?id=${id}`, { method: 'DELETE' })
-    await loadFolders()
   }
 
   const dowOptions = WEEKDAY_LABELS.map((label, value) => ({ label, value: value as Weekday }))
@@ -1378,8 +1348,20 @@ export function BlogClient() {
           >
             <ArrowLeft className="h-3.5 w-3.5" /> 글 발행 홈
           </button>
-          <h1 className="text-xl font-bold text-white">{activeMeta?.title}</h1>
-          <p className="mt-1 text-sm text-white/45">{activeMeta?.hint}</p>
+          {mode === 'product' ? (
+            <>
+              <p className="text-[11px] font-medium tracking-[0.2em] text-white/35">NAVER BLOG</p>
+              <h1 className="mt-2 text-[1.7rem] font-semibold tracking-tight text-white">자동 글쓰기</h1>
+              <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/45">
+                폴더와 제목을 정해 두면, 사진과 멘트를 이어서 올립니다.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold text-white">{activeMeta?.title}</h1>
+              <p className="mt-1 text-sm text-white/45">{activeMeta?.hint}</p>
+            </>
+          )}
         </div>
         {(mode === 'seo' || mode === 'home') && (
           <button
@@ -1583,8 +1565,162 @@ export function BlogClient() {
         </div>
       ) : null}
 
-      {subTab === 'folders' || mode === 'product' ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+      {mode === 'product' ? (
+        <section className="space-y-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-medium text-white/80">계정</h2>
+              {naverAccounts.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    for (const account of naverAccounts) void verifyAccount(account)
+                  }}
+                  className="text-[11px] text-white/40 transition hover:text-white/70"
+                >
+                  연동 {naverAccounts.filter((account) => linkStatus[account.id]?.state === 'linked').length}/
+                  {naverAccounts.length}
+                </button>
+              ) : null}
+            </div>
+            {showNaverAccountForm ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  value={naverLoginId}
+                  onChange={(e) => setNaverLoginId(e.target.value)}
+                  placeholder="네이버 아이디"
+                  name="mostem-naver-login-id"
+                  autoComplete="off"
+                  readOnly
+                  onFocus={(e) => {
+                    e.currentTarget.readOnly = false
+                  }}
+                  className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25"
+                />
+                <input
+                  value={naverPassword}
+                  onChange={(e) => setNaverPassword(e.target.value)}
+                  placeholder="비밀번호"
+                  type="password"
+                  name="mostem-naver-login-secret"
+                  autoComplete="new-password"
+                  readOnly
+                  onFocus={(e) => {
+                    e.currentTarget.readOnly = false
+                  }}
+                  className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25"
+                />
+                <input
+                  value={naverBlogId}
+                  onChange={(e) => setNaverBlogId(e.target.value)}
+                  placeholder="블로그 아이디, 로그인 아이디와 같으면 비움"
+                  className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25 sm:col-span-2"
+                />
+                <button
+                  type="button"
+                  disabled={savingAccount}
+                  onClick={() => void saveNaverAccount()}
+                  className="rounded-full bg-white px-4 py-3 text-sm font-semibold text-neutral-950 disabled:opacity-50"
+                >
+                  {savingAccount ? '등록 중' : '계정 등록'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNaverAccountForm(false)
+                    setNaverLoginId('')
+                    setNaverPassword('')
+                    setNaverBlogId('')
+                  }}
+                  className="rounded-full px-4 py-3 text-sm text-white/55 transition hover:text-white"
+                >
+                  닫기
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {naverAccounts.map((account) => {
+                  const selected = account.id === uploadAccountId
+                  const linked = linkStatus[account.id]?.state === 'linked'
+                  return (
+                    <div
+                      key={account.id}
+                      className={cn(
+                        'flex items-center gap-2 rounded-full border px-3 py-1.5 transition',
+                        selected ? 'border-white/30 bg-white text-neutral-950' : 'border-white/10 bg-white/[0.03] text-white/70'
+                      )}
+                    >
+                      <button type="button" onClick={() => setUploadAccountId(account.id)} className="text-sm font-medium">
+                        {account.username || accountBlogId(account)}
+                      </button>
+                      <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
+                      <button
+                        type="button"
+                        onClick={() => void removeAccount(account.id)}
+                        className={cn('text-[11px]', selected ? 'text-neutral-500' : 'text-white/35 hover:text-white/70')}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  )
+                })}
+                <button
+                  type="button"
+                  onClick={() => setShowNaverAccountForm(true)}
+                  className="rounded-full border border-dashed border-white/15 px-3 py-1.5 text-sm text-white/50 transition hover:border-white/30 hover:text-white"
+                >
+                  계정 추가
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-white/80">폴더</h2>
+            </div>
+            <button
+              type="button"
+              disabled={pickingFolder}
+              onClick={() => void pickLocalFolder()}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2.5 text-sm text-white/80 transition hover:border-white/25 hover:bg-white/[0.04] disabled:opacity-50"
+            >
+              {pickingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+              폴더 찾아보기
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-white/80">제목</h2>
+              <span className="text-[11px] text-white/35">{splitTitleText(folderTitles).length}개 · 쓸 때마다 랜덤</span>
+            </div>
+            <textarea
+              value={folderTitles}
+              onChange={(e) => setFolderTitles(e.target.value)}
+              placeholder="한 줄에 하나, 또는 띄어쓰기로 구분"
+              rows={6}
+              className="w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-relaxed outline-none transition placeholder:text-white/25 focus:border-white/25"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              disabled={busyKey === 'chrome' || !folderPath.trim()}
+              onClick={() => void startChromeWrite()}
+              className="mostem-upload-btn group relative flex w-full items-center justify-center overflow-hidden rounded-full bg-[linear-gradient(110deg,#fff8e8_0%,#f6d98a_38%,#fffdf6_50%,#f0c85a_100%)] px-6 py-4 text-[15px] font-semibold tracking-tight text-neutral-950 transition duration-300 hover:scale-[1.015] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
+            >
+              <span className="mostem-upload-sheen pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+              <span className="relative">{busyKey === 'chrome' ? '업로드 중' : '자동업로드 시작'}</span>
+            </button>
+            {chromeNote ? <p className="text-center text-xs text-white/45">{chromeNote}</p> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {subTab === 'folders' && mode !== 'product' ? (
+        <div className="grid gap-4">
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
             {mode === 'product' ? (
               <div className="space-y-2">
@@ -1731,14 +1867,6 @@ export function BlogClient() {
                 {pickingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
                 폴더 찾아보기
               </button>
-              <button
-                type="button"
-                disabled={busyKey === 'folder' || !folderPath.trim()}
-                onClick={() => void addFolder()}
-                className="rounded-xl bg-gold/20 px-3 py-2.5 text-sm font-semibold text-gold disabled:opacity-50"
-              >
-                이 모드에 등록
-              </button>
               {mode === 'product' ? (
                 <button
                   type="button"
@@ -1773,67 +1901,17 @@ export function BlogClient() {
               </>
             ) : null}
           </div>
-          <div className="space-y-2">
-            {modeFolders.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-white/40">
-                이 모드에 등록된 폴더가 없습니다.
-              </div>
-            ) : (
-              modeFolders.map((f) => (
-                <div
-                  key={f.id}
-                  className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 text-sm"
-                >
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="font-semibold text-white">{f.label || f.local_path}</span>
-                    <span className={cn('text-[10px]', f.enabled ? 'text-emerald-400' : 'text-white/35')}>
-                      {f.enabled ? '감시중' : '중지'}
-                    </span>
-                  </div>
-                  <p className="break-all text-[11px] text-white/45">{f.local_path}</p>
-                  {mode === 'product' && typeof f.meta?.accountId === 'string' ? (
-                    <p className="mt-1 text-[11px] text-white/40">
-                      업로드 계정{' '}
-                      {naverAccounts.find((account) => account.id === f.meta.accountId)?.username || '선택됨'}
-                    </p>
-                  ) : null}
-                  {mode === 'product' ? (
-                    <p className="mt-1 text-[11px] text-white/40">
-                      제목 {Array.isArray(f.meta?.titles) ? f.meta.titles.length : 0}개 · 다음 이미지{' '}
-                      {Number(f.meta?.imageOffset) || 0}번부터 10장
-                    </p>
-                  ) : null}
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void toggleFolder(f.id, !f.enabled)}
-                      className="rounded-lg bg-white/10 px-2 py-1 text-[11px]"
-                    >
-                      {f.enabled ? '중지' : '시작'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void removeFolder(f.id)}
-                      className="rounded-lg bg-red-500/15 px-2 py-1 text-[11px] text-red-200"
-                    >
-                      삭제
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
         </div>
       ) : null}
 
       {subTab === 'ops' || mode === 'product' ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '3. 카테고리 On/Off' : '네이버 카테고리 On/Off'}
+        <div className={mode === 'product' ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'}>
+          <div className={mode === 'product' ? 'space-y-4 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8' : 'space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4'}>
+            <div className="flex items-center gap-2 text-sm font-medium text-white/80">
+              <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '카테고리 공개' : '네이버 카테고리 On/Off'}
             </div>
-            <p className="text-xs text-white/40">
-              예: 금 17:00 공개 → 일 21:00 비공개. 예약 시각에 PC + 로컬 에이전트가 켜져 있어야 합니다.
+            <p className="text-xs leading-relaxed text-white/40">
+              예: 금 17:00 공개, 일 21:00 비공개. 그 시간에 이 PC가 켜져 있어야 합니다.
             </p>
             <input
               value={catName}
@@ -1849,9 +1927,10 @@ export function BlogClient() {
                 const blogId = String(acc?.meta?.blogId || '')
                 if (blogId) setCatBlogId(blogId)
               }}
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-sm text-white"
+              className="w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none"
+              style={{ colorScheme: 'dark' }}
             >
-              <option value="">네이버 계정 선택 (선택)</option>
+              <option value="">네이버 계정 선택</option>
               {accounts
                 .filter((a) => a.provider === 'naver')
                 .map((a) => (
@@ -1872,7 +1951,8 @@ export function BlogClient() {
                 <select
                   value={openDow}
                   onChange={(e) => setOpenDow(Number(e.target.value) as Weekday)}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-sm text-white"
+                  className="mt-1 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none"
+                  style={{ colorScheme: 'dark' }}
                 >
                   {dowOptions.map((d) => (
                     <option key={d.value} value={d.value}>
@@ -1894,7 +1974,8 @@ export function BlogClient() {
                 <select
                   value={closeDow}
                   onChange={(e) => setCloseDow(Number(e.target.value) as Weekday)}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-sm text-white"
+                  className="mt-1 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none"
+                  style={{ colorScheme: 'dark' }}
                 >
                   {dowOptions.map((d) => (
                     <option key={d.value} value={d.value}>
@@ -1916,7 +1997,7 @@ export function BlogClient() {
               type="button"
               disabled={busyKey === 'sched'}
               onClick={() => void addSchedule()}
-              className="rounded-lg bg-gold/20 px-3 py-2 text-xs font-semibold text-gold disabled:opacity-50"
+              className="rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/80 transition hover:bg-white/[0.04] disabled:opacity-50"
             >
               스케줄 추가
             </button>
@@ -2096,7 +2177,7 @@ export function BlogClient() {
             return uploads.map((item) => ({ folder, item: item as Record<string, unknown> }))
           }).length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
-              아직 올린 글이 없습니다. 폴더를 등록하면 사용한 제목과 이미지가 여기에 남습니다.
+              아직 올린 글이 없습니다.
             </div>
           ) : (
             modeFolders.flatMap((folder) => {
