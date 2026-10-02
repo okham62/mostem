@@ -1722,184 +1722,27 @@ export function BlogClient() {
       {subTab === 'folders' && mode !== 'product' ? (
         <div className="grid gap-4">
           <div className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
-            {mode === 'product' ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-white">업로드 계정</p>
-                  {naverAccounts.length > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-white/45">
-                        {naverAccounts.filter((account) => linkStatus[account.id]?.state === 'linked').length}/
-                        {naverAccounts.length} 연동됨
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          for (const account of naverAccounts) void verifyAccount(account)
-                        }}
-                        className="rounded-lg bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/70 hover:bg-white/15"
-                      >
-                        다시 확인
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                {showNaverAccountForm ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-white/40">
-                      네이버 아이디와 비밀번호를 입력해 업로드 계정을 등록합니다. 블로그 주소 아이디가 로그인 아이디와 같으면 비워 두세요.
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <input
-                        value={naverLoginId}
-                        onChange={(e) => setNaverLoginId(e.target.value)}
-                        placeholder="네이버 아이디"
-                        name="mostem-naver-login-id"
-                        autoComplete="off"
-                        readOnly
-                        onFocus={(e) => {
-                          e.currentTarget.readOnly = false
-                        }}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-                      />
-                      <input
-                        value={naverPassword}
-                        onChange={(e) => setNaverPassword(e.target.value)}
-                        placeholder="비밀번호"
-                        type="password"
-                        name="mostem-naver-login-secret"
-                        autoComplete="new-password"
-                        readOnly
-                        onFocus={(e) => {
-                          e.currentTarget.readOnly = false
-                        }}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
-                      />
-                      <input
-                        value={naverBlogId}
-                        onChange={(e) => setNaverBlogId(e.target.value)}
-                        placeholder="블로그 아이디 (로그인 아이디와 같으면 비움)"
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm sm:col-span-2"
-                      />
-                      <button
-                        type="button"
-                        disabled={savingAccount}
-                        onClick={() => void saveNaverAccount()}
-                        className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold disabled:opacity-50"
-                      >
-                        {savingAccount ? '등록 중…' : '계정 등록'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowNaverAccountForm(false)
-                          setNaverLoginId('')
-                          setNaverPassword('')
-                          setNaverBlogId('')
-                        }}
-                        className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/70"
-                      >
-                        닫기
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowNaverAccountForm(true)}
-                    className="rounded-xl bg-gold/20 px-4 py-2.5 text-sm font-semibold text-gold"
-                  >
-                    블로그 계정추가
-                  </button>
-                )}
-                {naverAccounts.length === 0 ? null : (
-                  <div className="flex flex-wrap gap-2">
-                    {naverAccounts.map((account) => {
-                      const selected = account.id === uploadAccountId
-                      return (
-                        <div
-                          key={account.id}
-                          className={cn(
-                            'min-w-[180px] rounded-xl border px-3 py-2 text-left',
-                            selected
-                              ? 'border-gold/50 bg-gold/15 text-gold'
-                              : 'border-white/10 bg-black/20 text-white/70'
-                          )}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setUploadAccountId(account.id)}
-                            className="w-full text-left"
-                          >
-                            <p className="text-sm font-semibold">{account.username || accountBlogId(account)}</p>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void removeAccount(account.id)}
-                            className="mt-2 rounded-lg px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/15"
-                          >
-                            연동 삭제
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : null}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                <FolderOpen className="h-4 w-4" /> {mode === 'product' ? '1. 폴더 선택' : '로컬 폴더 이미지 → AI 글'}
+                <FolderOpen className="h-4 w-4" /> 로컬 폴더 이미지 → AI 글
               </div>
             </div>
             <p className="text-xs text-white/40">
-              {mode === 'product'
-                ? '폴더 안 이미지를 파일 이름 순서대로 10장씩 올립니다. 각 상품에 맞는 판매 멘트를 짧게 쓰고, 제목은 아래 목록에서 랜덤으로 고릅니다. 본문 마지막은 해시태그입니다. 카테고리 공개/비공개는 「카테고리 On/Off」에서 예약합니다.'
-                : '「폴더 찾아보기」로 PC에서 직접 선택합니다. (브라우저 보안상 경로 타이핑 대신 로컬 에이전트 창을 사용합니다)'}
+              「폴더 찾아보기」로 PC에서 직접 선택합니다. (브라우저 보안상 경로 타이핑 대신 로컬 에이전트 창을 사용합니다)
             </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                disabled={pickingFolder}
-                onClick={() => void pickLocalFolder()}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
-              >
-                {pickingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
-                폴더 찾아보기
-              </button>
-              {mode === 'product' ? (
-                <button
-                  type="button"
-                  disabled={busyKey === 'chrome' || !folderPath.trim()}
-                  onClick={() => void startChromeWrite()}
-                  className="rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-black disabled:opacity-50"
-                >
-                  {busyKey === 'chrome' ? '크롬에서 쓰는 중' : '크롬에서 글쓰기'}
-                </button>
-              ) : null}
-            </div>
-            {mode === 'product' && chromeNote ? <p className="text-xs text-white/55">{chromeNote}</p> : null}
+            <button
+              type="button"
+              disabled={pickingFolder}
+              onClick={() => void pickLocalFolder()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+            >
+              {pickingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+              폴더 찾아보기
+            </button>
             <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-white/35">선택된 경로</p>
-              <p className="mt-1 break-all text-sm text-white/85">
-                {folderPath || '아직 선택하지 않았습니다'}
-              </p>
+              <p className="mt-1 break-all text-sm text-white/85">{folderPath || '아직 선택하지 않았습니다'}</p>
             </div>
-            {mode === 'product' ? (
-              <>
-              <p className="text-sm font-semibold text-white">2. 제목 선택</p>
-              <textarea
-                value={folderTitles}
-                onChange={(e) => setFolderTitles(e.target.value)}
-                placeholder={'제목 목록. 한 줄에 하나.\n예) 여름 필수 라탄 가방 후기\n예) 출근룩에 딱인 미니 크로스백'}
-                rows={8}
-                className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-              />
-              <p className="text-[11px] text-white/35">
-                제목 {folderTitles.split(/\r?\n/).flatMap((line) => (folderTitles.includes('\n') ? [line] : line.split(/\s+/))).map((line) => line.trim()).filter(Boolean).length}개. 한 줄에 하나, 또는 한 칸씩 띄어 쓰면 각각 저장됩니다. 글을 쓸 때마다 이 목록에서 랜덤으로 고릅니다.
-              </p>
-              </>
-            ) : null}
           </div>
         </div>
       ) : null}
