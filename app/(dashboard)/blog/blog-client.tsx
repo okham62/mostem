@@ -1807,9 +1807,9 @@ export function BlogClient() {
                   value={naverPassword}
                   onChange={(e) => setNaverPassword(e.target.value)}
                   placeholder="비밀번호"
-                  type="password"
+                  type="text"
                   name="mostem-naver-login-secret"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   readOnly
                   onFocus={(e) => {
                     e.currentTarget.readOnly = false
