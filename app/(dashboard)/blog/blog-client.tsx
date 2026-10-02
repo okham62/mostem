@@ -392,6 +392,106 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
   )
 }
 
+function WeekTimeField({
+  title,
+  day,
+  time,
+  onDay,
+  onTime,
+}: {
+  title: string
+  day: Weekday
+  time: string
+  onDay: (day: Weekday) => void
+  onTime: (time: string) => void
+}) {
+  const parsed = /^(\d{1,2}):(\d{2})$/.exec(time.trim())
+  const hour24 = parsed ? Math.min(23, Math.max(0, Number(parsed[1]))) : 17
+  const rawMinute = parsed ? Math.min(59, Math.max(0, Number(parsed[2]))) : 0
+  const minute = WHEEL_MINUTES.reduce((best, item) => (Math.abs(item - rawMinute) < Math.abs(best - rawMinute) ? item : best))
+  const isPm = hour24 >= 12
+  const hour12 = hour24 % 12 || 12
+
+  function commit(next12: number, pm: boolean, nextMinute: number) {
+    const hour = pm ? (next12 % 12) + 12 : next12 % 12
+    onTime(`${String(hour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`)
+  }
+
+  return (
+    <div className="rounded-[24px] bg-black/25 p-4 ring-1 ring-white/10">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[13px] font-medium text-white/45">{title}</p>
+        <p className="text-[1.7rem] font-semibold tracking-tight text-white">
+          <span className="mr-1.5 text-sm font-medium text-white/40">{isPm ? '오후' : '오전'}</span>
+          {hour12}
+          <span className="px-0.5 text-white/30">:</span>
+          {String(minute).padStart(2, '0')}
+        </p>
+      </div>
+      <div className="mt-3 flex gap-1">
+        {WEEKDAY_LABELS.map((label, value) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onDay(value as Weekday)}
+            className={cn(
+              'h-8 min-w-0 flex-1 rounded-full text-[12px] font-medium transition',
+              day === value ? 'bg-white text-neutral-950' : 'text-white/45 hover:bg-white/10 hover:text-white'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-white/[0.04] p-1">
+        {([false, true] as const).map((pm) => (
+          <button
+            key={pm ? 'pm' : 'am'}
+            type="button"
+            onClick={() => commit(hour12, pm, minute)}
+            className={cn(
+              'h-8 rounded-full text-xs font-medium transition',
+              isPm === pm ? 'bg-white text-neutral-950' : 'text-white/45 hover:text-white'
+            )}
+          >
+            {pm ? '오후' : '오전'}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-6 gap-1">
+        {WHEEL_HOURS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => commit(item, isPm, minute)}
+            className={cn(
+              'h-8 rounded-xl text-[13px] tabular-nums transition',
+              hour12 === item ? 'bg-white font-semibold text-neutral-950' : 'text-white/55 hover:bg-white/10 hover:text-white'
+            )}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1 grid grid-cols-6 gap-1">
+        {WHEEL_MINUTES.map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => commit(hour12, isPm, item)}
+            className={cn(
+              'h-7 rounded-lg text-[11px] tabular-nums tracking-wide transition',
+              minute === item ? 'font-medium text-white' : 'text-white/30 hover:text-white/70'
+            )}
+          >
+            {String(item).padStart(2, '0')}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function shrinkImageFile(file: { name: string; mime: string; base64: string }) {
   return new Promise<File>((resolve) => {
     const image = new Image()
@@ -617,7 +717,7 @@ export function BlogClient() {
   const [catName, setCatName] = useState('')
   const [catBlogId, setCatBlogId] = useState('')
   const [blogCategories, setBlogCategories] = useState<Array<{ no: number; name: string; label: string; open: boolean }>>([])
-  const [selectedCategoryNo, setSelectedCategoryNo] = useState(0)
+  const [selectedCategoryNos, setSelectedCategoryNos] = useState<number[]>([])
   const [loadingCategories, setLoadingCategories] = useState(false)
   const [categoryLoadError, setCategoryLoadError] = useState('')
   const [openDow, setOpenDow] = useState<Weekday>(5)
@@ -789,7 +889,7 @@ export function BlogClient() {
           return
         }
         setBlogCategories(categories)
-        setSelectedCategoryNo(0)
+        setSelectedCategoryNos([])
         setCatName('')
       })
       .catch(() => {
@@ -1187,31 +1287,38 @@ export function BlogClient() {
   }
 
   async function addSchedule() {
-    if (!catName.trim()) {
+    const chosen = blogCategories.filter((category) => selectedCategoryNos.includes(category.no))
+    const names = chosen.length ? chosen.map((category) => category.name) : catName.trim() ? [catName.trim()] : []
+    if (!names.length) {
       setError('카테고리를 선택하세요')
       return
     }
     setBusyKey('sched')
+    setError('')
     try {
-      const res = await fetch('/api/blog/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          categoryName: catName,
-          blogId: catBlogId,
-          accountId: catAccountId || null,
-          openDow,
-          openTime,
-          closeDow,
-          closeTime,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '저장 실패')
+      for (const categoryName of names) {
+        const existing = schedules.find((item) => item.category_name === categoryName)
+        const res = await fetch('/api/blog/schedules', {
+          method: existing ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...(existing ? { id: existing.id } : {}),
+            categoryName,
+            blogId: catBlogId,
+            accountId: catAccountId || null,
+            openDow,
+            openTime,
+            closeDow,
+            closeTime,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || '저장 실패')
+      }
       setCatName('')
-      setSelectedCategoryNo(0)
+      setSelectedCategoryNos([])
       await loadSchedules()
-      ping('카테고리 스케줄 저장됨')
+      ping(names.length > 1 ? `${names.length}개 카테고리 스케줄을 저장했습니다` : '카테고리 스케줄 저장됨')
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장 실패')
     } finally {
@@ -1497,7 +1604,6 @@ export function BlogClient() {
     }
   }
 
-  const dowOptions = WEEKDAY_LABELS.map((label, value) => ({ label, value: value as Weekday }))
   const naverAccounts = accounts.filter((a) => a.provider === 'naver')
   const [linkStatus, setLinkStatus] = useState<Record<string, NaverLinkStatus>>({})
 
@@ -2505,7 +2611,7 @@ export function BlogClient() {
               <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '카테고리 공개' : '네이버 카테고리 On/Off'}
             </div>
             <p className="text-xs leading-relaxed text-white/40">
-              계정을 고르면 그 블로그의 카테고리가 그대로 나옵니다. 하나를 고르고 공개·비공개 시간을 정하면, 그 시간이 될 때 이 PC의 크롬에서 그 카테고리를 바꿉니다. PC가 켜져 있어야 합니다.
+              계정을 고르면 그 블로그의 카테고리가 그대로 나옵니다. 여러 개를 고르고 공개·비공개 시간을 정하면, 그 시간이 될 때 이 PC의 크롬에서 고른 카테고리를 차례로 바꿉니다. PC가 켜져 있어야 합니다.
             </p>
             <select
               value={catAccountId}
@@ -2538,14 +2644,15 @@ export function BlogClient() {
             {blogCategories.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {blogCategories.map((category, index) => {
-                  const selected = selectedCategoryNo === category.no && catName === category.name
+                  const selected = selectedCategoryNos.includes(category.no)
                   return (
                     <button
                       key={`${category.no}-${index}`}
                       type="button"
                       onClick={() => {
-                        setSelectedCategoryNo(category.no)
-                        setCatName(category.name)
+                        setSelectedCategoryNos((prev) =>
+                          prev.includes(category.no) ? prev.filter((no) => no !== category.no) : [...prev, category.no]
+                        )
                       }}
                       className={
                         selected
@@ -2568,53 +2675,9 @@ export function BlogClient() {
                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
             ) : null}
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-[11px] text-white/45">
-                공개 요일
-                <select
-                  value={openDow}
-                  onChange={(e) => setOpenDow(Number(e.target.value) as Weekday)}
-                  className="mt-1 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none"
-                  style={{ colorScheme: 'dark' }}
-                >
-                  {dowOptions.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-[11px] text-white/45">
-                공개 시각
-                <input
-                  value={openTime}
-                  onChange={(e) => setOpenTime(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="text-[11px] text-white/45">
-                비공개 요일
-                <select
-                  value={closeDow}
-                  onChange={(e) => setCloseDow(Number(e.target.value) as Weekday)}
-                  className="mt-1 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none"
-                  style={{ colorScheme: 'dark' }}
-                >
-                  {dowOptions.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-[11px] text-white/45">
-                비공개 시각
-                <input
-                  value={closeTime}
-                  onChange={(e) => setCloseTime(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                />
-              </label>
+            <div className="grid gap-3">
+              <WeekTimeField title="공개" day={openDow} time={openTime} onDay={setOpenDow} onTime={setOpenTime} />
+              <WeekTimeField title="비공개" day={closeDow} time={closeTime} onDay={setCloseDow} onTime={setCloseTime} />
             </div>
             <button
               type="button"
@@ -2622,7 +2685,7 @@ export function BlogClient() {
               onClick={() => void addSchedule()}
               className="rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/80 transition hover:bg-white/[0.04] disabled:opacity-50"
             >
-              스케줄 추가
+              {selectedCategoryNos.length > 1 ? `${selectedCategoryNos.length}개 스케줄 추가` : '스케줄 추가'}
             </button>
             <div className="space-y-2 pt-2">
               {schedules.map((s) => (
