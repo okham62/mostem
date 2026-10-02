@@ -721,6 +721,7 @@ export function BlogClient() {
   const [savingAccount, setSavingAccount] = useState(false)
 
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [catAccountId, setCatAccountId] = useState('')
   const [catName, setCatName] = useState('')
   const [catBlogId, setCatBlogId] = useState('')
@@ -2385,10 +2386,12 @@ export function BlogClient() {
                       onClick={() => setUploadAccountId(account.id)}
                       className={cn(
                         'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition',
-                        selected ? 'border-white/30 bg-white text-neutral-950' : 'border-white/10 bg-white/[0.03] text-white/70'
+                        selected ? 'border-white/30 bg-white' : 'border-white/10 bg-white/[0.03]'
                       )}
                     >
-                      {account.username || accountBlogId(account)}
+                      <span className={selected ? 'text-emerald-600' : 'text-emerald-400'}>
+                        {account.username || accountBlogId(account)}
+                      </span>
                       <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
                     </button>
                   )
@@ -2429,7 +2432,7 @@ export function BlogClient() {
                       key={account.id}
                       className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
                     >
-                      <span className="truncate text-sm text-white">{account.username || accountBlogId(account)}</span>
+                      <span className="truncate text-sm font-medium text-emerald-400">{account.username || accountBlogId(account)}</span>
                       <button
                         type="button"
                         onClick={() => void removeAccount(account.id)}
@@ -2630,25 +2633,61 @@ export function BlogClient() {
             <p className="text-xs leading-relaxed text-white/40">
               계정을 고르면 그 블로그의 카테고리가 그대로 나옵니다. 여러 개를 고르고 공개·비공개 시간을 정하면, 그 시간이 될 때 이 PC의 크롬에서 고른 카테고리를 차례로 바꿉니다. PC가 켜져 있어야 합니다.
             </p>
-            <select
-              value={catAccountId}
-              onChange={(e) => {
-                setCatAccountId(e.target.value)
-                const acc = accounts.find((a) => a.id === e.target.value)
-                setCatBlogId(acc ? accountBlogId(acc) : '')
-              }}
-              className="w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none"
-              style={{ colorScheme: 'dark' }}
-            >
-              <option value="">네이버 계정 선택</option>
-              {accounts
-                .filter((a) => a.provider === 'naver')
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.username} ({a.site_url})
-                  </option>
-                ))}
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAccountMenuOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-left text-sm outline-none"
+              >
+                {(() => {
+                  const selected = accounts.find((a) => a.id === catAccountId && a.provider === 'naver')
+                  return selected ? (
+                    <span className="min-w-0 truncate">
+                      <span className="font-medium text-emerald-400">{selected.username}</span>
+                      <span className="text-white/45"> ({selected.site_url})</span>
+                    </span>
+                  ) : (
+                    <span className="text-white/45">네이버 계정 선택</span>
+                  )
+                })()}
+                <ChevronDown className={cn('h-4 w-4 shrink-0 text-white/40 transition', accountMenuOpen && 'rotate-180')} />
+              </button>
+              {accountMenuOpen ? (
+                <>
+                  <button type="button" aria-label="닫기" className="fixed inset-0 z-10 cursor-default" onClick={() => setAccountMenuOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 py-1 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCatAccountId('')
+                        setCatBlogId('')
+                        setAccountMenuOpen(false)
+                      }}
+                      className="block w-full px-3 py-2.5 text-left text-sm text-white/45 hover:bg-white/[0.04]"
+                    >
+                      네이버 계정 선택
+                    </button>
+                    {accounts
+                      .filter((a) => a.provider === 'naver')
+                      .map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => {
+                            setCatAccountId(a.id)
+                            setCatBlogId(accountBlogId(a))
+                            setAccountMenuOpen(false)
+                          }}
+                          className="block w-full px-3 py-2.5 text-left text-sm hover:bg-white/[0.04]"
+                        >
+                          <span className="font-medium text-emerald-400">{a.username}</span>
+                          <span className="text-white/45"> ({a.site_url})</span>
+                        </button>
+                      ))}
+                  </div>
+                </>
+              ) : null}
+            </div>
             {loadingCategories ? (
               <p className="inline-flex items-center gap-1.5 text-xs text-white/45">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> 카테고리를 가져오는 중
