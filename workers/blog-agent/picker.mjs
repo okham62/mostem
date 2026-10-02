@@ -200,6 +200,38 @@ const server = http.createServer(async (req, res) => {
       })
     return
   }
+  if (url.pathname === '/login-account' && req.method === 'POST') {
+    const body = await readJson(req)
+    const typing = ['login', 'captcha', 'title', 'body', 'images', 'save']
+    const { chromeAlive, resetNaverSession } = await import('./naver-type.mjs')
+    const alive = await chromeAlive()
+    if (alive && typing.includes(writeJob.phase)) {
+      res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
+      return
+    }
+    resetNaverSession()
+    writeJob = { phase: 'chrome', message: '로그인 창을 여는 중' }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ ok: true }))
+    import('./naver-type.mjs')
+      .then(({ loginNaverAccount }) =>
+        loginNaverAccount(
+          {
+            blogId: String(body.blogId || ''),
+            loginId: String(body.loginId || ''),
+            password: String(body.password || ''),
+          },
+          (status) => {
+            writeJob = status
+          }
+        )
+      )
+      .catch((error) => {
+        writeJob = { phase: 'error', message: error instanceof Error ? error.message : '로그인 실패' }
+      })
+    return
+  }
   if (url.pathname === '/write-post' && req.method === 'POST') {
     const body = await readJson(req)
     if (['title', 'body', 'images', 'save'].includes(writeJob.phase)) {

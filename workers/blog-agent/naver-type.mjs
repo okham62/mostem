@@ -264,6 +264,23 @@ async function login(page, loginId, password, report) {
   }
 }
 
+export async function loginNaverAccount(input, onStatus) {
+  const report = guardStatus(onStatus)
+  const loginId = String(input.loginId || '')
+  const blogId = String(input.blogId || loginId)
+  report('chrome', '로그인 창을 여는 중')
+  const context = await browser('https://nid.naver.com/nidlogin.login')
+  const pages = context.pages()
+  const page = pages.find((item) => isLoginUrl(item.url())) || pages[0] || (await context.newPage())
+  await page.bringToFront()
+  report('login', `${loginId} 계정으로 로그인 중`)
+  await page.goto('https://nid.naver.com/nidlogin.logout', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {})
+  await login(page, loginId, input.password, report)
+  const home = blogId ? `https://blog.naver.com/${encodeURIComponent(blogId)}` : 'https://www.naver.com'
+  await page.goto(home, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {})
+  report('done', `${loginId} 로그인했습니다. 창은 닫지 않습니다.`)
+}
+
 async function editorFrame(page) {
   const deadline = Date.now() + 25000
   while (Date.now() < deadline) {

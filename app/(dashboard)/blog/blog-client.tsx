@@ -485,6 +485,7 @@ export function BlogClient() {
   const [uploadFinish, setUploadFinish] = useState<'' | 'draft' | 'schedule'>('')
   const [scheduleAt, setScheduleAt] = useState('')
   const [scheduleQueue, setScheduleQueue] = useState<string[]>([])
+  const [kakaoConnected, setKakaoConnected] = useState(false)
 
   const ping = (msg: string) => {
     setToast(msg)
@@ -787,6 +788,77 @@ export function BlogClient() {
     }
   }
 
+  async function loginAccount(account: AccountRow) {
+    setUploadAccountId(account.id)
+    setBusyKey(`login:${account.id}`)
+    setError('')
+    setChromeNote('로그인 창을 여는 중')
+    try {
+      const secretRes = await fetch('/api/blog/accounts/secret', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: account.id }),
+      })
+      const secret = await secretRes.json()
+      if (!secretRes.ok) throw new Error(secret.error || '계정 정보를 읽지 못했습니다')
+      const openRes = await fetch('http://127.0.0.1:39217/login-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          blogId: secret.blogId,
+          loginId: secret.loginId,
+          password: secret.password,
+        }),
+      })
+      const openData = await openRes.json().catch(() => ({}))
+      if (!openRes.ok) throw new Error(openData.error || '로그인 창을 열지 못했습니다. 폴더 프로그램을 확인해 주세요.')
+      let solvedImage = ''
+      let last = '로그인 창을 여는 중'
+      let done = false
+      for (let i = 0; i < 90; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        const statusRes = await fetch('http://127.0.0.1:39217/write-status')
+        const status = await statusRes.json().catch(() => ({}))
+        if (status.message) {
+          last = String(status.message)
+          setChromeNote(last)
+        }
+        if (status.phase === 'captcha' && status.image && status.image !== solvedImage) {
+          solvedImage = String(status.image)
+          setChromeNote('보안 확인 문제를 읽는 중')
+          const answerRes = await fetch('/api/blog/login-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              question: status.question || '화면의 영수증을 보고 입력칸의 정답을 구하세요',
+              image: status.image,
+            }),
+          })
+          const answerData = await answerRes.json().catch(() => ({}))
+          if (!answerRes.ok) throw new Error(answerData.error || '보안 확인 정답을 읽지 못했습니다')
+          await fetch('http://127.0.0.1:39217/captcha-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answer: answerData.answer }),
+          })
+        }
+        if (status.phase === 'error') throw new Error(last)
+        if (status.phase === 'done') {
+          done = true
+          break
+        }
+      }
+      if (!done) throw new Error('로그인 창을 확인한 뒤 다시 눌러 주세요.')
+      ping(last)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '로그인 실패'
+      setError(message)
+      setChromeNote(message)
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   async function removeAccount(id: string) {
     await fetch(`/api/blog/accounts?id=${id}`, { method: 'DELETE' })
     await loadAccounts()
@@ -894,6 +966,25 @@ export function BlogClient() {
     },
     [folderPath, folderTitles, folderLabel, mode, uploadAccountId, activeMeta, loadFolders]
   )
+
+  useEffect(() => {
+    if (mode !== 'product') return
+    const flag = searchParams.get('kakao')
+    if (flag === 'ok') {
+      setKakaoConnected(true)
+      ping('카톡 알림을 연결했습니다')
+    } else if (flag === 'nokey') {
+      setError('카톡 연결에 필요한 카카오 앱 키가 아직 없습니다.')
+    } else if (flag === 'fail') {
+      setError('카톡 연결에 실패했습니다. 나에게 보내기 동의가 필요합니다.')
+    }
+    void fetch('/api/blog/kakao')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.connected) setKakaoConnected(true)
+      })
+      .catch(() => null)
+  }, [mode, searchParams])
 
   useEffect(() => {
     if (mode !== 'product' || !folderPath.trim()) return
@@ -1914,6 +2005,17 @@ export function BlogClient() {
                         {account.username || accountBlogId(account)}
                       </button>
                       <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
+                      <button
+                        type="button"
+                        disabled={Boolean(busyKey)}
+                        onClick={() => void loginAccount(account)}
+                        className={cn(
+                          'text-[11px] font-medium underline-offset-2 hover:underline disabled:opacity-40',
+                          selected ? 'text-neutral-600' : 'text-white/55'
+                        )}
+                      >
+                        {busyKey === `login:${account.id}` ? '로그인 중' : '로그인하기'}
+                      </button>
                     </div>
                   )
                 })}
@@ -2071,7 +2173,7 @@ export function BlogClient() {
             <button
               type="button"
               disabled={
-                busyKey === 'chrome' ||
+                Boolean(busyKey) ||
                 !folderPath.trim() ||
                 (uploadFinish !== 'draft' && uploadFinish !== 'schedule') ||
                 (uploadFinish === 'schedule' && scheduleQueue.length === 0 && !scheduleAt)
