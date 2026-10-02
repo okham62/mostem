@@ -647,6 +647,7 @@ export function BlogClient() {
   const [folderLabel, setFolderLabel] = useState('')
   const [pickingFolder, setPickingFolder] = useState(false)
   const [chromeNote, setChromeNote] = useState('')
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null)
   const [uploadFinish, setUploadFinish] = useState<'' | 'draft' | 'schedule'>('')
   const [scheduleAt, setScheduleAt] = useState('')
   const [scheduleQueue, setScheduleQueue] = useState<string[]>([])
@@ -1348,6 +1349,8 @@ export function BlogClient() {
             usedFiles: writtenFiles,
             excerpt: String(articleData.article?.bodyMarkdown || '').replace(/!\[[^\]]*\]\([^)]+\)/g, '').slice(0, 240),
             postId: articleData.post?.id || null,
+            accountId: uploadAccountId,
+            accountName: accounts.find((item) => item.id === uploadAccountId)?.username || '',
           }),
         })
       }
@@ -2634,70 +2637,83 @@ export function BlogClient() {
       {mode === 'product' ? (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-white">업로드 기록</h2>
-          {modeFolders.flatMap((folder) => {
-            const uploads = Array.isArray(folder.meta?.uploads) ? folder.meta.uploads : []
-            return uploads.map((item) => ({ folder, item: item as Record<string, unknown> }))
-          }).length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
-              아직 올린 글이 없습니다.
-            </div>
-          ) : (
-            modeFolders.flatMap((folder) => {
-              const uploads = Array.isArray(folder.meta?.uploads) ? folder.meta.uploads : []
-              return uploads.map((raw) => {
-                const item = raw as Record<string, unknown>
-                const uploadId = String(item.id || '')
-                const files = Array.isArray(item.files) ? item.files.map((name) => String(name)) : []
-                const sent = Array.isArray(item.accounts) ? item.accounts : []
-                const sentIds = new Set(
-                  sent.map((account) => String((account as Record<string, unknown>).accountId || ''))
-                )
-                return (
-                  <article
-                    key={`${folder.id}:${uploadId}`}
-                    className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h3 className="text-sm font-bold text-white">{String(item.title || '제목 없음')}</h3>
-                      <p className="text-[11px] text-white/35">
-                        {item.at ? new Date(String(item.at)).toLocaleString('ko-KR') : ''}
-                      </p>
-                    </div>
-                    {item.excerpt ? (
-                      <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-white/55">{String(item.excerpt)}</p>
-                    ) : null}
-                    <p className="mt-2 text-[11px] text-white/40">이미지 {files.length}장 · {files.join(', ') || '기록 없음'}</p>
-                    <p className="mt-1 text-[11px] text-white/40">
-                      올린 계정:{' '}
-                      {sent.length
-                        ? sent.map((account) => String((account as Record<string, unknown>).name || '')).join(', ')
-                        : '아직 없음'}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {naverAccounts.length === 0 ? (
-                        <p className="text-[11px] text-white/35">네이버 계정을 추가하면 그 계정으로 다시 올릴 수 있습니다.</p>
-                      ) : (
-                        naverAccounts.map((account) => {
-                          const done = sentIds.has(account.id)
-                          return (
-                            <button
-                              key={account.id}
-                              type="button"
-                              disabled={done || Boolean(busyKey)}
-                              onClick={() => void reuploadToAccount(folder.id, uploadId, account.id)}
-                              className="rounded-lg bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
-                            >
-                              {done ? `${account.username}에 올림` : `${account.username}으로 재업로드`}
-                            </button>
-                          )
-                        })
-                      )}
-                    </div>
-                  </article>
-                )
+          {(() => {
+            const history = modeFolders
+              .flatMap((folder) => {
+                const uploads = Array.isArray(folder.meta?.uploads) ? folder.meta.uploads : []
+                return uploads.map((raw) => ({ folder, item: raw as Record<string, unknown> }))
               })
+              .sort((a, b) => String(b.item.at || '').localeCompare(String(a.item.at || '')))
+              .slice(0, 50)
+            if (history.length === 0) {
+              return (
+                <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/40">
+                  아직 올린 글이 없습니다.
+                </div>
+              )
+            }
+            return history.map(({ folder, item }) => {
+              const uploadId = String(item.id || '')
+              const rowId = `${folder.id}:${uploadId}`
+              const open = openHistoryId === rowId
+              const files = Array.isArray(item.files) ? item.files.map((name) => String(name)) : []
+              const sent = Array.isArray(item.accounts) ? item.accounts : []
+              const sentIds = new Set(
+                sent.map((account) => String((account as Record<string, unknown>).accountId || ''))
+              )
+              const accountLabel = sent.length
+                ? sent.map((account) => String((account as Record<string, unknown>).name || '')).filter(Boolean).join(', ')
+                : '계정 없음'
+              const when = item.at ? new Date(String(item.at)).toLocaleString('ko-KR') : ''
+              return (
+                <article
+                  key={rowId}
+                  className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenHistoryId((current) => (current === rowId ? null : rowId))}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                      {String(item.title || '제목 없음')}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-white/55">{accountLabel}</span>
+                    <span className="shrink-0 text-[11px] text-white/35">{when}</span>
+                  </button>
+                  {open ? (
+                    <div className="border-t border-white/10 px-4 pb-4 pt-3">
+                      {item.excerpt ? (
+                        <p className="line-clamp-3 text-xs leading-relaxed text-white/55">{String(item.excerpt)}</p>
+                      ) : null}
+                      <p className="mt-2 text-[11px] text-white/40">이미지 {files.length}장 · {files.join(', ') || '기록 없음'}</p>
+                      <p className="mt-1 text-[11px] text-white/40">올린 계정: {accountLabel}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {naverAccounts.length === 0 ? (
+                          <p className="text-[11px] text-white/35">네이버 계정을 추가하면 그 계정으로 다시 올릴 수 있습니다.</p>
+                        ) : (
+                          naverAccounts.map((account) => {
+                            const done = sentIds.has(account.id)
+                            return (
+                              <button
+                                key={account.id}
+                                type="button"
+                                disabled={done || Boolean(busyKey)}
+                                onClick={() => void reuploadToAccount(folder.id, uploadId, account.id)}
+                                className="rounded-lg bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
+                              >
+                                {done ? `${account.username}에 올림` : `${account.username}으로 재업로드`}
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              )
             })
-          )}
+          })()}
         </section>
       ) : null}
     </div>

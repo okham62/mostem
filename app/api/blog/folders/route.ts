@@ -121,9 +121,15 @@ export async function PATCH(req: Request) {
         excerpt: typeof body.excerpt === 'string' ? body.excerpt.slice(0, 240) : '',
         files,
         postId: typeof body.postId === 'string' ? body.postId : null,
-        accounts: [],
+        accounts: typeof body.accountId === 'string' && body.accountId
+          ? [{
+              accountId: body.accountId,
+              name: typeof body.accountName === 'string' ? body.accountName.trim() : '',
+              at: new Date().toISOString(),
+            }]
+          : [],
       })
-      meta.uploads = uploads.slice(0, 100)
+      meta.uploads = uploads.slice(0, 50)
     }
     patch.meta = meta
   }

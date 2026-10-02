@@ -119,7 +119,7 @@ export async function POST(req: Request) {
           postId: typeof body.postId === 'string' ? body.postId : null,
           accounts: [],
         })
-        meta.uploads = uploads.slice(0, 100)
+        meta.uploads = uploads.slice(0, 50)
       }
       await updateFolderWatcher(userId, folderId, {
         last_scan_at: new Date().toISOString(),
