@@ -1844,8 +1844,11 @@ export function BlogClient() {
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div>
               <h2 className="text-sm font-medium text-white/80">폴더</h2>
+              <p className="mt-1 break-all text-[11px] leading-relaxed text-white/45">
+                {folderPath.trim() || '아직 선택하지 않았습니다'}
+              </p>
             </div>
             <button
               type="button"
