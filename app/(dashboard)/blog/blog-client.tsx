@@ -766,10 +766,12 @@ export function BlogClient() {
       let writeSent = false
       let solvedImage = ''
       let last = '크롬 창을 여는 중'
+      let lastPhase = ''
       for (let i = 0; i < 180; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
         const statusRes = await fetch('http://127.0.0.1:39217/write-status')
         const status = await statusRes.json().catch(() => ({}))
+        if (status.phase) lastPhase = String(status.phase)
         if (status.message) {
           last = String(status.message)
           setChromeNote(last)
@@ -829,7 +831,7 @@ export function BlogClient() {
       if (!articleState.packed) articleState.packed = await articlePromise
       const articleData = articleState.packed.articleData
       const imageData = articleState.packed.imageData
-      if (folder?.id) {
+      if (folder?.id && lastPhase === 'done') {
         await fetch('/api/blog/folders', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },

@@ -137,6 +137,17 @@ const server = http.createServer(async (req, res) => {
         mime: mimeFor(file.name),
         base64: fs.readFileSync(file.abs).toString('base64'),
       }))
+      if (!files.length) {
+        const total = listImages(dir, new Set(), limit).length
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({
+          ok: false,
+          error: total
+            ? '이 폴더의 사진은 이미 사용한 것으로 표시되어 있습니다. 새 사진을 넣어 주세요.'
+            : '폴더에 이미지 파일이 없습니다',
+        }))
+        return
+      }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ ok: true, files }))
     } catch (error) {
@@ -155,10 +166,16 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/open-chrome' && req.method === 'POST') {
     const body = await readJson(req)
-    if (['chrome', 'login', 'captcha', 'ready', 'title', 'body', 'images'].includes(writeJob.phase)) {
-      res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
-      return
+    const typing = ['login', 'captcha', 'title', 'body', 'images']
+    if (typing.includes(writeJob.phase)) {
+      const { chromeAlive, resetNaverSession } = await import('./naver-type.mjs')
+      if (await chromeAlive()) {
+        res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
+        return
+      }
+      resetNaverSession()
+      writeJob = { phase: 'idle', message: '' }
     }
     writeJob = { phase: 'chrome', message: '크롬 창을 여는 중' }
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
@@ -184,9 +201,14 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/write-post' && req.method === 'POST') {
     const body = await readJson(req)
     if (['title', 'body', 'images'].includes(writeJob.phase)) {
-      res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
-      return
+      const { chromeAlive, resetNaverSession } = await import('./naver-type.mjs')
+      if (await chromeAlive()) {
+        res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
+        return
+      }
+      resetNaverSession()
+      writeJob = { phase: 'idle', message: '' }
     }
     if (!writeJob.phase || ['idle', 'done', 'error'].includes(writeJob.phase)) {
       writeJob = { phase: 'chrome', message: '크롬 창을 여는 중' }
