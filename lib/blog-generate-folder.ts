@@ -77,7 +77,7 @@ async function describeImageClaude(image: FolderImageInput, index: number) {
 async function describeImageGemini(image: FolderImageInput, index: number) {
   const apiKey = geminiKey()
   if (!apiKey) throw new AiError('Gemini 키가 없습니다.')
-  const model = 'gemini-2.0-flash'
+  const model = 'gemini-3.1-flash'
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
@@ -193,8 +193,9 @@ JSON만 반환:
 
   const gKey = geminiKey()
   if (!gKey) throw new AiError('AI 키가 없습니다.')
+  const geminiModel = 'gemini-3.1-flash'
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent?key=${gKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${gKey}`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -209,7 +210,7 @@ JSON만 반환:
   }
   const text = payload.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('')?.trim()
   if (!text) throw new AiError('Gemini 빈 응답')
-  return { raw: text, modelId: model.id }
+  return { raw: text, modelId: geminiModel }
 }
 
 /**
