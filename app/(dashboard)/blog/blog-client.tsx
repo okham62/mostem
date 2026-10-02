@@ -87,123 +87,137 @@ function formatSchedule(value: string) {
 function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next: string) => void }) {
   const now = new Date()
   const selected = parseSchedule(value)
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const selectedOffset = selected
-    ? Math.round(
-        (new Date(selected.getFullYear(), selected.getMonth(), selected.getDate()).getTime() - todayStart.getTime()) /
-          86400000
-      )
-    : -1
+  const weekdays = ['일', '월', '화', '수', '목', '금', '토']
+  const days = Array.from({ length: 21 }, (_, offset) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+    return {
+      offset,
+      date,
+      key: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+      name: offset === 0 ? '오늘' : offset === 1 ? '내일' : weekdays[date.getDay()],
+    }
+  })
 
-  function atDayHour(offset: number, hour: number, minute: number) {
-    const next = new Date(now)
-    next.setDate(next.getDate() + offset)
-    next.setHours(hour, minute, 0, 0)
-    return next
+  function sameDay(a: Date, b: Date) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   }
 
-  const presets = [
-    { label: '1시간 뒤', at: new Date(now.getTime() + 60 * 60 * 1000) },
-    { label: '3시간 뒤', at: new Date(now.getTime() + 3 * 60 * 60 * 1000) },
-    { label: '내일 오전', at: atDayHour(1, 9, 0) },
-    { label: '내일 저녁', at: atDayHour(1, 18, 0) },
-  ].filter((item) => item.at.getTime() > now.getTime() + 60_000)
-
-  function pickDay(offset: number) {
-    const hour = selected?.getHours() ?? 18
-    const minute = selected?.getMinutes() ?? 0
-    let next = atDayHour(offset, hour, minute)
-    if (next.getTime() < now.getTime() + 60_000) next = atDayHour(Math.max(offset, 1), 18, 0)
+  function apply(date: Date, hour24: number, minute: number) {
+    const next = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour24, minute, 0, 0)
+    if (next.getTime() < now.getTime() + 60_000) return
     onChange(toLocalInput(next))
   }
 
-  function pickDate(dateValue: string) {
-    const [year, month, day] = dateValue.split('-').map(Number)
-    if (!year || !month || !day) return
-    const next = new Date(year, month - 1, day, selected?.getHours() ?? 18, selected?.getMinutes() ?? 0, 0, 0)
-    onChange(toLocalInput(next))
-  }
-
-  function pickHour(hour: number) {
-    const base = selected ?? atDayHour(hour <= now.getHours() ? 1 : 0, hour, 0)
-    const next = new Date(base)
-    next.setHours(hour, selected?.getMinutes() ?? 0, 0, 0)
-    if (next.getTime() < now.getTime() + 60_000) next.setDate(next.getDate() + 1)
-    onChange(toLocalInput(next))
-  }
-
-  function pickMinute(minute: number) {
-    const base = selected ?? atDayHour(1, 18, minute)
-    const next = new Date(base)
-    next.setMinutes(minute, 0, 0)
-    if (next.getTime() < now.getTime() + 60_000) next.setDate(next.getDate() + 1)
-    onChange(toLocalInput(next))
-  }
-
-  const dateValue = selected
-    ? `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
-    : ''
-  const minDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-
-  const pill = (active: boolean) =>
-    cn(
-      'h-7 rounded-full border px-2.5 text-xs font-medium transition',
-      active ? 'border-white bg-white text-neutral-950' : 'border-white/10 text-white/75 hover:border-white/25'
-    )
+  const hour24 = selected?.getHours() ?? 18
+  const minute = selected?.getMinutes() ?? 0
+  const isPm = hour24 >= 12
+  const hour12 = hour24 % 12 || 12
+  const baseDate = selected ?? days[1].date
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-1">
-        {presets.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            onClick={() => onChange(toLocalInput(item.at))}
-            className={pill(value === toLocalInput(item.at))}
-          >
-            {item.label}
-          </button>
-        ))}
+    <div className="overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
+      <div className="px-4 pb-2 pt-3">
+        <p className="text-[22px] font-medium tracking-tight text-white">
+          {value ? formatSchedule(value) : '날짜와 시간'}
+        </p>
       </div>
-      <div className="flex flex-wrap items-center gap-1">
-        {['오늘', '내일', '모레'].map((label, offset) => (
-          <button key={label} type="button" onClick={() => pickDay(offset)} className={pill(selectedOffset === offset)}>
-            {label}
-          </button>
-        ))}
-        <input
-          type="date"
-          value={dateValue}
-          min={minDate}
-          onChange={(event) => pickDate(event.target.value)}
-          aria-label="예약 날짜"
-          className="h-7 rounded-full border border-white/10 bg-black/20 px-2 text-xs text-white outline-none"
-          style={{ colorScheme: 'dark' }}
-        />
+      <div className="flex gap-1 overflow-x-auto px-3 pb-3">
+        {days.map((day) => {
+          const active = selected ? sameDay(selected, day.date) : false
+          return (
+            <button
+              key={day.key}
+              type="button"
+              onClick={() => apply(day.date, hour24, minute)}
+              className={cn(
+                'flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-xl text-[11px] transition',
+                active ? 'bg-white text-neutral-950' : 'text-white/55 hover:bg-white/10 hover:text-white'
+              )}
+            >
+              <span className={cn('text-[10px]', active ? 'text-neutral-500' : 'text-white/35')}>{day.name}</span>
+              <span className="text-sm font-medium leading-none">{day.date.getDate()}</span>
+            </button>
+          )
+        })}
       </div>
-      <div className="flex flex-wrap gap-1">
-        {[9, 12, 15, 18, 21].map((hour) => (
-          <button
-            key={hour}
-            type="button"
-            onClick={() => pickHour(hour)}
-            className={pill(Boolean(selected && selected.getHours() === hour))}
-          >
-            {hour}시
-          </button>
-        ))}
-        {[0, 30].map((minute) => (
-          <button
-            key={minute}
-            type="button"
-            onClick={() => pickMinute(minute)}
-            className={pill(Boolean(selected && selected.getMinutes() === minute))}
-          >
-            {String(minute).padStart(2, '0')}분
-          </button>
-        ))}
+      <div className="space-y-2 border-t border-white/10 px-3 py-3">
+        <div className="grid grid-cols-2 rounded-lg bg-black/40 p-0.5 text-xs">
+          {(['오전', '오후'] as const).map((label) => {
+            const active = selected ? (label === '오후') === isPm : false
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  const nextHour = label === '오후' ? (hour12 % 12) + 12 : hour12 % 12
+                  apply(baseDate, nextHour === 24 ? 12 : nextHour, minute)
+                }}
+                className={cn(
+                  'rounded-md py-1 transition',
+                  active ? 'bg-white text-neutral-950' : 'text-white/50 hover:text-white'
+                )}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="grid grid-cols-6 gap-1">
+          {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => {
+            const hourValue = isPm ? (hour % 12) + 12 : hour % 12
+            const slot = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hourValue, minute, 0, 0)
+            const past = slot.getTime() < now.getTime() + 60_000
+            return (
+              <button
+                key={hour}
+                type="button"
+                disabled={past}
+                onClick={() => apply(baseDate, hourValue, minute)}
+                className={cn(
+                  'h-7 rounded-md text-xs transition disabled:text-white/15',
+                  selected && hour12 === hour ? 'bg-[#0a84ff] text-white' : 'text-white/70 hover:bg-white/10'
+                )}
+              >
+                {hour}
+              </button>
+            )
+          })}
+        </div>
+        <div className="grid grid-cols-6 gap-1">
+          {[0, 10, 20, 30, 40, 50].map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => apply(baseDate, hour24, item)}
+              className={cn(
+                'h-7 rounded-md text-[11px] transition',
+                selected && minute === item ? 'bg-white text-neutral-950' : 'text-white/45 hover:bg-white/10 hover:text-white'
+              )}
+            >
+              {String(item).padStart(2, '0')}
+            </button>
+          ))}
+        </div>
       </div>
-      {value ? <p className="text-xs font-medium text-white/80">{formatSchedule(value)}</p> : null}
+      <div className="flex gap-4 border-t border-white/10 px-4 py-2 text-[11px] text-white/45">
+        <button type="button" className="hover:text-white" onClick={() => onChange(toLocalInput(new Date(now.getTime() + 60 * 60 * 1000)))}>
+          1시간 뒤
+        </button>
+        <button
+          type="button"
+          className="hover:text-white"
+          onClick={() => apply(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), 9, 0)}
+        >
+          내일 오전
+        </button>
+        <button
+          type="button"
+          className="hover:text-white"
+          onClick={() => apply(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), 18, 0)}
+        >
+          내일 저녁
+        </button>
+      </div>
     </div>
   )
 }
