@@ -22,6 +22,7 @@ export const authConfig = {
         nextUrl.pathname.startsWith('/ai') ||
         nextUrl.pathname.startsWith('/calendar') ||
         nextUrl.pathname.startsWith('/links') ||
+        nextUrl.pathname.startsWith('/downloads') ||
         nextUrl.pathname.startsWith('/profit') ||
         nextUrl.pathname.startsWith('/challenge') ||
         nextUrl.pathname.startsWith('/ranking') ||

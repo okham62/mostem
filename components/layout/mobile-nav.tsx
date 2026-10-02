@@ -23,7 +23,7 @@ import { warmRealtimeCache } from '@/lib/realtime-cache'
 import { warmShoppingCache } from '@/lib/shopping-cache'
 import { warmTrendCache } from '@/lib/trend-cache'
 import { previewHideMarketTicker } from '@/components/layout/market-ticker'
-import { explore, publish, tools, type NavItem } from '@/components/layout/sidebar'
+import { downloads, explore, publish, tools, type NavItem } from '@/components/layout/sidebar'
 import type { Session } from 'next-auth'
 
 const PRIMARY = [
@@ -86,6 +86,7 @@ export function MobileNav({ session }: { session: Session | null }) {
     { title: '탐색', items: explore },
     { title: '발행', items: publish },
     { title: '도구', items: tools },
+    { title: '다운로드', items: downloads },
     ...(isAdmin
       ? [
           {

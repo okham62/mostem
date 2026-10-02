@@ -13,6 +13,7 @@ import {
   LineChart,
   Link2,
   Users,
+  Download,
   LogOut,
   PanelLeftClose,
   Sparkles,
@@ -75,6 +76,10 @@ export const tools = [
   { href: '/ai', label: 'AI 도구', icon: Sparkles },
   { href: '/links', label: '링크 변환', icon: Link2 },
   { href: '/coins', label: '코인 장부', icon: Coins },
+]
+
+export const downloads: NavItem[] = [
+  { href: '/downloads', label: '블로그 자동글쓰기', icon: Download },
 ]
 
 interface SidebarProps {
@@ -220,6 +225,7 @@ export function Sidebar({ session, onHide }: SidebarProps) {
         <NavGroup title="탐색" items={explore} />
         <NavGroup title="발행" items={publish} />
         <NavGroup title="도구" items={tools} />
+        <NavGroup title="다운로드" items={downloads} />
         {isAdmin && (
           <NavGroup
             title="관리"

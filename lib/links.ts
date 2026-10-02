@@ -220,6 +220,7 @@ export const RESERVED_PROFILE_SLUGS = new Set(
     'signout',
     'auth',
     'dashboard',
+    'downloads',
     'links',
     'threads',
     'instagram',
