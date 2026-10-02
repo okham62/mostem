@@ -195,9 +195,8 @@ function TimeWheel({
         event.currentTarget.dataset.dragY = String(event.clientY)
       }}
     >
-      <p className="mb-1 text-center text-[10px] text-white/35">{label}</p>
       <div className="flex items-stretch gap-1.5">
-        <div className="min-w-0 flex-1 overflow-hidden rounded-2xl bg-black/20 py-1">
+        <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-[#09090b] py-1 shadow-[inset_0_10px_16px_rgba(0,0,0,0.72),inset_0_-8px_12px_rgba(255,255,255,0.05)]">
           {around.map((item, row) => {
             const current = row === 1
             const blocked = disabled(item)
@@ -205,10 +204,15 @@ function TimeWheel({
               <div
                 key={`${row}-${item}`}
                 className={cn(
-                  'mx-2 flex h-8 items-center justify-center rounded-lg text-sm',
-                  current && tone === 'blue' && 'bg-[#0a84ff] font-medium text-white',
-                  current && tone === 'white' && 'bg-white font-medium text-neutral-950',
-                  !current && (blocked ? 'text-white/15' : 'text-white/35')
+                  'mx-2 flex h-8 items-center justify-center rounded-lg text-sm transition',
+                  current &&
+                    tone === 'blue' &&
+                    'bg-[linear-gradient(180deg,#7ec4ff_0%,#0a84ff_42%,#0057c2_100%)] font-semibold text-white shadow-[0_8px_14px_rgba(0,70,170,0.45),inset_0_1px_0_rgba(255,255,255,0.7)]',
+                  current &&
+                    tone === 'white' &&
+                    'bg-[linear-gradient(180deg,#ffffff_0%,#f3f3f5_48%,#d5d5dc_100%)] font-semibold text-neutral-950 shadow-[0_8px_14px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.95)]',
+                  !current && 'scale-90',
+                  !current && (blocked ? 'text-white/15' : 'text-white/40')
                 )}
               >
                 {format(item)}
@@ -223,7 +227,7 @@ function TimeWheel({
           aria-valuemin={values[0]}
           aria-valuemax={values[values.length - 1]}
           aria-valuenow={value}
-          className="relative my-1 w-3 shrink-0 cursor-ns-resize rounded-full bg-white/10"
+          className="relative my-1 w-3.5 shrink-0 cursor-ns-resize rounded-full bg-[#121214] shadow-[inset_2px_0_4px_rgba(0,0,0,0.75),inset_-1px_0_2px_rgba(255,255,255,0.12)]"
           onPointerDown={(event) => {
             event.stopPropagation()
             event.currentTarget.setPointerCapture(event.pointerId)
@@ -236,11 +240,12 @@ function TimeWheel({
         >
           <div
             data-dragbar="1"
-            className="absolute inset-x-0.5 rounded-full bg-white/80"
+            className="absolute inset-x-0.5 rounded-full bg-[linear-gradient(90deg,#ffffff_0%,#b9b9c2_42%,#f4f4f6_100%)] shadow-[0_2px_5px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.95)]"
             style={{ top: `${topPct}%`, height: `${thumbPct}%` }}
           />
         </div>
       </div>
+      <p className="mt-2 text-center text-[11px] tracking-wide text-white/55">{label}</p>
     </div>
   )
 }
@@ -352,7 +357,7 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
             )
           })}
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 pt-3">
           <TimeWheel
             label="시간"
             values={WHEEL_HOURS}
