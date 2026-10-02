@@ -56,6 +56,45 @@ function splitTitleText(text: string) {
     .filter(Boolean)
 }
 
+function shrinkImageFile(file: { name: string; mime: string; base64: string }) {
+  return new Promise<File>((resolve) => {
+    const image = new Image()
+    image.onload = () => {
+      const max = 960
+      const scale = Math.min(1, max / Math.max(image.width, image.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(image.width * scale))
+      canvas.height = Math.max(1, Math.round(image.height * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        resolve(fileFromBase64(file))
+        return
+      }
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(fileFromBase64(file))
+            return
+          }
+          resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
+        },
+        'image/jpeg',
+        0.72
+      )
+    }
+    image.onerror = () => resolve(fileFromBase64(file))
+    image.src = `data:${file.mime || 'image/jpeg'};base64,${file.base64}`
+  })
+}
+
+function fileFromBase64(file: { name: string; mime: string; base64: string }) {
+  const binary = atob(file.base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  return new File([bytes], file.name, { type: file.mime || 'image/jpeg' })
+}
+
 function imageCaptionBlocks(markdown: string, imagePaths: string[]) {
   const text = markdown.replace(/!\[[^\]]*\]\([^)]+\)/g, '').replace(/\*\*/g, '')
   const chunks = text.split(/\[IMAGE_(\d+)\]/i)
@@ -744,13 +783,21 @@ export function BlogClient() {
         form.set('titles', title)
         if (folder?.id) form.set('folderId', folder.id)
         for (const file of imageData.files as Array<{ name: string; mime: string; base64: string; path: string }>) {
-          const binary = atob(file.base64)
-          const bytes = new Uint8Array(binary.length)
-          for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-          form.append('images', new File([bytes], file.name, { type: file.mime || 'image/jpeg' }))
+          const image = await shrinkImageFile(file)
+          form.append('images', image)
         }
         const articleRes = await fetch('/api/blog/folder-generate', { method: 'POST', body: form })
-        const articleData = await articleRes.json()
+        const articleText = await articleRes.text()
+        let articleData: { error?: string; article?: { title?: string; bodyMarkdown?: string; tags?: string[] }; post?: { id?: string } } = {}
+        try {
+          articleData = articleText ? JSON.parse(articleText) : {}
+        } catch {
+          throw new Error(
+            articleRes.status === 403
+              ? '글 생성 요청이 거절되었습니다. 사진을 줄여 다시 시도해 주세요.'
+              : articleText.slice(0, 160) || '글 생성 실패'
+          )
+        }
         if (!articleRes.ok) throw new Error(articleData.error || '글 생성 실패')
         return { imageData, articleData }
       })()
