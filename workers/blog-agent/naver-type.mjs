@@ -289,11 +289,17 @@ async function attachImage(page, frame, filePath) {
   await page.waitForTimeout(800)
 }
 
-async function dismissContinueDraft(page) {
+async function dismissContinueDraft(page, fresh) {
+  const names = fresh ? ['취소', '새로 작성', '새 글쓰기'] : ['확인']
   for (const frame of page.frames()) {
     const ask = frame.getByText('작성 중인 글이 있습니다')
-    if (await ask.isVisible().catch(() => false)) {
-      await frame.getByRole('button', { name: '확인' }).first().click({ timeout: 3000 }).catch(() => {})
+    if (!(await ask.isVisible().catch(() => false))) continue
+    for (const name of names) {
+      const button = frame.getByRole('button', { name, exact: true })
+      if (await button.first().isVisible().catch(() => false)) {
+        await button.first().click({ timeout: 3000 }).catch(() => {})
+        return
+      }
     }
   }
 }
@@ -309,8 +315,8 @@ async function typeTitle(page, frame, title) {
 async function openEditor(input, onStatus) {
   const report = (phase, message, extra) => onStatus?.({ phase, message, ...extra })
   const blogId = String(input.blogId || '')
-  const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${encodeURIComponent(blogId)}`
-  report('chrome', '글쓰기 창으로 이동')
+  const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${encodeURIComponent(blogId)}${input.fresh ? `&n=${Date.now()}` : ''}`
+  report('chrome', input.fresh ? '다음 글을 위해 새 글쓰기 화면으로 이동' : '글쓰기 창으로 이동')
   const context = await browser(writeUrl)
   const pages = context.pages()
   const page =
@@ -321,17 +327,18 @@ async function openEditor(input, onStatus) {
   await page.bringToFront()
   const onLogin = () => isLoginUrl(page.url())
   const here = isWriteUrl(page.url(), blogId)
-  if (!here || (await page.locator('#id').count())) {
-    report('login', '네이버 로그인 중')
+  if (input.fresh || !here || (await page.locator('#id').count())) {
     if (!onLogin() && !(await page.locator('#id').count())) {
       await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
     }
     if (onLogin() || (await page.locator('#id').count())) {
+      report('login', '네이버 로그인 중')
       await login(page, input.loginId, input.password, report)
       await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
     }
   }
-  await dismissContinueDraft(page)
+  if (input.fresh) await page.waitForTimeout(800)
+  await dismissContinueDraft(page, Boolean(input.fresh))
   const frame = await editorFrame(page)
   if (input.title) {
     report('title', '제목을 입력하는 중')

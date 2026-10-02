@@ -188,6 +188,7 @@ const server = http.createServer(async (req, res) => {
             loginId: String(body.loginId || ''),
             password: String(body.password || ''),
             title: String(body.title || ''),
+            fresh: Boolean(body.fresh),
           },
           (status) => {
             writeJob = status

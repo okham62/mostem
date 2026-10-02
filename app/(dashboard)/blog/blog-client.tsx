@@ -464,6 +464,7 @@ export function BlogClient() {
   const [naverPassword, setNaverPassword] = useState('')
   const [naverBlogId, setNaverBlogId] = useState('')
   const [showNaverAccountForm, setShowNaverAccountForm] = useState(false)
+  const [managingAccounts, setManagingAccounts] = useState(false)
   const [savingAccount, setSavingAccount] = useState(false)
 
   const [catAccountId, setCatAccountId] = useState('')
@@ -483,6 +484,7 @@ export function BlogClient() {
   const [chromeNote, setChromeNote] = useState('')
   const [uploadFinish, setUploadFinish] = useState<'' | 'draft' | 'schedule'>('')
   const [scheduleAt, setScheduleAt] = useState('')
+  const [scheduleQueue, setScheduleQueue] = useState<string[]>([])
 
   const ping = (msg: string) => {
     setToast(msg)
@@ -901,15 +903,29 @@ export function BlogClient() {
     return () => window.clearTimeout(handle)
   }, [mode, folderPath, rememberFolder])
 
+  function addScheduleSlot() {
+    const when = new Date(scheduleAt)
+    if (!scheduleAt || Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
+      setError('예약 시각은 지금부터 이후로 선택하세요')
+      return
+    }
+    if (scheduleQueue.includes(scheduleAt)) return
+    if (scheduleQueue.length >= 10) {
+      setError('예약은 한 번에 10편까지 넣을 수 있습니다')
+      return
+    }
+    setError('')
+    setScheduleQueue((prev) => [...prev, scheduleAt].sort((a, b) => new Date(a).getTime() - new Date(b).getTime()))
+  }
+
   async function startChromeWrite() {
     const titles = splitTitleText(folderTitles)
     const folder = folders.find((item) => item.local_path === folderPath) || folders.find((item) => item.mode === 'product')
-    const title = titles[Math.floor(Math.random() * titles.length)] || ''
     if (!folderPath.trim()) {
       setError('폴더를 먼저 선택하세요')
       return
     }
-    if (!title) {
+    if (!titles.length) {
       setError('쓸 수 있는 제목이 없습니다')
       return
     }
@@ -921,16 +937,26 @@ export function BlogClient() {
       setError('일시저장 또는 예약을 선택하세요')
       return
     }
-    if (uploadFinish === 'schedule') {
-      const when = new Date(scheduleAt)
-      if (!scheduleAt || Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
-        setError('예약 시각은 지금부터 이후로 선택하세요')
-        return
-      }
+    const slots =
+      uploadFinish === 'schedule'
+        ? [...(scheduleQueue.length ? scheduleQueue : [scheduleAt])].sort(
+            (a, b) => new Date(a).getTime() - new Date(b).getTime()
+          )
+        : ['']
+    if (
+      uploadFinish === 'schedule' &&
+      slots.some((slot) => {
+        const when = new Date(slot)
+        return !slot || Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000
+      })
+    ) {
+      setError('예약 시각은 지금부터 이후로 선택하세요')
+      return
     }
     setBusyKey('chrome')
     setError('')
-    setChromeNote('크롬 창을 여는 중')
+    setChromeNote(slots.length > 1 ? `1/${slots.length}편 작성 중` : '크롬 창을 여는 중')
+    let finishedCount = 0
     try {
       const secretRes = await fetch('/api/blog/accounts/secret', {
         method: 'POST',
@@ -939,6 +965,13 @@ export function BlogClient() {
       })
       const secret = await secretRes.json()
       if (!secretRes.ok) throw new Error(secret.error || '계정 정보를 읽지 못했습니다')
+      const usedNames = Array.isArray(folder?.meta?.usedFiles) ? folder.meta.usedFiles.map((name) => String(name)) : []
+      let last = '크롬 창을 여는 중'
+      for (let index = 0; index < slots.length; index += 1) {
+      const slot = slots[index]
+      const title = titles[Math.floor(Math.random() * titles.length)] || ''
+      const step = slots.length > 1 ? `${index + 1}/${slots.length}편` : ''
+      if (step) setChromeNote(`${step} 작성 중`)
       const openRes = await fetch('http://127.0.0.1:39217/open-chrome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -947,16 +980,16 @@ export function BlogClient() {
           loginId: secret.loginId,
           password: secret.password,
           title,
+          fresh: index > 0,
         }),
       })
       const openData = await openRes.json().catch(() => ({}))
       if (!openRes.ok) throw new Error(openData.error || '크롬 창을 열지 못했습니다. 폴더 프로그램을 확인해 주세요.')
-      const usedFiles = Array.isArray(folder?.meta?.usedFiles) ? folder.meta.usedFiles.map((name) => String(name)) : []
       const articlePromise = (async () => {
         const imageRes = await fetch('http://127.0.0.1:39217/folder-images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: folderPath, skip: usedFiles, limit: 10 }),
+          body: JSON.stringify({ path: folderPath, skip: usedNames, limit: 10 }),
         })
         const imageData = await imageRes.json().catch(() => ({}))
         if (!imageRes.ok || !imageData.files?.length) {
@@ -997,7 +1030,6 @@ export function BlogClient() {
       })
       let writeSent = false
       let solvedImage = ''
-      let last = '크롬 창을 여는 중'
       let lastPhase = ''
       for (let i = 0; i < 180; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -1006,11 +1038,11 @@ export function BlogClient() {
         if (status.phase) lastPhase = String(status.phase)
         if (status.message) {
           last = String(status.message)
-          setChromeNote(last)
+          setChromeNote(step ? `${step} · ${last}` : last)
         }
         if (status.phase === 'captcha' && status.image && status.image !== solvedImage) {
           solvedImage = String(status.image)
-          setChromeNote('보안 확인 문제를 읽는 중')
+          setChromeNote(step ? `${step} · 보안 확인 문제를 읽는 중` : '보안 확인 문제를 읽는 중')
           const answerRes = await fetch('/api/blog/login-answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1053,38 +1085,51 @@ export function BlogClient() {
                 .filter(Boolean)
                 .join(' '),
               finish: uploadFinish,
-              scheduleAt: uploadFinish === 'schedule' ? scheduleAt : '',
+              scheduleAt: uploadFinish === 'schedule' ? slot : '',
             }),
           })
           const writeData = await writeRes.json().catch(() => ({}))
           if (!writeRes.ok) throw new Error(writeData.error || '크롬 글쓰기를 시작하지 못했습니다')
         }
-        if (status.phase === 'done') break
+        if (status.phase === 'done' && writeSent) break
         if (articleState.error && !['captcha', 'login', 'chrome'].includes(String(status.phase || ''))) throw articleState.error
       }
       if (articleState.error && !articleState.packed) throw articleState.error
       if (!articleState.packed) articleState.packed = await articlePromise
+      if (!writeSent || lastPhase !== 'done') {
+        throw new Error('이 편을 끝까지 쓰지 못했습니다. 남은 예약은 목록에 남아 있습니다.')
+      }
       const articleData = articleState.packed.articleData
       const imageData = articleState.packed.imageData
-      if (folder?.id && lastPhase === 'done') {
+      const writtenFiles = (imageData.files as Array<{ name: string }>).map((file) => file.name)
+      if (folder?.id) {
         await fetch('/api/blog/folders', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: folder.id,
             usedTitle: articleData.article?.title || title,
-            usedFiles: (imageData.files as Array<{ name: string }>).map((file) => file.name),
+            usedFiles: writtenFiles,
             excerpt: String(articleData.article?.bodyMarkdown || '').replace(/!\[[^\]]*\]\([^)]+\)/g, '').slice(0, 240),
             postId: articleData.post?.id || null,
           }),
         })
-        await loadFolders()
       }
+      usedNames.push(...writtenFiles)
+      finishedCount += 1
+      if (uploadFinish === 'schedule') setScheduleQueue((prev) => prev.filter((item) => item !== slot))
+      }
+      if (uploadFinish === 'schedule' && slots.length > 1) {
+        last = `${slots.length}편 예약했습니다. 창은 닫지 않습니다.`
+        setChromeNote(last)
+      }
+      await loadFolders()
       ping(last)
     } catch (e) {
       const message = e instanceof Error ? e.message : '크롬 글쓰기 실패'
-      setError(message)
-      setChromeNote(message)
+      const prefix = finishedCount > 0 ? `${finishedCount}편은 예약됐습니다. ` : ''
+      setError(prefix + message)
+      setChromeNote(prefix + message)
     } finally {
       setBusyKey(null)
     }
@@ -1775,7 +1820,16 @@ export function BlogClient() {
         <section className="space-y-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-medium text-white/80">계정</h2>
+              <button
+                type="button"
+                onClick={() => setManagingAccounts((open) => !open)}
+                className={cn(
+                  'text-sm font-medium transition',
+                  managingAccounts ? 'text-white' : 'text-white/80 hover:text-white'
+                )}
+              >
+                계정관리
+              </button>
               {naverAccounts.length > 0 ? (
                 <button
                   type="button"
@@ -1860,13 +1914,6 @@ export function BlogClient() {
                         {account.username || accountBlogId(account)}
                       </button>
                       <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
-                      <button
-                        type="button"
-                        onClick={() => void removeAccount(account.id)}
-                        className={cn('text-[11px]', selected ? 'text-neutral-500' : 'text-white/35 hover:text-white/70')}
-                      >
-                        삭제
-                      </button>
                     </div>
                   )
                 })}
@@ -1879,6 +1926,31 @@ export function BlogClient() {
                 </button>
               </div>
             )}
+            {managingAccounts && !showNaverAccountForm ? (
+              <ul className="space-y-2">
+                {naverAccounts.length === 0 ? (
+                  <li className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-white/40">
+                    등록된 계정이 없습니다.
+                  </li>
+                ) : (
+                  naverAccounts.map((account) => (
+                    <li
+                      key={account.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
+                    >
+                      <span className="truncate text-sm text-white">{account.username || accountBlogId(account)}</span>
+                      <button
+                        type="button"
+                        onClick={() => void removeAccount(account.id)}
+                        className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-xs text-white/70 transition hover:border-rose-300/50 hover:text-rose-200"
+                      >
+                        삭제
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            ) : null}
           </div>
 
           <div className="space-y-3">
@@ -1958,20 +2030,63 @@ export function BlogClient() {
                 예약
               </button>
             </div>
-            {uploadFinish === 'schedule' ? <ScheduleQuickPick value={scheduleAt} onChange={setScheduleAt} /> : null}
+            {uploadFinish === 'schedule' ? (
+              <>
+                <ScheduleQuickPick value={scheduleAt} onChange={setScheduleAt} />
+                <button
+                  type="button"
+                  onClick={addScheduleSlot}
+                  disabled={!scheduleAt || scheduleQueue.includes(scheduleAt) || scheduleQueue.length >= 10}
+                  className="w-full rounded-full border border-white/15 px-4 py-2.5 text-sm text-white/80 transition hover:border-white/30 hover:text-white disabled:opacity-40"
+                >
+                  이 시각 추가
+                </button>
+                {scheduleQueue.length > 0 ? (
+                  <ul className="space-y-1">
+                    {scheduleQueue.map((item, index) => (
+                      <li
+                        key={item}
+                        className="flex items-center justify-between rounded-xl bg-white/[0.04] px-3 py-2 text-sm text-white"
+                      >
+                        <span>
+                          {index + 1}. {formatSchedule(item)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setScheduleQueue((prev) => prev.filter((value) => value !== item))}
+                          className="text-xs text-white/45 transition hover:text-white"
+                        >
+                          빼기
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-center text-[11px] text-white/35">
+                    시각을 여러 개 추가하면, 시작 한 번으로 그 순서대로 이어서 예약합니다.
+                  </p>
+                )}
+              </>
+            ) : null}
             <button
               type="button"
               disabled={
                 busyKey === 'chrome' ||
                 !folderPath.trim() ||
                 (uploadFinish !== 'draft' && uploadFinish !== 'schedule') ||
-                (uploadFinish === 'schedule' && !scheduleAt)
+                (uploadFinish === 'schedule' && scheduleQueue.length === 0 && !scheduleAt)
               }
               onClick={() => void startChromeWrite()}
               className="mostem-upload-btn group relative flex w-full items-center justify-center overflow-hidden rounded-full bg-[linear-gradient(110deg,#fff8e8_0%,#f6d98a_38%,#fffdf6_50%,#f0c85a_100%)] px-6 py-4 text-[15px] font-semibold tracking-tight text-neutral-950 transition duration-300 hover:scale-[1.015] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
             >
               <span className="mostem-upload-sheen pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent" />
-              <span className="relative">{busyKey === 'chrome' ? '업로드 중' : '자동업로드 시작'}</span>
+              <span className="relative">
+                {busyKey === 'chrome'
+                  ? '업로드 중'
+                  : uploadFinish === 'schedule' && scheduleQueue.length > 1
+                    ? `자동업로드 시작 · ${scheduleQueue.length}편`
+                    : '자동업로드 시작'}
+              </span>
             </button>
             {chromeNote ? <p className="text-center text-xs text-white/45">{chromeNote}</p> : null}
           </div>
