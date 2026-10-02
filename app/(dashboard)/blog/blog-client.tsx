@@ -290,6 +290,7 @@ export function BlogClient() {
   const [closeTime, setCloseTime] = useState('21:00')
 
   const [folderTitles, setFolderTitles] = useState('')
+  const [editingTitles, setEditingTitles] = useState(false)
   const [uploadAccountId, setUploadAccountId] = useState('')
   const [folderPath, setFolderPath] = useState('')
   const [folderLabel, setFolderLabel] = useState('')
@@ -1711,26 +1712,46 @@ export function BlogClient() {
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
+            <div>
               <h2 className="text-sm font-medium text-white/80">제목</h2>
-              <span className="text-[11px] text-white/35">{splitTitleText(folderTitles).length}개 · 쓸 때마다 랜덤</span>
+              <p className="mt-1 text-[11px] text-white/35">
+                {splitTitleText(folderTitles).length
+                  ? `${splitTitleText(folderTitles).length}개 · 쓸 때마다 하나`
+                  : '아직 없음'}
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setEditingTitles((open) => !open)}
+              className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-white/70 transition hover:border-white/25 hover:text-white"
+            >
+              {editingTitles ? '닫기' : '수정'}
+            </button>
+          </div>
+          {editingTitles ? (
             <textarea
               wrap="off"
               value={titleFieldValue(folderTitles)}
               onChange={(e) => setFolderTitles(e.target.value)}
-              placeholder={'제목은 한 줄에 하나\n길어도 다음 줄로 내려가지 않습니다'}
-              rows={Math.min(10, Math.max(4, splitTitleText(folderTitles).length || 4))}
-              className="w-full resize-none overflow-x-auto overflow-y-auto rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-8 outline-none transition placeholder:text-white/25 focus:border-white/25"
+              placeholder={'제목은 한 줄에 하나'}
+              rows={Math.min(8, Math.max(4, splitTitleText(folderTitles).length || 4))}
+              className="w-full resize-none overflow-auto rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-8 outline-none transition placeholder:text-white/25 focus:border-white/25"
               style={{ whiteSpace: 'pre', overflowWrap: 'normal', wordBreak: 'keep-all' }}
             />
+          ) : null}
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-white/80">마무리</h2>
-              <span className="text-[11px] text-white/35">하나를 선택해야 시작됩니다</span>
-            </div>
+            <h2 className="text-sm font-medium text-white/80">마무리</h2>
+            {folderPath.trim() &&
+            (uploadFinish !== 'draft' && (uploadFinish !== 'schedule' || !scheduleAt)) ? (
+              <p className="rounded-2xl bg-[#f6d98a] px-4 py-3 text-center text-sm font-semibold text-neutral-950">
+                {uploadFinish === 'schedule'
+                  ? '예약 시각을 정해야 시작할 수 있습니다'
+                  : '일시저장 또는 예약을 정해야 시작할 수 있습니다'}
+              </p>
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
