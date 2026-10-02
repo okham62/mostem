@@ -1874,14 +1874,6 @@ export function BlogClient() {
 
           <div className="space-y-3">
             <h2 className="text-sm font-medium text-white/80">마무리</h2>
-            {folderPath.trim() &&
-            (uploadFinish !== 'draft' && (uploadFinish !== 'schedule' || !scheduleAt)) ? (
-              <p className="rounded-2xl bg-[#f6d98a] px-4 py-3 text-center text-sm font-semibold text-neutral-950">
-                {uploadFinish === 'schedule'
-                  ? '예약 시각을 정해야 시작할 수 있습니다'
-                  : '일시저장 또는 예약을 정해야 시작할 수 있습니다'}
-              </p>
-            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
