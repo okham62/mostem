@@ -15,6 +15,7 @@ import {
   Settings2,
   ExternalLink,
   CalendarClock,
+  ChevronDown,
   ShoppingBag,
   Home,
   PenLine,
@@ -428,65 +429,95 @@ function WeekTimeField({
           {String(minute).padStart(2, '0')}
         </p>
       </div>
-      <div className="mt-3 flex gap-1">
-        {WEEKDAY_LABELS.map((label, value) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => onDay(value as Weekday)}
-            className={cn(
-              'h-8 min-w-0 flex-1 rounded-full text-[12px] font-medium transition',
-              day === value ? 'bg-white text-neutral-950' : 'text-white/45 hover:bg-white/10 hover:text-white'
-            )}
-          >
-            {label}
-          </button>
-        ))}
+
+      <div className="mt-4">
+        <p className="text-[11px] font-medium tracking-wide text-white/35">요일</p>
+        <div className="mt-2 flex justify-between">
+          {WEEKDAY_LABELS.map((label, value) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onDay(value as Weekday)}
+              className={cn(
+                'flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-medium transition',
+                day === value ? 'bg-gold text-neutral-950' : 'text-white/45 hover:bg-white/8 hover:text-white'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-white/[0.04] p-1">
-        {([false, true] as const).map((pm) => (
-          <button
-            key={pm ? 'pm' : 'am'}
-            type="button"
-            onClick={() => commit(hour12, pm, minute)}
-            className={cn(
-              'h-8 rounded-full text-xs font-medium transition',
-              isPm === pm ? 'bg-white text-neutral-950' : 'text-white/45 hover:text-white'
-            )}
-          >
-            {pm ? '오후' : '오전'}
-          </button>
-        ))}
+
+      <div className="mt-5">
+        <p className="text-[11px] font-medium tracking-wide text-white/35">오전 · 오후</p>
+        <div className="relative mt-2 grid h-11 grid-cols-2 rounded-2xl bg-white/[0.05] p-1">
+          <span
+            className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl bg-white shadow-sm transition-transform"
+            style={{ left: 4, transform: isPm ? 'translateX(100%)' : 'translateX(0)' }}
+          />
+          {([false, true] as const).map((pm) => (
+            <button
+              key={pm ? 'pm' : 'am'}
+              type="button"
+              onClick={() => commit(hour12, pm, minute)}
+              className={cn(
+                'relative z-10 text-sm font-medium transition',
+                isPm === pm ? 'text-neutral-950' : 'text-white/45 hover:text-white'
+              )}
+            >
+              {pm ? '오후' : '오전'}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mt-3 grid grid-cols-6 gap-1">
-        {WHEEL_HOURS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => commit(item, isPm, minute)}
-            className={cn(
-              'h-8 rounded-xl text-[13px] tabular-nums transition',
-              hour12 === item ? 'bg-white font-semibold text-neutral-950' : 'text-white/55 hover:bg-white/10 hover:text-white'
-            )}
-          >
-            {item}
-          </button>
-        ))}
+
+      <div className="mt-5">
+        <p className="text-[11px] font-medium tracking-wide text-white/35">시</p>
+        <div className="mt-2 grid grid-cols-6 gap-1.5">
+          {WHEEL_HOURS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => commit(item, isPm, minute)}
+              className={cn(
+                'h-9 rounded-lg text-[15px] tabular-nums transition',
+                hour12 === item
+                  ? 'bg-gold/15 font-semibold text-gold ring-1 ring-gold/70'
+                  : 'bg-white/[0.03] text-white/55 ring-1 ring-white/8 hover:text-white'
+              )}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mt-1 grid grid-cols-6 gap-1">
-        {WHEEL_MINUTES.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => commit(hour12, isPm, item)}
-            className={cn(
-              'h-7 rounded-lg text-[11px] tabular-nums tracking-wide transition',
-              minute === item ? 'font-medium text-white' : 'text-white/30 hover:text-white/70'
-            )}
-          >
-            {String(item).padStart(2, '0')}
-          </button>
-        ))}
+
+      <div className="mt-5">
+        <p className="text-[11px] font-medium tracking-wide text-white/35">분</p>
+        <div className="relative mt-3">
+          <div className="absolute left-2 right-2 top-[7px] h-px bg-white/15" />
+          <div className="relative flex justify-between">
+            {WHEEL_MINUTES.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => commit(hour12, isPm, item)}
+                className="flex w-8 flex-col items-center gap-2"
+              >
+                <span className={cn('w-px', minute === item ? 'h-4 bg-gold' : 'h-3.5 bg-white/30')} />
+                <span
+                  className={cn(
+                    'text-[12px] tabular-nums',
+                    minute === item ? 'font-semibold text-gold' : 'text-white/35 hover:text-white/70'
+                  )}
+                >
+                  {String(item).padStart(2, '0')}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -713,6 +744,7 @@ export function BlogClient() {
   const [managingAccounts, setManagingAccounts] = useState(false)
   const [savingAccount, setSavingAccount] = useState(false)
 
+  const [categoryPanelOpen, setCategoryPanelOpen] = useState(false)
   const [catAccountId, setCatAccountId] = useState('')
   const [catName, setCatName] = useState('')
   const [catBlogId, setCatBlogId] = useState('')
@@ -2607,9 +2639,18 @@ export function BlogClient() {
       {subTab === 'ops' || mode === 'product' ? (
         <div className={mode === 'product' ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'}>
           <div className={mode === 'product' ? 'space-y-4 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8' : 'space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4'}>
-            <div className="flex items-center gap-2 text-sm font-medium text-white/80">
-              <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '카테고리 공개' : '네이버 카테고리 On/Off'}
-            </div>
+            <button
+              type="button"
+              onClick={() => setCategoryPanelOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-3 text-left text-sm font-medium text-white/80"
+            >
+              <span className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '카테고리 공개' : '네이버 카테고리 On/Off'}
+              </span>
+              <ChevronDown className={cn('h-4 w-4 text-white/40 transition', categoryPanelOpen && 'rotate-180')} />
+            </button>
+            {categoryPanelOpen ? (
+            <>
             <p className="text-xs leading-relaxed text-white/40">
               계정을 고르면 그 블로그의 카테고리가 그대로 나옵니다. 여러 개를 고르고 공개·비공개 시간을 정하면, 그 시간이 될 때 이 PC의 크롬에서 고른 카테고리를 차례로 바꿉니다. PC가 켜져 있어야 합니다.
             </p>
@@ -2628,7 +2669,7 @@ export function BlogClient() {
                 .filter((a) => a.provider === 'naver')
                 .map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.username} · {a.site_url}
+                    {a.username} ({a.site_url})
                   </option>
                 ))}
             </select>
@@ -2716,6 +2757,8 @@ export function BlogClient() {
                 </div>
               ))}
             </div>
+            </>
+            ) : null}
           </div>
 
           {mode === 'product' ? null : (
