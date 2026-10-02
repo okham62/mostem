@@ -151,14 +151,40 @@ function TimeWheel({
     onPick(stepWheel(values, value, direction, disabled))
   }
 
+  function pickFromTrack(clientY: number, track: HTMLDivElement) {
+    const rect = track.getBoundingClientRect()
+    const ratio = rect.height <= 0 ? 0 : Math.min(1, Math.max(0, (clientY - rect.top) / rect.height))
+    const index = Math.round(ratio * (values.length - 1))
+    const item = values[index] ?? values[0]
+    if (!disabled(item)) {
+      onPick(item)
+      return
+    }
+    let nearest = item
+    let distance = values.length
+    values.forEach((candidate, candidateIndex) => {
+      if (disabled(candidate)) return
+      const gap = Math.abs(candidateIndex - index)
+      if (gap < distance) {
+        distance = gap
+        nearest = candidate
+      }
+    })
+    onPick(nearest)
+  }
+
+  const span = Math.max(1, values.length - 1)
+  const thumbPct = Math.max(22, 100 / values.length)
+  const topPct = (at / span) * (100 - thumbPct)
+
   return (
     <div
       ref={ref}
       className="touch-none select-none"
       onPointerDown={(event) => {
-        const startY = event.clientY
+        if ((event.target as HTMLElement).dataset.dragbar === '1') return
         event.currentTarget.setPointerCapture(event.pointerId)
-        event.currentTarget.dataset.dragY = String(startY)
+        event.currentTarget.dataset.dragY = String(event.clientY)
       }}
       onPointerMove={(event) => {
         if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
@@ -170,24 +196,50 @@ function TimeWheel({
       }}
     >
       <p className="mb-1 text-center text-[10px] text-white/35">{label}</p>
-      <div className="overflow-hidden rounded-2xl bg-black/20 py-1">
-        {around.map((item, row) => {
-          const current = row === 1
-          const blocked = disabled(item)
-          return (
-            <div
-              key={`${row}-${item}`}
-              className={cn(
-                'mx-2 flex h-8 items-center justify-center rounded-lg text-sm',
-                current && tone === 'blue' && 'bg-[#0a84ff] font-medium text-white',
-                current && tone === 'white' && 'bg-white font-medium text-neutral-950',
-                !current && (blocked ? 'text-white/15' : 'text-white/35')
-              )}
-            >
-              {format(item)}
-            </div>
-          )
-        })}
+      <div className="flex items-stretch gap-1.5">
+        <div className="min-w-0 flex-1 overflow-hidden rounded-2xl bg-black/20 py-1">
+          {around.map((item, row) => {
+            const current = row === 1
+            const blocked = disabled(item)
+            return (
+              <div
+                key={`${row}-${item}`}
+                className={cn(
+                  'mx-2 flex h-8 items-center justify-center rounded-lg text-sm',
+                  current && tone === 'blue' && 'bg-[#0a84ff] font-medium text-white',
+                  current && tone === 'white' && 'bg-white font-medium text-neutral-950',
+                  !current && (blocked ? 'text-white/15' : 'text-white/35')
+                )}
+              >
+                {format(item)}
+              </div>
+            )
+          })}
+        </div>
+        <div
+          data-dragbar="1"
+          role="slider"
+          aria-label={`${label} 드래그`}
+          aria-valuemin={values[0]}
+          aria-valuemax={values[values.length - 1]}
+          aria-valuenow={value}
+          className="relative my-1 w-3 shrink-0 cursor-ns-resize rounded-full bg-white/10"
+          onPointerDown={(event) => {
+            event.stopPropagation()
+            event.currentTarget.setPointerCapture(event.pointerId)
+            pickFromTrack(event.clientY, event.currentTarget)
+          }}
+          onPointerMove={(event) => {
+            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+            pickFromTrack(event.clientY, event.currentTarget)
+          }}
+        >
+          <div
+            data-dragbar="1"
+            className="absolute inset-x-0.5 rounded-full bg-white/80"
+            style={{ top: `${topPct}%`, height: `${thumbPct}%` }}
+          />
+        </div>
       </div>
     </div>
   )
