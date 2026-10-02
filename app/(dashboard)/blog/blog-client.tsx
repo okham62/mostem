@@ -745,12 +745,14 @@ export function BlogClient() {
         if (!articleRes.ok) throw new Error(articleData.error || '글 생성 실패')
         return { imageData, articleData }
       })()
-      let packed: { imageData: { files: Array<{ name: string; path: string }> }; articleData: { article?: { title?: string; bodyMarkdown?: string; tags?: string[] }; post?: { id?: string } } } | null = null
-      let articleError: Error | null = null
+      const articleState: {
+        packed: { imageData: { files: Array<{ name: string; path: string }> }; articleData: { article?: { title?: string; bodyMarkdown?: string; tags?: string[] }; post?: { id?: string } } } | null
+        error: Error | null
+      } = { packed: null, error: null }
       articlePromise.then((value) => {
-        packed = value
+        articleState.packed = value
       }).catch((error) => {
-        articleError = error instanceof Error ? error : new Error('글 생성 실패')
+        articleState.error = error instanceof Error ? error : new Error('글 생성 실패')
       })
       let writeSent = false
       let solvedImage = ''
@@ -783,10 +785,10 @@ export function BlogClient() {
           })
         }
         if (status.phase === 'error') throw new Error(last)
-        if (packed && !writeSent && ['ready', 'login', 'chrome', 'captcha'].includes(String(status.phase))) {
+        if (articleState.packed && !writeSent && ['ready', 'login', 'chrome', 'captcha'].includes(String(status.phase))) {
           writeSent = true
-          const articleData = packed.articleData
-          const imageData = packed.imageData
+          const articleData = articleState.packed.articleData
+          const imageData = articleState.packed.imageData
           const writeRes = await fetch('http://127.0.0.1:39217/write-post', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -806,12 +808,12 @@ export function BlogClient() {
           if (!writeRes.ok) throw new Error(writeData.error || '크롬 글쓰기를 시작하지 못했습니다')
         }
         if (status.phase === 'done') break
-        if (articleError && !['captcha', 'login', 'chrome'].includes(String(status.phase || ''))) throw articleError
+        if (articleState.error && !['captcha', 'login', 'chrome'].includes(String(status.phase || ''))) throw articleState.error
       }
-      if (articleError && !packed) throw articleError
-      if (!packed) packed = await articlePromise
-      const articleData = packed.articleData
-      const imageData = packed.imageData
+      if (articleState.error && !articleState.packed) throw articleState.error
+      if (!articleState.packed) articleState.packed = await articlePromise
+      const articleData = articleState.packed.articleData
+      const imageData = articleState.packed.imageData
       if (folder?.id) {
         await fetch('/api/blog/folders', {
           method: 'PATCH',
