@@ -56,6 +56,11 @@ function splitTitleText(text: string) {
     .filter(Boolean)
 }
 
+function titleFieldValue(text: string) {
+  if (text.includes('\n')) return text.replace(/\r\n/g, '\n')
+  return splitTitleText(text).join('\n')
+}
+
 function shrinkImageFile(file: { name: string; mime: string; base64: string }) {
   return new Promise<File>((resolve) => {
     const image = new Image()
@@ -1696,11 +1701,13 @@ export function BlogClient() {
               <span className="text-[11px] text-white/35">{splitTitleText(folderTitles).length}개 · 쓸 때마다 랜덤</span>
             </div>
             <textarea
-              value={folderTitles}
+              wrap="off"
+              value={titleFieldValue(folderTitles)}
               onChange={(e) => setFolderTitles(e.target.value)}
-              placeholder="한 줄에 하나, 또는 띄어쓰기로 구분"
-              rows={6}
-              className="w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-relaxed outline-none transition placeholder:text-white/25 focus:border-white/25"
+              placeholder={'제목은 한 줄에 하나\n길어도 다음 줄로 내려가지 않습니다'}
+              rows={Math.min(10, Math.max(4, splitTitleText(folderTitles).length || 4))}
+              className="w-full resize-none overflow-x-auto overflow-y-auto rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-8 outline-none transition placeholder:text-white/25 focus:border-white/25"
+              style={{ whiteSpace: 'pre', overflowWrap: 'normal', wordBreak: 'keep-all' }}
             />
           </div>
 
