@@ -61,6 +61,136 @@ function titleFieldValue(text: string) {
   return splitTitleText(text).join('\n')
 }
 
+function toLocalInput(date: Date) {
+  const copy = new Date(date)
+  copy.setSeconds(0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${copy.getFullYear()}-${pad(copy.getMonth() + 1)}-${pad(copy.getDate())}T${pad(copy.getHours())}:${pad(copy.getMinutes())}`
+}
+
+function parseSchedule(value: string) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatSchedule(value: string) {
+  const date = parseSchedule(value)
+  if (!date) return ''
+  const hour = date.getHours()
+  const ampm = hour < 12 ? '오전' : '오후'
+  const h12 = hour % 12 || 12
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${h12}:${minute}`
+}
+
+function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const now = new Date()
+  const selected = parseSchedule(value)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const selectedOffset = selected
+    ? Math.round(
+        (new Date(selected.getFullYear(), selected.getMonth(), selected.getDate()).getTime() - todayStart.getTime()) /
+          86400000
+      )
+    : -1
+
+  function atDayHour(offset: number, hour: number, minute: number) {
+    const next = new Date(now)
+    next.setDate(next.getDate() + offset)
+    next.setHours(hour, minute, 0, 0)
+    return next
+  }
+
+  const presets = [
+    { label: '1시간 뒤', at: new Date(now.getTime() + 60 * 60 * 1000) },
+    { label: '3시간 뒤', at: new Date(now.getTime() + 3 * 60 * 60 * 1000) },
+    { label: '내일 오전', at: atDayHour(1, 9, 0) },
+    { label: '내일 저녁', at: atDayHour(1, 18, 0) },
+  ].filter((item) => item.at.getTime() > now.getTime() + 60_000)
+
+  function pickDay(offset: number) {
+    const hour = selected?.getHours() ?? 18
+    const minute = selected?.getMinutes() ?? 0
+    let next = atDayHour(offset, hour, minute)
+    if (next.getTime() < now.getTime() + 60_000) next = atDayHour(Math.max(offset, 1), 18, 0)
+    onChange(toLocalInput(next))
+  }
+
+  function pickHour(hour: number) {
+    const offset = selectedOffset >= 0 ? selectedOffset : hour <= now.getHours() ? 1 : 0
+    const minute = selected?.getMinutes() ?? 0
+    let next = atDayHour(offset, hour, minute)
+    if (next.getTime() < now.getTime() + 60_000) next = atDayHour(offset + 1, hour, minute)
+    onChange(toLocalInput(next))
+  }
+
+  function pickMinute(minute: number) {
+    const offset = selectedOffset >= 0 ? selectedOffset : 1
+    const hour = selected?.getHours() ?? 18
+    let next = atDayHour(offset, hour, minute)
+    if (next.getTime() < now.getTime() + 60_000) next = atDayHour(offset + 1, hour, minute)
+    onChange(toLocalInput(next))
+  }
+
+  const pill = (active: boolean) =>
+    cn(
+      'rounded-full border px-3 py-2 text-sm font-medium transition',
+      active ? 'border-white bg-white text-neutral-950' : 'border-white/10 text-white/75 hover:border-white/25'
+    )
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {presets.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => onChange(toLocalInput(item.at))}
+            className={pill(value === toLocalInput(item.at))}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {['오늘', '내일', '모레'].map((label, offset) => (
+          <button key={label} type="button" onClick={() => pickDay(offset)} className={pill(selectedOffset === offset)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-5 gap-2">
+        {[9, 12, 15, 18, 21].map((hour) => (
+          <button
+            key={hour}
+            type="button"
+            onClick={() => pickHour(hour)}
+            className={pill(Boolean(selected && selected.getHours() === hour))}
+          >
+            {hour}시
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {[0, 30].map((minute) => (
+          <button
+            key={minute}
+            type="button"
+            onClick={() => pickMinute(minute)}
+            className={pill(Boolean(selected && selected.getMinutes() === minute))}
+          >
+            {String(minute).padStart(2, '0')}분
+          </button>
+        ))}
+      </div>
+      <p className={cn('text-center text-sm font-semibold', value ? 'text-white' : 'text-white/40')}>
+        {value ? formatSchedule(value) : '버튼을 누르면 바로 정해집니다'}
+      </p>
+    </div>
+  )
+}
+
 function shrinkImageFile(file: { name: string; mime: string; base64: string }) {
   return new Promise<File>((resolve) => {
     const image = new Image()
@@ -1778,16 +1908,7 @@ export function BlogClient() {
                 예약
               </button>
             </div>
-            {uploadFinish === 'schedule' ? (
-              <input
-                type="datetime-local"
-                step={600}
-                value={scheduleAt}
-                onChange={(e) => setScheduleAt(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/25"
-                style={{ colorScheme: 'dark' }}
-              />
-            ) : null}
+            {uploadFinish === 'schedule' ? <ScheduleQuickPick value={scheduleAt} onChange={setScheduleAt} /> : null}
             <button
               type="button"
               disabled={
