@@ -11,6 +11,26 @@ const debugPort = 9333
 let contextPromise = null
 let opening = null
 let captchaResolve = null
+let sessionId = 0
+
+export function chromeAlive() {
+  return debugReady()
+}
+
+export function resetNaverSession() {
+  sessionId += 1
+  opening = null
+  contextPromise = null
+  captchaResolve = null
+}
+
+function guardStatus(onStatus) {
+  const id = sessionId
+  return (status) => {
+    if (id !== sessionId) return
+    onStatus?.(status)
+  }
+}
 
 export function provideCaptchaAnswer(answer) {
   const text = String(answer || '').trim()
@@ -229,29 +249,59 @@ async function attachImage(page, frame, filePath) {
   await page.waitForTimeout(800)
 }
 
+async function dismissContinueDraft(page) {
+  for (const frame of page.frames()) {
+    const ask = frame.getByText('작성 중인 글이 있습니다')
+    if (await ask.isVisible().catch(() => false)) {
+      await frame.getByRole('button', { name: '확인' }).first().click({ timeout: 3000 }).catch(() => {})
+    }
+  }
+}
+
+async function typeTitle(page, frame, title) {
+  const field = frame.locator('.se-title-text, .se-documentTitle .se-text-paragraph, .se-documentTitle').first()
+  await field.click({ timeout: 8000 })
+  await page.keyboard.press('Control+A')
+  await page.keyboard.type(title, { delay: 8 })
+  await page.keyboard.press('Enter')
+}
+
 async function openEditor(input, onStatus) {
   const report = (phase, message, extra) => onStatus?.({ phase, message, ...extra })
-  report('chrome', '크롬 창을 여는 중')
+  report('chrome', '글쓰기 창으로 이동')
   const context = await browser()
-  const page = context.pages()[0] || (await context.newPage())
-  await page.bringToFront()
-  const blogId = input.blogId
+  const blogId = String(input.blogId || '')
   const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${encodeURIComponent(blogId)}`
-  report('login', '네이버 로그인 중')
-  await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
-  if (page.url().includes('nid.naver.com') || (await page.locator('#id').count())) {
-    await login(page, input.loginId, input.password, report)
+  const page =
+    context.pages().find((item) => item.url().includes('PostWriteForm.naver') && item.url().includes(blogId)) ||
+    context.pages()[0] ||
+    (await context.newPage())
+  await page.bringToFront()
+  const here = page.url().includes('PostWriteForm.naver') && page.url().includes(blogId)
+  if (!here) {
+    report('login', '네이버 로그인 중')
     await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    if (page.url().includes('nid.naver.com') || (await page.locator('#id').count())) {
+      await login(page, input.loginId, input.password, report)
+      await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    }
   }
-  await editorFrame(page)
-  report('ready', '글쓰기 화면입니다')
+  await dismissContinueDraft(page)
+  const frame = await editorFrame(page)
+  if (input.title) {
+    report('title', '제목을 입력하는 중')
+    await typeTitle(page, frame, input.title)
+  }
+  report('ready', '제목을 넣었습니다. 사진 멘트를 준비하는 중')
   return page
 }
 
 export function beginNaver(input, onStatus) {
+  const report = guardStatus(onStatus)
   if (!opening) {
-    opening = openEditor(input, onStatus).catch((error) => {
-      opening = null
+    const id = sessionId
+    opening = openEditor(input, report).catch((error) => {
+      if (id === sessionId) opening = null
       throw error
     })
   }
@@ -259,16 +309,16 @@ export function beginNaver(input, onStatus) {
 }
 
 export async function typeNaverPost(input, onStatus) {
-  const report = (phase, message, extra) => onStatus?.({ phase, message, ...extra })
+  const send = guardStatus(onStatus)
+  const report = (phase, message, extra) => send({ phase, message, ...extra })
   const page = await beginNaver(input, onStatus)
   opening = null
 
   const frame = await editorFrame(page)
-  report('title', '제목을 입력하는 중')
-  const title = frame.locator('.se-title-text, .se-documentTitle .se-text-paragraph, .se-documentTitle').first()
-  await title.click({ timeout: 15000 })
-  await page.keyboard.type(input.title || '', { delay: 20 })
-  await page.keyboard.press('Enter')
+  if (!input.skipTitle && input.title) {
+    report('title', '제목을 입력하는 중')
+    await typeTitle(page, frame, input.title)
+  }
 
   const blocks =
     Array.isArray(input.blocks) && input.blocks.length
@@ -296,5 +346,37 @@ export async function typeNaverPost(input, onStatus) {
     await page.keyboard.type(String(input.hashtags), { delay: 8 })
   }
 
-  report('done', '입력이 끝났습니다. 창은 닫지 않습니다. 발행은 직접 눌러 주세요.')
+  await saveDraft(page, report)
+  report('done', '저장했습니다. 창은 닫지 않습니다. 발행은 직접 눌러 주세요.')
+}
+
+async function saveDraft(page, report) {
+  report('save', '저장하는 중')
+  await page.bringToFront()
+  const button = await findSaveButton(page)
+  if (!button) throw new Error('저장 버튼을 찾지 못했습니다. 열린 창에서 저장을 눌러 주세요.')
+  await button.click({ timeout: 8000 })
+  await page.waitForTimeout(1200)
+  for (const frame of page.frames()) {
+    const saved = frame.getByText(/저장되었습니다|임시저장/)
+    if (await saved.first().isVisible().catch(() => false)) {
+      const confirm = frame.getByRole('button', { name: '확인' })
+      if (await confirm.first().isVisible().catch(() => false)) {
+        await confirm.first().click({ timeout: 3000 }).catch(() => {})
+      }
+      return
+    }
+  }
+}
+
+async function findSaveButton(page) {
+  for (const frame of page.frames()) {
+    const buttons = frame.getByRole('button', { name: '저장', exact: true })
+    const count = await buttons.count().catch(() => 0)
+    for (let i = 0; i < count; i += 1) {
+      const button = buttons.nth(i)
+      if (await button.isVisible().catch(() => false)) return button
+    }
+  }
+  return null
 }

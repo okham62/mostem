@@ -236,13 +236,20 @@ export async function generateFolderArticle(input: {
   if (input.images.length > 20) throw new AiError('이미지는 최대 20장입니다.')
 
   const useClaude = Boolean(claudeKey())
-  const descriptions: string[] = []
-  for (let i = 0; i < input.images.length; i++) {
-    const desc = useClaude
-      ? await describeImageClaude(input.images[i], i)
-      : await describeImageGemini(input.images[i], i)
-    descriptions.push(desc)
+  const descriptions = new Array<string>(input.images.length)
+  let cursor = 0
+  async function describeNext() {
+    while (cursor < input.images.length) {
+      const index = cursor
+      cursor += 1
+      const image = input.images[index]
+      descriptions[index] = useClaude
+        ? await describeImageClaude(image, index)
+        : await describeImageGemini(image, index)
+    }
   }
+  const workers = Math.min(4, input.images.length)
+  await Promise.all(Array.from({ length: workers }, () => describeNext()))
 
   const { raw, modelId } = await writeFromDescriptions({
     mode: input.mode || 'folder',

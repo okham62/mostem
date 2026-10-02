@@ -166,7 +166,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/open-chrome' && req.method === 'POST') {
     const body = await readJson(req)
-    const typing = ['login', 'captcha', 'title', 'body', 'images']
+    const typing = ['login', 'captcha', 'title', 'body', 'images', 'save']
     if (typing.includes(writeJob.phase)) {
       const { chromeAlive, resetNaverSession } = await import('./naver-type.mjs')
       if (await chromeAlive()) {
@@ -187,6 +187,7 @@ const server = http.createServer(async (req, res) => {
             blogId: String(body.blogId || ''),
             loginId: String(body.loginId || ''),
             password: String(body.password || ''),
+            title: String(body.title || ''),
           },
           (status) => {
             writeJob = status
@@ -200,7 +201,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/write-post' && req.method === 'POST') {
     const body = await readJson(req)
-    if (['title', 'body', 'images'].includes(writeJob.phase)) {
+    if (['title', 'body', 'images', 'save'].includes(writeJob.phase)) {
       const { chromeAlive, resetNaverSession } = await import('./naver-type.mjs')
       if (await chromeAlive()) {
         res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
@@ -223,6 +224,7 @@ const server = http.createServer(async (req, res) => {
             loginId: String(body.loginId || ''),
             password: String(body.password || ''),
             title: String(body.title || ''),
+            skipTitle: Boolean(body.skipTitle),
             paragraphs: Array.isArray(body.paragraphs) ? body.paragraphs.map((line) => String(line)) : [],
             imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths.map((line) => String(line)) : [],
             hashtags: String(body.hashtags || ''),

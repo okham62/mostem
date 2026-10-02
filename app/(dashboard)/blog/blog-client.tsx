@@ -727,11 +727,7 @@ export function BlogClient() {
   async function startChromeWrite() {
     const titles = splitTitleText(folderTitles)
     const folder = folders.find((item) => item.local_path === folderPath) || folders.find((item) => item.mode === 'product')
-    const used = new Set(
-      Array.isArray(folder?.meta?.usedTitles) ? folder.meta.usedTitles.map((title) => String(title)) : []
-    )
-    const pool = titles.filter((title) => !used.has(title))
-    const title = pool[Math.floor(Math.random() * pool.length)] || ''
+    const title = titles[Math.floor(Math.random() * titles.length)] || ''
     if (!folderPath.trim()) {
       setError('폴더를 먼저 선택하세요')
       return
@@ -762,6 +758,7 @@ export function BlogClient() {
           blogId: secret.blogId,
           loginId: secret.loginId,
           password: secret.password,
+          title,
         }),
       })
       const openData = await openRes.json().catch(() => ({}))
@@ -855,6 +852,7 @@ export function BlogClient() {
               loginId: secret.loginId,
               password: secret.password,
               title: articleData.article?.title || title,
+              skipTitle: true,
               blocks: imageCaptionBlocks(
                 String(articleData.article?.bodyMarkdown || ''),
                 imageData.files.map((file) => file.path)
@@ -1770,7 +1768,7 @@ export function BlogClient() {
                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
               <p className="text-[11px] text-white/35">
-                제목 {folderTitles.split(/\r?\n/).flatMap((line) => (folderTitles.includes('\n') ? [line] : line.split(/\s+/))).map((line) => line.trim()).filter(Boolean).length}개. 한 줄에 하나, 또는 한 칸씩 띄어 쓰면 각각 저장됩니다. 글을 쓸 때 이 목록에서 아직 안 쓴 제목을 랜덤으로 고릅니다.
+                제목 {folderTitles.split(/\r?\n/).flatMap((line) => (folderTitles.includes('\n') ? [line] : line.split(/\s+/))).map((line) => line.trim()).filter(Boolean).length}개. 한 줄에 하나, 또는 한 칸씩 띄어 쓰면 각각 저장됩니다. 글을 쓸 때마다 이 목록에서 랜덤으로 고릅니다.
               </p>
               </>
             ) : null}
