@@ -88,15 +88,7 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
   const now = new Date()
   const selected = parseSchedule(value)
   const weekdays = ['일', '월', '화', '수', '목', '금', '토']
-  const days = Array.from({ length: 21 }, (_, offset) => {
-    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
-    return {
-      offset,
-      date,
-      key: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
-      name: offset === 0 ? '오늘' : offset === 1 ? '내일' : weekdays[date.getDay()],
-    }
-  })
+  const [cursor, setCursor] = useState(() => new Date((selected ?? now).getFullYear(), (selected ?? now).getMonth(), 1))
 
   function sameDay(a: Date, b: Date) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -112,36 +104,68 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
   const minute = selected?.getMinutes() ?? 0
   const isPm = hour24 >= 12
   const hour12 = hour24 % 12 || 12
-  const baseDate = selected ?? days[1].date
+  const baseDate = selected ?? new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const firstWeekday = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getDay()
+  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate()
+  const cells = [...Array.from({ length: firstWeekday }, () => null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)]
 
   return (
     <div className="overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
       <div className="px-4 pb-2 pt-3">
-        <p className="text-[22px] font-medium tracking-tight text-white">
-          {value ? formatSchedule(value) : '날짜와 시간'}
-        </p>
+        <p className="text-[22px] font-medium tracking-tight text-white">{value ? formatSchedule(value) : '날짜와 시간'}</p>
       </div>
-      <div className="flex gap-1 overflow-x-auto px-3 pb-3">
-        {days.map((day) => {
-          const active = selected ? sameDay(selected, day.date) : false
-          return (
-            <button
-              key={day.key}
-              type="button"
-              onClick={() => apply(day.date, hour24, minute)}
-              className={cn(
-                'flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-xl text-[11px] transition',
-                active ? 'bg-white text-neutral-950' : 'text-white/55 hover:bg-white/10 hover:text-white'
-              )}
-            >
-              <span className={cn('text-[10px]', active ? 'text-neutral-500' : 'text-white/35')}>{day.name}</span>
-              <span className="text-sm font-medium leading-none">{day.date.getDate()}</span>
-            </button>
-          )
-        })}
+      <div className="px-3 pb-3">
+        <div className="mb-2 flex items-center justify-between">
+          <button
+            type="button"
+            aria-label="이전 달"
+            onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}
+            className="h-7 w-7 rounded-full text-sm text-white/60 hover:bg-white/10 hover:text-white"
+          >
+            ‹
+          </button>
+          <p className="text-xs font-medium text-white/80">
+            {cursor.getFullYear()}년 {cursor.getMonth() + 1}월
+          </p>
+          <button
+            type="button"
+            aria-label="다음 달"
+            onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}
+            className="h-7 w-7 rounded-full text-sm text-white/60 hover:bg-white/10 hover:text-white"
+          >
+            ›
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center">
+          {weekdays.map((label) => (
+            <span key={label} className="py-1 text-[10px] text-white/35">
+              {label}
+            </span>
+          ))}
+          {cells.map((day, index) => {
+            if (!day) return <span key={`empty-${index}`} />
+            const date = new Date(cursor.getFullYear(), cursor.getMonth(), day)
+            const past = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 0, 0).getTime() < now.getTime()
+            const active = selected ? sameDay(selected, date) : false
+            return (
+              <button
+                key={day}
+                type="button"
+                disabled={past}
+                onClick={() => apply(date, hour24, minute)}
+                className={cn(
+                  'h-8 rounded-full text-xs transition disabled:text-white/15',
+                  active ? 'bg-white font-medium text-neutral-950' : 'text-white/75 hover:bg-white/10'
+                )}
+              >
+                {day}
+              </button>
+            )
+          })}
+        </div>
       </div>
       <div className="space-y-2 border-t border-white/10 px-3 py-3">
-        <div className="grid grid-cols-2 rounded-lg bg-black/40 p-0.5 text-xs">
+        <div className="grid grid-cols-2 gap-2">
           {(['오전', '오후'] as const).map((label) => {
             const active = selected ? (label === '오후') === isPm : false
             return (
@@ -150,11 +174,11 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
                 type="button"
                 onClick={() => {
                   const nextHour = label === '오후' ? (hour12 % 12) + 12 : hour12 % 12
-                  apply(baseDate, nextHour === 24 ? 12 : nextHour, minute)
+                  apply(baseDate, nextHour, minute)
                 }}
                 className={cn(
-                  'rounded-md py-1 transition',
-                  active ? 'bg-white text-neutral-950' : 'text-white/50 hover:text-white'
+                  'h-8 rounded-full text-xs font-medium transition',
+                  active ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
                 )}
               >
                 {label}
