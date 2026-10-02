@@ -57,11 +57,7 @@ async function typeInto(page, selector, text) {
 }
 
 async function visibleAnswerField(frame) {
-  const locators = [
-    frame.getByPlaceholder(/정답/),
-    frame.locator('input[placeholder*="정답"]'),
-    frame.locator('input[type="text"]'),
-  ]
+  const locators = [frame.getByPlaceholder(/정답/), frame.locator('input[placeholder*="정답"]')]
   for (const locator of locators) {
     const count = await locator.count().catch(() => 0)
     for (let i = 0; i < count; i += 1) {
@@ -74,52 +70,75 @@ async function visibleAnswerField(frame) {
 
 async function findChallenge(page) {
   for (const frame of page.frames()) {
-    const text = await frame.locator('body').innerText().catch(() => '')
-    if (!text.includes('추가 확인') && !text.includes('정답을 입력')) continue
     const field = await visibleAnswerField(frame)
-    if (field) return { frame, field, text }
+    const text = await frame.locator('body').innerText().catch(() => '')
+    const looksLikeCheck = /추가 확인|자동입력 방지|얼마입니까|정답을 입력/.test(text)
+    if (!field && !looksLikeCheck) continue
+    if (!field) continue
+    return { frame, field, text }
   }
   return null
 }
 
 function questionFrom(text) {
-  const line = text
+  const lines = text
     .split('\n')
     .map((item) => item.trim())
-    .find((item) => /[?？]$/.test(item) && item.length < 140 && !item.includes('입력해'))
-  return line || ''
+    .filter((item) => item && item.length < 160 && !item.includes('입력해') && !item.includes('가상으로'))
+  return (
+    lines.find((item) => /입니까\?|얼마|몇\s*번째|숫자/.test(item)) ||
+    lines.find((item) => /[?？]$/.test(item)) ||
+    ''
+  )
+}
+
+async function captureCheck(frame, page) {
+  const question = frame.getByText(/입니까\?|얼마입니까|무엇입니까/).last()
+  if (await question.count().catch(() => 0)) {
+    let target = question
+    for (let i = 0; i < 8; i += 1) {
+      const parent = target.locator('xpath=..')
+      const box = await parent.boundingBox().catch(() => null)
+      if (box && box.width >= 260 && box.height >= 240 && box.height < 900) {
+        return (await parent.screenshot()).toString('base64')
+      }
+      target = parent
+    }
+  }
+  const images = frame.locator('img')
+  const count = await images.count().catch(() => 0)
+  let shot = null
+  let bestArea = 0
+  for (let i = 0; i < count; i += 1) {
+    const box = await images.nth(i).boundingBox().catch(() => null)
+    if (!box || box.width < 80) continue
+    const area = box.width * box.height
+    if (area > bestArea) {
+      bestArea = area
+      shot = images.nth(i)
+    }
+  }
+  const buffer = shot ? await shot.screenshot() : await page.screenshot({ fullPage: false })
+  return buffer.toString('base64')
 }
 
 async function answerSecurityCheck(page, report) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const challenge = await findChallenge(page)
     if (!challenge) return
-    await page.keyboard.press('Escape').catch(() => {})
     const question = questionFrom(challenge.text)
-    const receipt = challenge.frame.locator('img')
-    let shot = null
-    const count = await receipt.count().catch(() => 0)
-    let bestArea = 0
-    for (let i = 0; i < count; i += 1) {
-      const box = await receipt.nth(i).boundingBox().catch(() => null)
-      if (!box || box.width < 80) continue
-      const area = box.width * box.height
-      if (area > bestArea) {
-        bestArea = area
-        shot = receipt.nth(i)
-      }
-    }
-    const image = (shot ? await shot.screenshot() : await page.screenshot({ fullPage: false })).toString('base64')
-    report('captcha', '보안 확인 문제를 읽는 중', { question, image })
+    const image = await captureCheck(challenge.frame, page)
+    report('captcha', question ? `이번 문제: ${question}` : '보안 확인 문제를 읽는 중', { question, image })
     const answer = await waitCaptchaAnswer()
-    report('captcha', '보안 확인 정답을 입력하는 중')
+    report('captcha', `${question || '이번 문제'} → ${answer}`)
     await challenge.field.click({ timeout: 10000 })
     await challenge.field.fill('')
     await challenge.field.pressSequentially(answer, { delay: 12 })
     const confirm = challenge.frame.getByRole('button', { name: '확인' })
     if (await confirm.count()) await confirm.first().click({ timeout: 10000 })
     else await page.getByRole('button', { name: '확인' }).first().click({ timeout: 10000 })
-    await page.waitForTimeout(1500)
+    await page.waitForTimeout(2000)
+    if (!(await findChallenge(page))) return
   }
   if (await findChallenge(page)) {
     throw new Error('보안 확인 정답이 맞지 않습니다. 열린 창에서 직접 입력해 주세요.')
@@ -133,9 +152,8 @@ async function login(page, loginId, password, report) {
     await typeInto(page, '#id', loginId)
     await typeInto(page, '#pw', password)
     await page.locator('#loginBtn_column:visible, #loginBtn_row:visible').first().click({ timeout: 10000 })
-    await page.keyboard.press('Escape').catch(() => {})
   }
-  const deadline = Date.now() + 20000
+  const deadline = Date.now() + 45000
   while (Date.now() < deadline) {
     if (await findChallenge(page)) {
       await answerSecurityCheck(page, report)

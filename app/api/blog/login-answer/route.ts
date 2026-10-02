@@ -28,13 +28,15 @@ export async function POST(req: Request) {
             parts: [
               { inline_data: { mime_type: 'image/png', data: image } },
               {
-                text: `영수증 사진을 읽고 질문에 답하라.
-질문: ${question}
-규칙:
-- 총 구매 금액이면 오른쪽 총합 칸의 숫자를 모두 더한다.
-- 한 개 당 가격이면 가격 칸의 숫자만 쓴다.
-- 전화번호의 몇 번째 숫자면 숫자만 이어 읽고 그 자리를 센다.
-- 출력은 정답 숫자만. 쉼표, 원, 설명 금지.`,
+                text: `이 확인 문제는 로그인할 때마다 문장이 다르다. 사진에 보이는 이번 질문만 풀어라.
+이번 질문: ${question || '사진 속 질문 문장'}
+영수증에 실제로 인쇄된 숫자만 사용하라. 가려진 별표는 숫자로 세지 마라.
+- 총 구매 금액, 합계: 총합 칸을 모두 더한다.
+- 한 개당 가격, 단가: 그 품목의 가격 칸 하나만.
+- 뒤에서 N번째 숫자: 끝에서 N번째 한 자리.
+- 앞에서 N번째 숫자: 앞에서 N번째 한 자리.
+다른 질문이면 그 문장이 묻는 값만 계산하라.
+마지막 줄에 정답 숫자만 써라.`,
               },
             ],
           },
@@ -52,7 +54,8 @@ export async function POST(req: Request) {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
   }
   const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || ''
-  const answer = text.replace(/원/g, '').replace(/,/g, '').trim().split('\n')[0]?.trim() || ''
+  const numbers = text.replace(/,/g, '').match(/\d+/g) || []
+  const answer = numbers[numbers.length - 1] || ''
   if (!answer) return NextResponse.json({ error: '보안 확인 정답을 읽지 못했습니다' }, { status: 502 })
   return NextResponse.json({ answer })
 }
