@@ -485,7 +485,6 @@ export function BlogClient() {
   const [uploadFinish, setUploadFinish] = useState<'' | 'draft' | 'schedule'>('')
   const [scheduleAt, setScheduleAt] = useState('')
   const [scheduleQueue, setScheduleQueue] = useState<string[]>([])
-  const [kakaoConnected, setKakaoConnected] = useState(false)
 
   const ping = (msg: string) => {
     setToast(msg)
@@ -966,25 +965,6 @@ export function BlogClient() {
     },
     [folderPath, folderTitles, folderLabel, mode, uploadAccountId, activeMeta, loadFolders]
   )
-
-  useEffect(() => {
-    if (mode !== 'product') return
-    const flag = searchParams.get('kakao')
-    if (flag === 'ok') {
-      setKakaoConnected(true)
-      ping('카톡 알림을 연결했습니다')
-    } else if (flag === 'nokey') {
-      setError('카톡 연결에 필요한 카카오 앱 키가 아직 없습니다.')
-    } else if (flag === 'fail') {
-      setError('카톡 연결에 실패했습니다. 나에게 보내기 동의가 필요합니다.')
-    }
-    void fetch('/api/blog/kakao')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.connected) setKakaoConnected(true)
-      })
-      .catch(() => null)
-  }, [mode, searchParams])
 
   useEffect(() => {
     if (mode !== 'product' || !folderPath.trim()) return
