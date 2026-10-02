@@ -117,31 +117,43 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
     onChange(toLocalInput(next))
   }
 
+  function pickDate(dateValue: string) {
+    const [year, month, day] = dateValue.split('-').map(Number)
+    if (!year || !month || !day) return
+    const next = new Date(year, month - 1, day, selected?.getHours() ?? 18, selected?.getMinutes() ?? 0, 0, 0)
+    onChange(toLocalInput(next))
+  }
+
   function pickHour(hour: number) {
-    const offset = selectedOffset >= 0 ? selectedOffset : hour <= now.getHours() ? 1 : 0
-    const minute = selected?.getMinutes() ?? 0
-    let next = atDayHour(offset, hour, minute)
-    if (next.getTime() < now.getTime() + 60_000) next = atDayHour(offset + 1, hour, minute)
+    const base = selected ?? atDayHour(hour <= now.getHours() ? 1 : 0, hour, 0)
+    const next = new Date(base)
+    next.setHours(hour, selected?.getMinutes() ?? 0, 0, 0)
+    if (next.getTime() < now.getTime() + 60_000) next.setDate(next.getDate() + 1)
     onChange(toLocalInput(next))
   }
 
   function pickMinute(minute: number) {
-    const offset = selectedOffset >= 0 ? selectedOffset : 1
-    const hour = selected?.getHours() ?? 18
-    let next = atDayHour(offset, hour, minute)
-    if (next.getTime() < now.getTime() + 60_000) next = atDayHour(offset + 1, hour, minute)
+    const base = selected ?? atDayHour(1, 18, minute)
+    const next = new Date(base)
+    next.setMinutes(minute, 0, 0)
+    if (next.getTime() < now.getTime() + 60_000) next.setDate(next.getDate() + 1)
     onChange(toLocalInput(next))
   }
 
+  const dateValue = selected
+    ? `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+    : ''
+  const minDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
   const pill = (active: boolean) =>
     cn(
-      'rounded-full border px-3 py-2 text-sm font-medium transition',
+      'h-7 rounded-full border px-2.5 text-xs font-medium transition',
       active ? 'border-white bg-white text-neutral-950' : 'border-white/10 text-white/75 hover:border-white/25'
     )
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1">
         {presets.map((item) => (
           <button
             key={item.label}
@@ -153,14 +165,23 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex flex-wrap items-center gap-1">
         {['오늘', '내일', '모레'].map((label, offset) => (
           <button key={label} type="button" onClick={() => pickDay(offset)} className={pill(selectedOffset === offset)}>
             {label}
           </button>
         ))}
+        <input
+          type="date"
+          value={dateValue}
+          min={minDate}
+          onChange={(event) => pickDate(event.target.value)}
+          aria-label="예약 날짜"
+          className="h-7 rounded-full border border-white/10 bg-black/20 px-2 text-xs text-white outline-none"
+          style={{ colorScheme: 'dark' }}
+        />
       </div>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="flex flex-wrap gap-1">
         {[9, 12, 15, 18, 21].map((hour) => (
           <button
             key={hour}
@@ -171,8 +192,6 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
             {hour}시
           </button>
         ))}
-      </div>
-      <div className="grid grid-cols-2 gap-2">
         {[0, 30].map((minute) => (
           <button
             key={minute}
@@ -184,9 +203,7 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
           </button>
         ))}
       </div>
-      <p className={cn('text-center text-sm font-semibold', value ? 'text-white' : 'text-white/40')}>
-        {value ? formatSchedule(value) : '버튼을 누르면 바로 정해집니다'}
-      </p>
+      {value ? <p className="text-xs font-medium text-white/80">{formatSchedule(value)}</p> : null}
     </div>
   )
 }
