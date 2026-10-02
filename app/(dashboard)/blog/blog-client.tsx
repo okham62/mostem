@@ -419,42 +419,36 @@ function WeekTimeField({
   }
 
   return (
-    <div className="rounded-[24px] bg-black/25 p-4 ring-1 ring-white/10">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[13px] font-medium text-white/45">{title}</p>
-        <p className="text-[1.7rem] font-semibold tracking-tight text-white">
-          <span className="mr-1.5 text-sm font-medium text-white/40">{isPm ? '오후' : '오전'}</span>
-          {hour12}
-          <span className="px-0.5 text-white/30">:</span>
-          {String(minute).padStart(2, '0')}
+    <div className="rounded-2xl bg-black/25 px-3.5 py-3 ring-1 ring-white/10">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px] font-medium text-white/80">{title}</p>
+        <p className="text-[13px] font-semibold tabular-nums text-white">
+          {WEEKDAY_LABELS[day]}
+          <span className="mx-1.5 font-normal text-white/25">·</span>
+          {isPm ? '오후' : '오전'} {hour12}:{String(minute).padStart(2, '0')}
         </p>
       </div>
 
-      <div className="mt-4">
-        <p className="text-[11px] font-medium tracking-wide text-white/35">요일</p>
-        <div className="mt-2 flex justify-between">
+      <div className="mt-2.5 flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 justify-between">
           {WEEKDAY_LABELS.map((label, value) => (
             <button
               key={label}
               type="button"
               onClick={() => onDay(value as Weekday)}
               className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-medium transition',
-                day === value ? 'bg-gold text-neutral-950' : 'text-white/45 hover:bg-white/8 hover:text-white'
+                'flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-medium transition',
+                day === value ? 'bg-gold text-neutral-950' : 'text-white/40 hover:text-white'
               )}
             >
               {label}
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="mt-5">
-        <p className="text-[11px] font-medium tracking-wide text-white/35">오전 · 오후</p>
-        <div className="relative mt-2 grid h-11 grid-cols-2 rounded-2xl bg-white/[0.05] p-1">
+        <div className="relative grid h-7 w-[84px] shrink-0 grid-cols-2 rounded-full bg-white/[0.06] p-0.5">
           <span
-            className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl bg-white shadow-sm transition-transform"
-            style={{ left: 4, transform: isPm ? 'translateX(100%)' : 'translateX(0)' }}
+            className="absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-white transition-transform"
+            style={{ left: 2, transform: isPm ? 'translateX(100%)' : 'translateX(0)' }}
           />
           {([false, true] as const).map((pm) => (
             <button
@@ -462,7 +456,7 @@ function WeekTimeField({
               type="button"
               onClick={() => commit(hour12, pm, minute)}
               className={cn(
-                'relative z-10 text-sm font-medium transition',
+                'relative z-10 text-[11px] font-medium transition',
                 isPm === pm ? 'text-neutral-950' : 'text-white/45 hover:text-white'
               )}
             >
@@ -472,51 +466,38 @@ function WeekTimeField({
         </div>
       </div>
 
-      <div className="mt-5">
-        <p className="text-[11px] font-medium tracking-wide text-white/35">시</p>
-        <div className="mt-2 grid grid-cols-6 gap-1.5">
+      <div className="mt-2 grid grid-cols-[14px_1fr] items-center gap-x-2">
+        <span className="text-[10px] text-white/30">시</span>
+        <div className="grid grid-cols-12">
           {WHEEL_HOURS.map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => commit(item, isPm, minute)}
               className={cn(
-                'h-9 rounded-lg text-[15px] tabular-nums transition',
-                hour12 === item
-                  ? 'bg-gold/15 font-semibold text-gold ring-1 ring-gold/70'
-                  : 'bg-white/[0.03] text-white/55 ring-1 ring-white/8 hover:text-white'
+                'h-7 text-[12px] tabular-nums transition',
+                hour12 === item ? 'font-semibold text-gold' : 'text-white/35 hover:text-white'
               )}
             >
               {item}
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="mt-5">
-        <p className="text-[11px] font-medium tracking-wide text-white/35">분</p>
-        <div className="relative mt-3">
-          <div className="absolute left-2 right-2 top-[7px] h-px bg-white/15" />
-          <div className="relative flex justify-between">
-            {WHEEL_MINUTES.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => commit(hour12, isPm, item)}
-                className="flex w-8 flex-col items-center gap-2"
-              >
-                <span className={cn('w-px', minute === item ? 'h-4 bg-gold' : 'h-3.5 bg-white/30')} />
-                <span
-                  className={cn(
-                    'text-[12px] tabular-nums',
-                    minute === item ? 'font-semibold text-gold' : 'text-white/35 hover:text-white/70'
-                  )}
-                >
-                  {String(item).padStart(2, '0')}
-                </span>
-              </button>
-            ))}
-          </div>
+        <span className="text-[10px] text-white/30">분</span>
+        <div className="grid grid-cols-6 border-t border-white/10">
+          {WHEEL_MINUTES.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => commit(hour12, isPm, item)}
+              className={cn(
+                'h-7 text-[11px] tabular-nums transition',
+                minute === item ? 'font-semibold text-gold' : 'text-white/30 hover:text-white/70'
+              )}
+            >
+              {String(item).padStart(2, '0')}
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -2716,7 +2697,7 @@ export function BlogClient() {
                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
               />
             ) : null}
-            <div className="grid gap-3">
+            <div className="grid gap-2">
               <WeekTimeField title="공개" day={openDow} time={openTime} onDay={setOpenDow} onTime={setOpenTime} />
               <WeekTimeField title="비공개" day={closeDow} time={closeTime} onDay={setCloseDow} onTime={setCloseTime} />
             </div>
