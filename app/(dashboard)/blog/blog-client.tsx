@@ -388,25 +388,6 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
           />
         </div>
       </div>
-      <div className="flex gap-4 border-t border-white/10 px-4 py-2 text-[11px] text-white/45">
-        <button type="button" className="hover:text-white" onClick={() => onChange(toLocalInput(new Date(now.getTime() + 60 * 60 * 1000)))}>
-          1시간 뒤
-        </button>
-        <button
-          type="button"
-          className="hover:text-white"
-          onClick={() => apply(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), 9, 0)}
-        >
-          내일 오전
-        </button>
-        <button
-          type="button"
-          className="hover:text-white"
-          onClick={() => apply(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), 18, 0)}
-        >
-          내일 저녁
-        </button>
-      </div>
     </div>
   )
 }
