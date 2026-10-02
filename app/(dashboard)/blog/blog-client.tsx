@@ -56,19 +56,28 @@ function splitTitleText(text: string) {
     .filter(Boolean)
 }
 
-function plainParagraphs(markdown: string, tags: string[]) {
-  const text = markdown
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
-    .replace(/^#+\s+/gm, '')
-    .replace(/\*\*/g, '')
-  const parts = text
-    .split(/\n{2,}/)
-    .map((part) => part.replace(/\n/g, ' ').trim())
-    .filter(Boolean)
-  if (tags.length) {
-    parts.push(tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`)).join(' '))
+function imageCaptionBlocks(markdown: string, imagePaths: string[]) {
+  const text = markdown.replace(/!\[[^\]]*\]\([^)]+\)/g, '').replace(/\*\*/g, '')
+  const chunks = text.split(/\[IMAGE_(\d+)\]/i)
+  const captions = imagePaths.map(() => '')
+  for (let i = 1; i < chunks.length; i += 2) {
+    const index = Number(chunks[i]) - 1
+    const caption = String(chunks[i + 1] || '')
+      .replace(/^#+\s+/gm, '')
+      .replace(/\n{2,}/g, '\n')
+      .trim()
+    if (index >= 0 && index < captions.length) captions[index] = caption
   }
-  return parts
+  if (!captions.some(Boolean)) {
+    const parts = text
+      .split(/\n{2,}/)
+      .map((part) => part.replace(/^#+\s+/gm, '').replace(/\n/g, ' ').trim())
+      .filter((part) => part && !part.startsWith('#'))
+    parts.forEach((part, index) => {
+      if (index < captions.length) captions[index] = part
+    })
+  }
+  return imagePaths.map((imagePath, index) => ({ imagePath, text: captions[index] || '' }))
 }
 
 function accountBlogId(account: AccountRow) {
@@ -797,11 +806,17 @@ export function BlogClient() {
               loginId: secret.loginId,
               password: secret.password,
               title: articleData.article?.title || title,
-              paragraphs: plainParagraphs(
+              blocks: imageCaptionBlocks(
                 String(articleData.article?.bodyMarkdown || ''),
-                Array.isArray(articleData.article?.tags) ? articleData.article.tags.map((tag: string) => String(tag)) : []
+                imageData.files.map((file) => file.path)
               ),
-              imagePaths: imageData.files.map((file) => file.path),
+              hashtags: (Array.isArray(articleData.article?.tags) ? articleData.article.tags : [])
+                .map((tag) => {
+                  const clean = String(tag).replace(/^#+/, '').trim()
+                  return clean ? `#${clean}` : ''
+                })
+                .filter(Boolean)
+                .join(' '),
             }),
           })
           const writeData = await writeRes.json().catch(() => ({}))

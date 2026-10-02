@@ -1,8 +1,12 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { spawn } from 'node:child_process'
 import { chromium } from 'playwright'
 
 const profileDir = path.join(os.homedir(), 'AppData', 'Local', 'mostem-blog-agent', 'chrome-profile')
+const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+const debugPort = 9333
 
 let contextPromise = null
 let opening = null
@@ -30,15 +34,46 @@ function waitCaptchaAnswer() {
   })
 }
 
+function debugReady() {
+  return fetch(`http://127.0.0.1:${debugPort}/json/version`, { signal: AbortSignal.timeout(800) })
+    .then((res) => res.ok)
+    .catch(() => false)
+}
+
+async function ensureChrome() {
+  if (await debugReady()) return
+  if (!fs.existsSync(chromePath)) throw new Error('크롬을 찾지 못했습니다')
+  const child = spawn(
+    chromePath,
+    [
+      `--user-data-dir=${profileDir}`,
+      `--remote-debugging-port=${debugPort}`,
+      '--start-maximized',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-session-crashed-bubble',
+      '--hide-crash-restore-bubble',
+    ],
+    { detached: true, stdio: 'ignore' }
+  )
+  child.unref()
+  const deadline = Date.now() + 15000
+  while (Date.now() < deadline) {
+    if (await debugReady()) return
+    await new Promise((resolve) => setTimeout(resolve, 300))
+  }
+  throw new Error('크롬 창을 열지 못했습니다')
+}
+
 async function browser() {
   if (!contextPromise) {
-    contextPromise = chromium
-      .launchPersistentContext(profileDir, {
-        channel: 'chrome',
-        headless: false,
-        viewport: null,
-        locale: 'ko-KR',
-        args: ['--start-maximized', '--disable-save-password-bubble'],
+    contextPromise = ensureChrome()
+      .then(async () => {
+        const connected = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`)
+        connected.close = async () => {}
+        const context = connected.contexts()[0]
+        if (!context) throw new Error('크롬 창을 열지 못했습니다')
+        return context
       })
       .catch((error) => {
         contextPromise = null
@@ -169,17 +204,29 @@ async function login(page, loginId, password, report) {
   }
 }
 
-async function attachImage(page, filePath) {
-  const button = page.locator('button[data-name="image"], button.se-image-toolbar-button, button[data-name="picture"]').first()
+async function editorFrame(page) {
+  const deadline = Date.now() + 25000
+  while (Date.now() < deadline) {
+    for (const frame of page.frames()) {
+      const hit = frame.locator('.se-title-text, .se-documentTitle, .se-text-paragraph')
+      if (await hit.count().catch(() => 0)) return frame
+    }
+    await page.waitForTimeout(400)
+  }
+  throw new Error('글쓰기 편집 화면을 찾지 못했습니다')
+}
+
+async function attachImage(page, frame, filePath) {
+  const button = frame.locator('button[data-name="image"], button.se-image-toolbar-button, button[data-name="picture"]').first()
   const chooserWait = page.waitForEvent('filechooser', { timeout: 8000 }).catch(() => null)
   await button.click({ timeout: 10000 })
   const chooser = await chooserWait
   if (chooser) {
     await chooser.setFiles(filePath)
   } else {
-    await page.locator('input[type="file"]').last().setInputFiles(filePath)
+    await frame.locator('input[type="file"]').last().setInputFiles(filePath)
   }
-  await page.waitForTimeout(1200)
+  await page.waitForTimeout(800)
 }
 
 async function openEditor(input, onStatus) {
@@ -196,6 +243,7 @@ async function openEditor(input, onStatus) {
     await login(page, input.loginId, input.password, report)
     await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
   }
+  await editorFrame(page)
   report('ready', '글쓰기 화면입니다')
   return page
 }
@@ -215,25 +263,38 @@ export async function typeNaverPost(input, onStatus) {
   const page = await beginNaver(input, onStatus)
   opening = null
 
+  const frame = await editorFrame(page)
   report('title', '제목을 입력하는 중')
-  const title = page.locator('.se-title-text, .se-documentTitle .se-text-paragraph').first()
-  await title.click({ timeout: 30000 })
-  await page.keyboard.type(input.title, { delay: 35 })
+  const title = frame.locator('.se-title-text, .se-documentTitle .se-text-paragraph, .se-documentTitle').first()
+  await title.click({ timeout: 15000 })
+  await page.keyboard.type(input.title || '', { delay: 20 })
+  await page.keyboard.press('Enter')
 
-  report('body', '본문을 입력하는 중')
-  const body = page.locator('.se-component.se-text .se-text-paragraph, .se-text-paragraph').nth(1)
-  if (await body.count()) await body.click()
-  for (const paragraph of input.paragraphs || []) {
-    await page.keyboard.type(paragraph, { delay: 16 })
+  const blocks =
+    Array.isArray(input.blocks) && input.blocks.length
+      ? input.blocks
+      : (input.imagePaths || []).map((imagePath, index) => ({
+          imagePath,
+          text: (input.paragraphs || [])[index] || '',
+        }))
+  const body = frame.locator('.se-component.se-text .se-text-paragraph, .se-text-paragraph').nth(1)
+  if (await body.count()) await body.click({ timeout: 10000 }).catch(() => {})
+
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i]
+    report('images', `사진 ${i + 1}/${blocks.length} 올리고 그 사진 멘트를 쓰는 중`)
+    if (block.imagePath) await attachImage(page, frame, block.imagePath)
     await page.keyboard.press('Enter')
-    await page.keyboard.press('Enter')
+    if (block.text) {
+      await page.keyboard.type(block.text, { delay: 12 })
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Enter')
+    }
+  }
+  if (input.hashtags) {
+    report('body', '해시태그를 넣는 중')
+    await page.keyboard.type(String(input.hashtags), { delay: 8 })
   }
 
-  const images = Array.isArray(input.imagePaths) ? input.imagePaths : []
-  for (let i = 0; i < images.length; i += 1) {
-    report('images', `이미지 첨부 ${i + 1}/${images.length}`)
-    await attachImage(page, images[i])
-  }
-
-  report('done', '입력이 끝났습니다. 발행은 크롬 창에서 눌러 주세요.')
+  report('done', '입력이 끝났습니다. 창은 닫지 않습니다. 발행은 직접 눌러 주세요.')
 }

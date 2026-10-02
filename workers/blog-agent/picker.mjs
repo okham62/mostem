@@ -203,6 +203,13 @@ const server = http.createServer(async (req, res) => {
             title: String(body.title || ''),
             paragraphs: Array.isArray(body.paragraphs) ? body.paragraphs.map((line) => String(line)) : [],
             imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths.map((line) => String(line)) : [],
+            hashtags: String(body.hashtags || ''),
+            blocks: Array.isArray(body.blocks)
+              ? body.blocks.map((item) => ({
+                  imagePath: String(item?.imagePath || ''),
+                  text: String(item?.text || ''),
+                }))
+              : [],
           },
           (status) => {
             writeJob = status
