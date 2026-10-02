@@ -96,7 +96,20 @@ async function answerSecurityCheck(page, report) {
     if (!challenge) return
     await page.keyboard.press('Escape').catch(() => {})
     const question = questionFrom(challenge.text)
-    const image = (await page.screenshot({ fullPage: false })).toString('base64')
+    const receipt = challenge.frame.locator('img')
+    let shot = null
+    const count = await receipt.count().catch(() => 0)
+    let bestArea = 0
+    for (let i = 0; i < count; i += 1) {
+      const box = await receipt.nth(i).boundingBox().catch(() => null)
+      if (!box || box.width < 80) continue
+      const area = box.width * box.height
+      if (area > bestArea) {
+        bestArea = area
+        shot = receipt.nth(i)
+      }
+    }
+    const image = (shot ? await shot.screenshot() : await page.screenshot({ fullPage: false })).toString('base64')
     report('captcha', '보안 확인 문제를 읽는 중', { question, image })
     const answer = await waitCaptchaAnswer()
     report('captcha', '보안 확인 정답을 입력하는 중')
