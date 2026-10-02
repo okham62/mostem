@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -74,6 +74,18 @@ function parseSchedule(value: string) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+function defaultTodaySlot(now = new Date()) {
+  const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0, 0)
+  if (evening.getTime() >= now.getTime() + 60_000) return evening
+  const soon = new Date(now.getTime() + 60_000)
+  soon.setSeconds(0, 0)
+  const minute = Math.ceil(soon.getMinutes() / 10) * 10
+  soon.setMinutes(0)
+  soon.setHours(soon.getHours() + Math.floor(minute / 60))
+  soon.setMinutes(minute % 60)
+  return soon
+}
+
 function formatSchedule(value: string) {
   const date = parseSchedule(value)
   if (!date) return ''
@@ -84,11 +96,113 @@ function formatSchedule(value: string) {
   return `${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${h12}:${minute}`
 }
 
+const WHEEL_HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+const WHEEL_MINUTES = [0, 10, 20, 30, 40, 50]
+
+function stepWheel(values: number[], current: number, direction: 1 | -1, disabled: (item: number) => boolean) {
+  const start = values.indexOf(current)
+  const origin = start < 0 ? 0 : start
+  for (let offset = 1; offset <= values.length; offset += 1) {
+    const next = values[(origin + direction * offset + values.length * 2) % values.length]
+    if (!disabled(next)) return next
+  }
+  return current
+}
+
+function TimeWheel({
+  label,
+  values,
+  value,
+  format,
+  disabled,
+  onPick,
+  tone,
+}: {
+  label: string
+  values: number[]
+  value: number
+  format: (item: number) => string
+  disabled: (item: number) => boolean
+  onPick: (item: number) => void
+  tone: 'blue' | 'white'
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const pickRef = useRef(onPick)
+  const disabledRef = useRef(disabled)
+  pickRef.current = onPick
+  disabledRef.current = disabled
+  const index = values.indexOf(value)
+  const at = index < 0 ? 0 : index
+  const around = [-1, 0, 1].map((offset) => values[(at + offset + values.length) % values.length])
+
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      if (event.deltaY === 0) return
+      pickRef.current(stepWheel(values, value, event.deltaY > 0 ? 1 : -1, disabledRef.current))
+    }
+    node.addEventListener('wheel', onWheel, { passive: false })
+    return () => node.removeEventListener('wheel', onWheel)
+  }, [value, values])
+
+  function move(direction: 1 | -1) {
+    onPick(stepWheel(values, value, direction, disabled))
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="touch-none select-none"
+      onPointerDown={(event) => {
+        const startY = event.clientY
+        event.currentTarget.setPointerCapture(event.pointerId)
+        event.currentTarget.dataset.dragY = String(startY)
+      }}
+      onPointerMove={(event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+        const startY = Number(event.currentTarget.dataset.dragY || event.clientY)
+        const delta = event.clientY - startY
+        if (Math.abs(delta) < 22) return
+        move(delta > 0 ? -1 : 1)
+        event.currentTarget.dataset.dragY = String(event.clientY)
+      }}
+    >
+      <p className="mb-1 text-center text-[10px] text-white/35">{label}</p>
+      <div className="overflow-hidden rounded-2xl bg-black/20 py-1">
+        {around.map((item, row) => {
+          const current = row === 1
+          const blocked = disabled(item)
+          return (
+            <div
+              key={`${row}-${item}`}
+              className={cn(
+                'mx-2 flex h-8 items-center justify-center rounded-lg text-sm',
+                current && tone === 'blue' && 'bg-[#0a84ff] font-medium text-white',
+                current && tone === 'white' && 'bg-white font-medium text-neutral-950',
+                !current && (blocked ? 'text-white/15' : 'text-white/35')
+              )}
+            >
+              {format(item)}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next: string) => void }) {
   const now = new Date()
-  const selected = parseSchedule(value)
+  const selected = parseSchedule(value) ?? defaultTodaySlot(now)
   const weekdays = ['일', '월', '화', '수', '목', '금', '토']
-  const [cursor, setCursor] = useState(() => new Date((selected ?? now).getFullYear(), (selected ?? now).getMonth(), 1))
+  const [cursor, setCursor] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1))
+
+  useEffect(() => {
+    if (value) return
+    onChange(toLocalInput(defaultTodaySlot()))
+  }, [value, onChange])
 
   function sameDay(a: Date, b: Date) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -104,7 +218,7 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
   const minute = selected?.getMinutes() ?? 0
   const isPm = hour24 >= 12
   const hour12 = hour24 % 12 || 12
-  const baseDate = selected ?? new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const baseDate = selected
   const firstWeekday = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getDay()
   const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate()
   const cells = [...Array.from({ length: firstWeekday }, () => null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)]
@@ -112,7 +226,7 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
   return (
     <div className="overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
       <div className="px-4 pb-2 pt-3">
-        <p className="text-[22px] font-medium tracking-tight text-white">{value ? formatSchedule(value) : '날짜와 시간'}</p>
+        <p className="text-[22px] font-medium tracking-tight text-white">{formatSchedule(toLocalInput(selected))}</p>
       </div>
       <div className="px-3 pb-3">
         <div className="mb-2 flex items-center justify-between">
@@ -186,41 +300,35 @@ function ScheduleQuickPick({ value, onChange }: { value: string; onChange: (next
             )
           })}
         </div>
-        <div className="grid grid-cols-6 gap-1">
-          {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => {
-            const hourValue = isPm ? (hour % 12) + 12 : hour % 12
-            const slot = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hourValue, minute, 0, 0)
-            const past = slot.getTime() < now.getTime() + 60_000
-            return (
-              <button
-                key={hour}
-                type="button"
-                disabled={past}
-                onClick={() => apply(baseDate, hourValue, minute)}
-                className={cn(
-                  'h-7 rounded-md text-xs transition disabled:text-white/15',
-                  selected && hour12 === hour ? 'bg-[#0a84ff] text-white' : 'text-white/70 hover:bg-white/10'
-                )}
-              >
-                {hour}
-              </button>
-            )
-          })}
-        </div>
-        <div className="grid grid-cols-6 gap-1">
-          {[0, 10, 20, 30, 40, 50].map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => apply(baseDate, hour24, item)}
-              className={cn(
-                'h-7 rounded-md text-[11px] transition',
-                selected && minute === item ? 'bg-white text-neutral-950' : 'text-white/45 hover:bg-white/10 hover:text-white'
-              )}
-            >
-              {String(item).padStart(2, '0')}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-2">
+          <TimeWheel
+            label="시간"
+            values={WHEEL_HOURS}
+            value={hour12}
+            format={(item) => String(item)}
+            tone="blue"
+            disabled={(hour) => {
+              const hourValue = isPm ? (hour % 12) + 12 : hour % 12
+              const slot = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hourValue, minute, 0, 0)
+              return slot.getTime() < now.getTime() + 60_000
+            }}
+            onPick={(hour) => {
+              const hourValue = isPm ? (hour % 12) + 12 : hour % 12
+              apply(baseDate, hourValue, minute)
+            }}
+          />
+          <TimeWheel
+            label="분"
+            values={WHEEL_MINUTES}
+            value={WHEEL_MINUTES.includes(minute) ? minute : 0}
+            format={(item) => String(item).padStart(2, '0')}
+            tone="white"
+            disabled={(item) => {
+              const slot = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hour24, item, 0, 0)
+              return slot.getTime() < now.getTime() + 60_000
+            }}
+            onPick={(item) => apply(baseDate, hour24, item)}
+          />
         </div>
       </div>
       <div className="flex gap-4 border-t border-white/10 px-4 py-2 text-[11px] text-white/45">
