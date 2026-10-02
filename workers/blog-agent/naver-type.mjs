@@ -38,7 +38,7 @@ async function browser() {
         headless: false,
         viewport: null,
         locale: 'ko-KR',
-        args: ['--start-maximized'],
+        args: ['--start-maximized', '--disable-save-password-bubble'],
       })
       .catch((error) => {
         contextPromise = null
@@ -56,46 +56,59 @@ async function typeInto(page, selector, text) {
   await field.pressSequentially(text, { delay: 12 })
 }
 
-async function securityQuestion(page) {
-  const text = await page.locator('body').innerText().catch(() => '')
-  const match = text.match(/([^\n]{4,80}얼마[^\n?]{0,40}\?)|([^\n]{4,80}입니까\?)/)
-  return match ? match[0].trim() : ''
-}
-
-async function captureChallenge(page) {
-  const images = page.locator('img')
-  const count = await images.count()
-  let best = null
-  let bestArea = 0
-  for (let i = 0; i < count; i += 1) {
-    const box = await images.nth(i).boundingBox()
-    if (!box || box.width < 80 || box.height < 40) continue
-    const area = box.width * box.height
-    if (area > bestArea) {
-      bestArea = area
-      best = images.nth(i)
+async function visibleAnswerField(frame) {
+  const locators = [
+    frame.getByPlaceholder(/정답/),
+    frame.locator('input[placeholder*="정답"]'),
+    frame.locator('input[type="text"]'),
+  ]
+  for (const locator of locators) {
+    const count = await locator.count().catch(() => 0)
+    for (let i = 0; i < count; i += 1) {
+      const item = locator.nth(i)
+      if (await item.isVisible().catch(() => false)) return item
     }
   }
-  const buffer = best ? await best.screenshot() : await page.screenshot({ fullPage: false })
-  return buffer.toString('base64')
+  return null
+}
+
+async function findChallenge(page) {
+  for (const frame of page.frames()) {
+    const text = await frame.locator('body').innerText().catch(() => '')
+    if (!text.includes('추가 확인') && !text.includes('정답을 입력')) continue
+    const field = await visibleAnswerField(frame)
+    if (field) return { frame, field, text }
+  }
+  return null
+}
+
+function questionFrom(text) {
+  const line = text
+    .split('\n')
+    .map((item) => item.trim())
+    .find((item) => /[?？]$/.test(item) && item.length < 140 && !item.includes('입력해'))
+  return line || ''
 }
 
 async function answerSecurityCheck(page, report) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const field = page.getByPlaceholder('정답을 입력해 주세요')
-    if (!(await field.isVisible().catch(() => false))) return
-    const question = await securityQuestion(page)
-    const image = await captureChallenge(page)
+    const challenge = await findChallenge(page)
+    if (!challenge) return
+    await page.keyboard.press('Escape').catch(() => {})
+    const question = questionFrom(challenge.text)
+    const image = (await page.screenshot({ fullPage: false })).toString('base64')
     report('captcha', '보안 확인 문제를 읽는 중', { question, image })
     const answer = await waitCaptchaAnswer()
     report('captcha', '보안 확인 정답을 입력하는 중')
-    await field.click({ timeout: 10000 })
-    await field.fill('')
-    await field.pressSequentially(answer, { delay: 12 })
-    await page.getByRole('button', { name: '확인' }).click({ timeout: 10000 })
-    await page.waitForTimeout(1200)
+    await challenge.field.click({ timeout: 10000 })
+    await challenge.field.fill('')
+    await challenge.field.pressSequentially(answer, { delay: 12 })
+    const confirm = challenge.frame.getByRole('button', { name: '확인' })
+    if (await confirm.count()) await confirm.first().click({ timeout: 10000 })
+    else await page.getByRole('button', { name: '확인' }).first().click({ timeout: 10000 })
+    await page.waitForTimeout(1500)
   }
-  if (await page.getByPlaceholder('정답을 입력해 주세요').isVisible().catch(() => false)) {
+  if (await findChallenge(page)) {
     throw new Error('보안 확인 정답이 맞지 않습니다. 열린 창에서 직접 입력해 주세요.')
   }
 }
@@ -107,18 +120,20 @@ async function login(page, loginId, password, report) {
     await typeInto(page, '#id', loginId)
     await typeInto(page, '#pw', password)
     await page.locator('#loginBtn_column:visible, #loginBtn_row:visible').first().click({ timeout: 10000 })
+    await page.keyboard.press('Escape').catch(() => {})
   }
-  const deadline = Date.now() + 30000
+  const deadline = Date.now() + 20000
   while (Date.now() < deadline) {
-    if (await page.getByPlaceholder('정답을 입력해 주세요').isVisible().catch(() => false)) {
+    if (await findChallenge(page)) {
       await answerSecurityCheck(page, report)
+      continue
     }
     const url = page.url()
     if (!url.includes('nid.naver.com')) return
     if (!url.includes('nidlogin') && !(await page.locator('#id').count())) return
     await page.waitForTimeout(400)
   }
-  if (page.url().includes('nidlogin')) {
+  if (await findChallenge(page) || page.url().includes('nidlogin')) {
     throw new Error('로그인 화면에서 넘어가지 못했습니다. 열린 창을 확인해 주세요.')
   }
 }

@@ -746,18 +746,17 @@ export function BlogClient() {
         return { imageData, articleData }
       })()
       let packed: { imageData: { files: Array<{ name: string; path: string }> }; articleData: { article?: { title?: string; bodyMarkdown?: string; tags?: string[] }; post?: { id?: string } } } | null = null
+      let articleError: Error | null = null
+      articlePromise.then((value) => {
+        packed = value
+      }).catch((error) => {
+        articleError = error instanceof Error ? error : new Error('글 생성 실패')
+      })
       let writeSent = false
       let solvedImage = ''
       let last = '크롬 창을 여는 중'
       for (let i = 0; i < 180; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
-        if (!packed) {
-          const raced = await Promise.race([
-            articlePromise.then((value) => ({ value })),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 0)),
-          ])
-          if (raced?.value) packed = raced.value
-        }
         const statusRes = await fetch('http://127.0.0.1:39217/write-status')
         const status = await statusRes.json().catch(() => ({}))
         if (status.message) {
@@ -807,7 +806,9 @@ export function BlogClient() {
           if (!writeRes.ok) throw new Error(writeData.error || '크롬 글쓰기를 시작하지 못했습니다')
         }
         if (status.phase === 'done') break
+        if (articleError && !['captcha', 'login', 'chrome'].includes(String(status.phase || ''))) throw articleError
       }
+      if (articleError && !packed) throw articleError
       if (!packed) packed = await articlePromise
       const articleData = packed.articleData
       const imageData = packed.imageData
