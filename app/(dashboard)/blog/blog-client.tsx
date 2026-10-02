@@ -46,6 +46,31 @@ type NaverLinkStatus = {
   blogName?: string
 }
 
+function splitTitleText(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  return (lines.length <= 1 ? lines.flatMap((line) => line.split(/\s+/)) : lines)
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function plainParagraphs(markdown: string, tags: string[]) {
+  const text = markdown
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    .replace(/^#+\s+/gm, '')
+    .replace(/\*\*/g, '')
+  const parts = text
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/\n/g, ' ').trim())
+    .filter(Boolean)
+  if (tags.length) {
+    parts.push(tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`)).join(' '))
+  }
+  return parts
+}
+
 function accountBlogId(account: AccountRow) {
   const metaId = account.meta && typeof account.meta.blogId === 'string' ? account.meta.blogId : ''
   if (metaId) return metaId
@@ -216,6 +241,7 @@ export function BlogClient() {
   const [folderPath, setFolderPath] = useState('')
   const [folderLabel, setFolderLabel] = useState('')
   const [pickingFolder, setPickingFolder] = useState(false)
+  const [chromeNote, setChromeNote] = useState('')
 
   const ping = (msg: string) => {
     setToast(msg)
@@ -645,6 +671,118 @@ export function BlogClient() {
       ping(`폴더가 등록되었습니다. 제목 ${titles.length}개`)
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  async function startChromeWrite() {
+    const titles = splitTitleText(folderTitles)
+    const folder = folders.find((item) => item.local_path === folderPath) || folders.find((item) => item.mode === 'product')
+    const used = new Set(
+      Array.isArray(folder?.meta?.usedTitles) ? folder.meta.usedTitles.map((title) => String(title)) : []
+    )
+    const pool = titles.filter((title) => !used.has(title))
+    const title = pool[Math.floor(Math.random() * pool.length)] || ''
+    if (!folderPath.trim()) {
+      setError('폴더를 먼저 선택하세요')
+      return
+    }
+    if (!title) {
+      setError('쓸 수 있는 제목이 없습니다')
+      return
+    }
+    if (!uploadAccountId) {
+      setError('업로드 계정을 선택하세요')
+      return
+    }
+    setBusyKey('chrome')
+    setError('')
+    setChromeNote('폴더 이미지를 읽는 중')
+    try {
+      const usedFiles = Array.isArray(folder?.meta?.usedFiles) ? folder.meta.usedFiles.map((name) => String(name)) : []
+      const imageRes = await fetch('http://127.0.0.1:39217/folder-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: folderPath, skip: usedFiles, limit: 10 }),
+      })
+      const imageData = await imageRes.json().catch(() => ({}))
+      if (!imageRes.ok || !imageData.files?.length) {
+        throw new Error(imageData.error || '폴더에서 이미지를 읽지 못했습니다. 폴더 프로그램을 확인해 주세요.')
+      }
+      setChromeNote('AI가 글을 쓰는 중')
+      const form = new FormData()
+      form.set('topic', title)
+      form.set('mode', 'product')
+      form.set('titles', title)
+      if (folder?.id) form.set('folderId', folder.id)
+      for (const file of imageData.files as Array<{ name: string; mime: string; base64: string; path: string }>) {
+        const binary = atob(file.base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+        form.append('images', new File([bytes], file.name, { type: file.mime || 'image/jpeg' }))
+      }
+      const articleRes = await fetch('/api/blog/folder-generate', { method: 'POST', body: form })
+      const articleData = await articleRes.json()
+      if (!articleRes.ok) throw new Error(articleData.error || '글 생성 실패')
+      const secretRes = await fetch('/api/blog/accounts/secret', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: uploadAccountId }),
+      })
+      const secret = await secretRes.json()
+      if (!secretRes.ok) throw new Error(secret.error || '계정 정보를 읽지 못했습니다')
+      setChromeNote('크롬 창을 여는 중')
+      const writeRes = await fetch('http://127.0.0.1:39217/write-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          blogId: secret.blogId,
+          loginId: secret.loginId,
+          password: secret.password,
+          title: articleData.article?.title || title,
+          paragraphs: plainParagraphs(
+            String(articleData.article?.bodyMarkdown || ''),
+            Array.isArray(articleData.article?.tags) ? articleData.article.tags.map((tag: string) => String(tag)) : []
+          ),
+          imagePaths: (imageData.files as Array<{ path: string }>).map((file) => file.path),
+        }),
+      })
+      const writeData = await writeRes.json().catch(() => ({}))
+      if (!writeRes.ok) throw new Error(writeData.error || '크롬 글쓰기를 시작하지 못했습니다')
+      let last = '크롬 창에서 글을 쓰는 중'
+      for (let i = 0; i < 120; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        const statusRes = await fetch('http://127.0.0.1:39217/write-status')
+        const status = await statusRes.json().catch(() => ({}))
+        if (status.message) {
+          last = String(status.message)
+          setChromeNote(last)
+        }
+        if (status.phase === 'done' || status.phase === 'error') {
+          if (status.phase === 'error') throw new Error(last)
+          break
+        }
+      }
+      if (folder?.id) {
+        await fetch('/api/blog/folders', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: folder.id,
+            usedTitle: articleData.article?.title || title,
+            usedFiles: (imageData.files as Array<{ name: string }>).map((file) => file.name),
+            excerpt: String(articleData.article?.bodyMarkdown || '').replace(/!\[[^\]]*\]\([^)]+\)/g, '').slice(0, 240),
+            postId: articleData.post?.id || null,
+          }),
+        })
+        await loadFolders()
+      }
+      ping(last)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '크롬 글쓰기 실패'
+      setError(message)
+      setChromeNote(message)
     } finally {
       setBusyKey(null)
     }
@@ -1489,7 +1627,18 @@ export function BlogClient() {
               >
                 이 모드에 등록
               </button>
+              {mode === 'product' ? (
+                <button
+                  type="button"
+                  disabled={busyKey === 'chrome' || !folderPath.trim()}
+                  onClick={() => void startChromeWrite()}
+                  className="rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  {busyKey === 'chrome' ? '크롬에서 쓰는 중' : '크롬에서 글쓰기'}
+                </button>
+              ) : null}
             </div>
+            {mode === 'product' && chromeNote ? <p className="text-xs text-white/55">{chromeNote}</p> : null}
             <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-white/35">선택된 경로</p>
               <p className="mt-1 break-all text-sm text-white/85">

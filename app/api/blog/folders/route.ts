@@ -96,11 +96,36 @@ export async function PATCH(req: Request) {
   if (typeof body.label === 'string') patch.label = body.label.trim()
   if (body.mode !== undefined) patch.mode = parseMode(body.mode)
   if (typeof body.enabled === 'boolean') patch.enabled = body.enabled
-  if ('titles' in body) {
-    const titles = parseTitles(body.titles) ?? []
+  const needsMeta = 'titles' in body || typeof body.usedTitle === 'string' || Array.isArray(body.usedFiles)
+  if (needsMeta) {
     const existing = (await listFolderWatchers(session.user.id)).find((folder) => folder.id === id)
     const prev = (existing?.meta && typeof existing.meta === 'object' ? existing.meta : {}) as Record<string, unknown>
-    patch.meta = { ...prev, titles }
+    const meta: Record<string, unknown> = { ...prev }
+    if ('titles' in body) meta.titles = parseTitles(body.titles) ?? []
+    const files = Array.isArray(body.usedFiles) ? body.usedFiles.map((name) => String(name)).filter(Boolean) : []
+    if (files.length) {
+      const prevFiles = Array.isArray(meta.usedFiles) ? meta.usedFiles.map((name) => String(name)) : []
+      meta.usedFiles = [...new Set([...prevFiles, ...files])]
+    }
+    const usedTitle = typeof body.usedTitle === 'string' ? body.usedTitle.trim() : ''
+    if (usedTitle) {
+      const prevTitles = Array.isArray(meta.usedTitles) ? meta.usedTitles.map((item) => String(item)) : []
+      if (!prevTitles.includes(usedTitle)) meta.usedTitles = [...prevTitles, usedTitle]
+    }
+    if (files.length || usedTitle) {
+      const uploads = Array.isArray(meta.uploads) ? [...meta.uploads] : []
+      uploads.unshift({
+        id: crypto.randomUUID(),
+        at: new Date().toISOString(),
+        title: usedTitle,
+        excerpt: typeof body.excerpt === 'string' ? body.excerpt.slice(0, 240) : '',
+        files,
+        postId: typeof body.postId === 'string' ? body.postId : null,
+        accounts: [],
+      })
+      meta.uploads = uploads.slice(0, 100)
+    }
+    patch.meta = meta
   }
 
   try {

@@ -24,6 +24,47 @@ function writeLastFolder(folder) {
   fs.writeFileSync(memoryFile, folder, 'utf8')
 }
 
+const imageExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
+
+function mimeFor(name) {
+  const ext = path.extname(name).toLowerCase()
+  if (ext === '.png') return 'image/png'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.gif') return 'image/gif'
+  return 'image/jpeg'
+}
+
+function listImages(dir, skip, limit) {
+  const found = []
+  for (const name of fs.readdirSync(dir)) {
+    const abs = path.join(dir, name)
+    let stat
+    try {
+      stat = fs.statSync(abs)
+    } catch {
+      continue
+    }
+    if (!stat.isFile() || !imageExt.has(path.extname(name).toLowerCase())) continue
+    if (skip.has(name)) continue
+    if (stat.size > 6 * 1024 * 1024) continue
+    found.push({ name, abs, size: stat.size })
+  }
+  found.sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+  return found.slice(0, limit)
+}
+
+async function readJson(req) {
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+  } catch {
+    return {}
+  }
+}
+
+let writeJob = { phase: 'idle', message: '' }
+
 function cors(res, origin) {
   const allowed = !origin || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('mostem.kr')
   res.setHeader('Access-Control-Allow-Origin', allowed && origin ? origin : '*')
@@ -74,17 +115,71 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ ok: true, service: 'mostem-blog-agent' }))
     return
   }
+  if (url.pathname === '/write-status' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify(writeJob))
+    return
+  }
+  if (url.pathname === '/folder-images' && req.method === 'POST') {
+    try {
+      const body = await readJson(req)
+      const dir = typeof body.path === 'string' ? body.path.trim() : ''
+      const skip = new Set(Array.isArray(body.skip) ? body.skip.map((name) => String(name)) : [])
+      const limit = Math.min(10, Math.max(1, Number(body.limit) || 10))
+      if (!dir || !fs.existsSync(dir)) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ ok: false, error: '폴더를 찾지 못했습니다' }))
+        return
+      }
+      const files = listImages(dir, skip, limit).map((file) => ({
+        name: file.name,
+        path: file.abs,
+        mime: mimeFor(file.name),
+        base64: fs.readFileSync(file.abs).toString('base64'),
+      }))
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ ok: true, files }))
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : '이미지 읽기 실패' }))
+    }
+    return
+  }
+  if (url.pathname === '/write-post' && req.method === 'POST') {
+    const body = await readJson(req)
+    if (writeJob.phase && !['idle', 'done', 'error'].includes(writeJob.phase)) {
+      res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
+      return
+    }
+    writeJob = { phase: 'chrome', message: '크롬 창을 여는 중' }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ ok: true }))
+    import('./naver-type.mjs')
+      .then(({ typeNaverPost }) =>
+        typeNaverPost(
+          {
+            blogId: String(body.blogId || ''),
+            loginId: String(body.loginId || ''),
+            password: String(body.password || ''),
+            title: String(body.title || ''),
+            paragraphs: Array.isArray(body.paragraphs) ? body.paragraphs.map((line) => String(line)) : [],
+            imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths.map((line) => String(line)) : [],
+          },
+          (status) => {
+            writeJob = status
+          }
+        )
+      )
+      .catch((error) => {
+        writeJob = { phase: 'error', message: error instanceof Error ? error.message : '크롬 글쓰기 실패' }
+      })
+    return
+  }
   if (url.pathname === '/pick-folder' && (req.method === 'GET' || req.method === 'POST')) {
     try {
-      const chunks = []
-      for await (const chunk of req) chunks.push(chunk)
-      let requested = ''
-      try {
-        const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
-        requested = typeof body.path === 'string' ? body.path.trim() : ''
-      } catch {
-        requested = ''
-      }
+      const body = await readJson(req)
+      let requested = typeof body.path === 'string' ? body.path.trim() : ''
       const startPath = requested && fs.existsSync(requested) ? requested : readLastFolder()
       const selected = await pickFolderNative(startPath)
       if (selected) writeLastFolder(selected)
