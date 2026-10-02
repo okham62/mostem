@@ -616,6 +616,10 @@ export function BlogClient() {
   const [catAccountId, setCatAccountId] = useState('')
   const [catName, setCatName] = useState('')
   const [catBlogId, setCatBlogId] = useState('')
+  const [blogCategories, setBlogCategories] = useState<Array<{ no: number; name: string; label: string; open: boolean }>>([])
+  const [selectedCategoryNo, setSelectedCategoryNo] = useState(0)
+  const [loadingCategories, setLoadingCategories] = useState(false)
+  const [categoryLoadError, setCategoryLoadError] = useState('')
   const [openDow, setOpenDow] = useState<Weekday>(5)
   const [openTime, setOpenTime] = useState('17:00')
   const [closeDow, setCloseDow] = useState<Weekday>(0)
@@ -757,6 +761,57 @@ export function BlogClient() {
     }
     if (data.error) setError(String(data.error))
   }, [])
+
+  useEffect(() => {
+    if (!catAccountId) {
+      setBlogCategories([])
+      setCategoryLoadError('')
+      return
+    }
+    let cancel = false
+    setLoadingCategories(true)
+    setCategoryLoadError('')
+    void fetch('/api/blog/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: catAccountId }),
+    })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string
+          categories?: Array<{ no: number; name: string; label: string; open: boolean }>
+        }
+        if (cancel) return
+        const categories = Array.isArray(data.categories) ? data.categories : []
+        if (!res.ok || !categories.length) {
+          setBlogCategories([])
+          setCategoryLoadError(data.error || '카테고리를 가져오지 못했습니다')
+          return
+        }
+        setBlogCategories(categories)
+        setSelectedCategoryNo(0)
+        setCatName('')
+      })
+      .catch(() => {
+        if (cancel) return
+        setBlogCategories([])
+        setCategoryLoadError('카테고리를 가져오지 못했습니다')
+      })
+      .finally(() => {
+        if (!cancel) setLoadingCategories(false)
+      })
+    return () => {
+      cancel = true
+    }
+  }, [catAccountId])
+
+  useEffect(() => {
+    if (catAccountId) return
+    const naver = accounts.filter((account) => account.provider === 'naver')
+    if (naver.length !== 1) return
+    setCatAccountId(naver[0].id)
+    setCatBlogId(accountBlogId(naver[0]))
+  }, [accounts, catAccountId])
 
   useEffect(() => {
     void loadTrends()
@@ -1133,7 +1188,7 @@ export function BlogClient() {
 
   async function addSchedule() {
     if (!catName.trim()) {
-      setError('카테고리명을 입력하세요')
+      setError('카테고리를 선택하세요')
       return
     }
     setBusyKey('sched')
@@ -1154,6 +1209,7 @@ export function BlogClient() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '저장 실패')
       setCatName('')
+      setSelectedCategoryNo(0)
       await loadSchedules()
       ping('카테고리 스케줄 저장됨')
     } catch (e) {
@@ -2449,21 +2505,14 @@ export function BlogClient() {
               <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '카테고리 공개' : '네이버 카테고리 On/Off'}
             </div>
             <p className="text-xs leading-relaxed text-white/40">
-              예: 금 17:00 공개, 일 21:00 비공개. 그 시간이 되면 이 PC의 크롬에서 카테고리를 고르고 공개 또는 비공개를 누른 뒤 확인까지 합니다. PC가 켜져 있어야 합니다.
+              계정을 고르면 그 블로그의 카테고리가 그대로 나옵니다. 하나를 고르고 공개·비공개 시간을 정하면, 그 시간이 될 때 이 PC의 크롬에서 그 카테고리를 바꿉니다. PC가 켜져 있어야 합니다.
             </p>
-            <input
-              value={catName}
-              onChange={(e) => setCatName(e.target.value)}
-              placeholder="카테고리명 (예: 폰케이스)"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-            />
             <select
               value={catAccountId}
               onChange={(e) => {
                 setCatAccountId(e.target.value)
                 const acc = accounts.find((a) => a.id === e.target.value)
-                const blogId = String(acc?.meta?.blogId || '')
-                if (blogId) setCatBlogId(blogId)
+                setCatBlogId(acc ? accountBlogId(acc) : '')
               }}
               className="w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none"
               style={{ colorScheme: 'dark' }}
@@ -2477,12 +2526,48 @@ export function BlogClient() {
                   </option>
                 ))}
             </select>
-            <input
-              value={catBlogId}
-              onChange={(e) => setCatBlogId(e.target.value)}
-              placeholder="네이버 blogId (선택)"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-            />
+            {loadingCategories ? (
+              <p className="inline-flex items-center gap-1.5 text-xs text-white/45">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> 카테고리를 가져오는 중
+              </p>
+            ) : null}
+            {categoryLoadError ? <p className="text-xs text-rose-300/80">{categoryLoadError}</p> : null}
+            {!catAccountId ? (
+              <p className="text-xs text-white/40">네이버 계정을 고르면 그 블로그의 카테고리가 나옵니다.</p>
+            ) : null}
+            {blogCategories.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {blogCategories.map((category, index) => {
+                  const selected = selectedCategoryNo === category.no && catName === category.name
+                  return (
+                    <button
+                      key={`${category.no}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategoryNo(category.no)
+                        setCatName(category.name)
+                      }}
+                      className={
+                        selected
+                          ? 'rounded-full bg-gold/20 px-3 py-1.5 text-xs font-semibold text-gold'
+                          : 'rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10'
+                      }
+                    >
+                      {category.label}
+                      {category.open ? '' : ' · 비공개'}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+            {!loadingCategories && catAccountId && blogCategories.length === 0 ? (
+              <input
+                value={catName}
+                onChange={(e) => setCatName(e.target.value)}
+                placeholder="카테고리를 가져오지 못하면 이름을 입력하세요"
+                className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              />
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[11px] text-white/45">
                 공개 요일
