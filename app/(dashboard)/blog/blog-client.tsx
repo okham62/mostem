@@ -1338,7 +1338,7 @@ export function BlogClient() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={cn('space-y-6', mode === 'product' && 'mx-auto w-full max-w-[680px]')}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <button
