@@ -698,33 +698,8 @@ export function BlogClient() {
     }
     setBusyKey('chrome')
     setError('')
-    setChromeNote('폴더 이미지를 읽는 중')
+    setChromeNote('크롬 창을 여는 중')
     try {
-      const usedFiles = Array.isArray(folder?.meta?.usedFiles) ? folder.meta.usedFiles.map((name) => String(name)) : []
-      const imageRes = await fetch('http://127.0.0.1:39217/folder-images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: folderPath, skip: usedFiles, limit: 10 }),
-      })
-      const imageData = await imageRes.json().catch(() => ({}))
-      if (!imageRes.ok || !imageData.files?.length) {
-        throw new Error(imageData.error || '폴더에서 이미지를 읽지 못했습니다. 폴더 프로그램을 확인해 주세요.')
-      }
-      setChromeNote('AI가 글을 쓰는 중')
-      const form = new FormData()
-      form.set('topic', title)
-      form.set('mode', 'product')
-      form.set('titles', title)
-      if (folder?.id) form.set('folderId', folder.id)
-      for (const file of imageData.files as Array<{ name: string; mime: string; base64: string; path: string }>) {
-        const binary = atob(file.base64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-        form.append('images', new File([bytes], file.name, { type: file.mime || 'image/jpeg' }))
-      }
-      const articleRes = await fetch('/api/blog/folder-generate', { method: 'POST', body: form })
-      const articleData = await articleRes.json()
-      if (!articleRes.ok) throw new Error(articleData.error || '글 생성 실패')
       const secretRes = await fetch('/api/blog/accounts/secret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -732,38 +707,110 @@ export function BlogClient() {
       })
       const secret = await secretRes.json()
       if (!secretRes.ok) throw new Error(secret.error || '계정 정보를 읽지 못했습니다')
-      setChromeNote('크롬 창을 여는 중')
-      const writeRes = await fetch('http://127.0.0.1:39217/write-post', {
+      const openRes = await fetch('http://127.0.0.1:39217/open-chrome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           blogId: secret.blogId,
           loginId: secret.loginId,
           password: secret.password,
-          title: articleData.article?.title || title,
-          paragraphs: plainParagraphs(
-            String(articleData.article?.bodyMarkdown || ''),
-            Array.isArray(articleData.article?.tags) ? articleData.article.tags.map((tag: string) => String(tag)) : []
-          ),
-          imagePaths: (imageData.files as Array<{ path: string }>).map((file) => file.path),
         }),
       })
-      const writeData = await writeRes.json().catch(() => ({}))
-      if (!writeRes.ok) throw new Error(writeData.error || '크롬 글쓰기를 시작하지 못했습니다')
-      let last = '크롬 창에서 글을 쓰는 중'
-      for (let i = 0; i < 120; i += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+      const openData = await openRes.json().catch(() => ({}))
+      if (!openRes.ok) throw new Error(openData.error || '크롬 창을 열지 못했습니다. 폴더 프로그램을 확인해 주세요.')
+      const usedFiles = Array.isArray(folder?.meta?.usedFiles) ? folder.meta.usedFiles.map((name) => String(name)) : []
+      const articlePromise = (async () => {
+        const imageRes = await fetch('http://127.0.0.1:39217/folder-images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: folderPath, skip: usedFiles, limit: 10 }),
+        })
+        const imageData = await imageRes.json().catch(() => ({}))
+        if (!imageRes.ok || !imageData.files?.length) {
+          throw new Error(imageData.error || '폴더에서 이미지를 읽지 못했습니다. 폴더 프로그램을 확인해 주세요.')
+        }
+        const form = new FormData()
+        form.set('topic', title)
+        form.set('mode', 'product')
+        form.set('titles', title)
+        if (folder?.id) form.set('folderId', folder.id)
+        for (const file of imageData.files as Array<{ name: string; mime: string; base64: string; path: string }>) {
+          const binary = atob(file.base64)
+          const bytes = new Uint8Array(binary.length)
+          for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+          form.append('images', new File([bytes], file.name, { type: file.mime || 'image/jpeg' }))
+        }
+        const articleRes = await fetch('/api/blog/folder-generate', { method: 'POST', body: form })
+        const articleData = await articleRes.json()
+        if (!articleRes.ok) throw new Error(articleData.error || '글 생성 실패')
+        return { imageData, articleData }
+      })()
+      let packed: { imageData: { files: Array<{ name: string; path: string }> }; articleData: { article?: { title?: string; bodyMarkdown?: string; tags?: string[] }; post?: { id?: string } } } | null = null
+      let writeSent = false
+      let solvedImage = ''
+      let last = '크롬 창을 여는 중'
+      for (let i = 0; i < 180; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        if (!packed) {
+          const raced = await Promise.race([
+            articlePromise.then((value) => ({ value })),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 0)),
+          ])
+          if (raced?.value) packed = raced.value
+        }
         const statusRes = await fetch('http://127.0.0.1:39217/write-status')
         const status = await statusRes.json().catch(() => ({}))
         if (status.message) {
           last = String(status.message)
           setChromeNote(last)
         }
-        if (status.phase === 'done' || status.phase === 'error') {
-          if (status.phase === 'error') throw new Error(last)
-          break
+        if (status.phase === 'captcha' && status.image && status.image !== solvedImage) {
+          solvedImage = String(status.image)
+          setChromeNote('보안 확인 문제를 읽는 중')
+          const answerRes = await fetch('/api/blog/login-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              question: status.question || '화면의 영수증을 보고 입력칸의 정답을 구하세요',
+              image: status.image,
+            }),
+          })
+          const answerData = await answerRes.json().catch(() => ({}))
+          if (!answerRes.ok) throw new Error(answerData.error || '보안 확인 정답을 읽지 못했습니다')
+          await fetch('http://127.0.0.1:39217/captcha-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answer: answerData.answer }),
+          })
         }
+        if (status.phase === 'error') throw new Error(last)
+        if (packed && !writeSent && ['ready', 'login', 'chrome', 'captcha'].includes(String(status.phase))) {
+          writeSent = true
+          const articleData = packed.articleData
+          const imageData = packed.imageData
+          const writeRes = await fetch('http://127.0.0.1:39217/write-post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              blogId: secret.blogId,
+              loginId: secret.loginId,
+              password: secret.password,
+              title: articleData.article?.title || title,
+              paragraphs: plainParagraphs(
+                String(articleData.article?.bodyMarkdown || ''),
+                Array.isArray(articleData.article?.tags) ? articleData.article.tags.map((tag: string) => String(tag)) : []
+              ),
+              imagePaths: imageData.files.map((file) => file.path),
+            }),
+          })
+          const writeData = await writeRes.json().catch(() => ({}))
+          if (!writeRes.ok) throw new Error(writeData.error || '크롬 글쓰기를 시작하지 못했습니다')
+        }
+        if (status.phase === 'done') break
       }
+      if (!packed) packed = await articlePromise
+      const articleData = packed.articleData
+      const imageData = packed.imageData
       if (folder?.id) {
         await fetch('/api/blog/folders', {
           method: 'PATCH',

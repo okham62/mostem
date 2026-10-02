@@ -145,14 +145,52 @@ const server = http.createServer(async (req, res) => {
     }
     return
   }
-  if (url.pathname === '/write-post' && req.method === 'POST') {
+  if (url.pathname === '/captcha-answer' && req.method === 'POST') {
     const body = await readJson(req)
-    if (writeJob.phase && !['idle', 'done', 'error'].includes(writeJob.phase)) {
+    const { provideCaptchaAnswer } = await import('./naver-type.mjs')
+    const ok = provideCaptchaAnswer(body.answer)
+    res.writeHead(ok ? 200 : 409, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ ok }))
+    return
+  }
+  if (url.pathname === '/open-chrome' && req.method === 'POST') {
+    const body = await readJson(req)
+    if (['chrome', 'login', 'captcha', 'ready', 'title', 'body', 'images'].includes(writeJob.phase)) {
       res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
       return
     }
     writeJob = { phase: 'chrome', message: '크롬 창을 여는 중' }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ ok: true }))
+    import('./naver-type.mjs')
+      .then(({ beginNaver }) =>
+        beginNaver(
+          {
+            blogId: String(body.blogId || ''),
+            loginId: String(body.loginId || ''),
+            password: String(body.password || ''),
+          },
+          (status) => {
+            writeJob = status
+          }
+        )
+      )
+      .catch((error) => {
+        writeJob = { phase: 'error', message: error instanceof Error ? error.message : '크롬 열기 실패' }
+      })
+    return
+  }
+  if (url.pathname === '/write-post' && req.method === 'POST') {
+    const body = await readJson(req)
+    if (['title', 'body', 'images'].includes(writeJob.phase)) {
+      res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
+      return
+    }
+    if (!writeJob.phase || ['idle', 'done', 'error'].includes(writeJob.phase)) {
+      writeJob = { phase: 'chrome', message: '크롬 창을 여는 중' }
+    }
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
     res.end(JSON.stringify({ ok: true }))
     import('./naver-type.mjs')
