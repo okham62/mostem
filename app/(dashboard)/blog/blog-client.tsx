@@ -2123,27 +2123,18 @@ export function BlogClient() {
                   const selected = account.id === uploadAccountId
                   const linked = linkStatus[account.id]?.state === 'linked'
                   return (
-                    <div key={account.id} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setUploadAccountId(account.id)}
-                        className={cn(
-                          'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition',
-                          selected ? 'border-white/30 bg-white text-neutral-950' : 'border-white/10 bg-white/[0.03] text-white/70'
-                        )}
-                      >
-                        {account.username || accountBlogId(account)}
-                        <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={Boolean(busyKey)}
-                        onClick={() => void loginAccount(account)}
-                        className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
-                      >
-                        {busyKey === `login:${account.id}` ? '로그인 중' : '로그인하기'}
-                      </button>
-                    </div>
+                    <button
+                      key={account.id}
+                      type="button"
+                      onClick={() => setUploadAccountId(account.id)}
+                      className={cn(
+                        'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition',
+                        selected ? 'border-white/30 bg-white text-neutral-950' : 'border-white/10 bg-white/[0.03] text-white/70'
+                      )}
+                    >
+                      {account.username || accountBlogId(account)}
+                      <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
+                    </button>
                   )
                 })}
                 <button
@@ -2153,6 +2144,21 @@ export function BlogClient() {
                 >
                   계정 추가
                 </button>
+                {naverAccounts.length > 0 ? (
+                  <button
+                    type="button"
+                    disabled={!uploadAccountId || Boolean(busyKey)}
+                    onClick={() => {
+                      const account = naverAccounts.find((item) => item.id === uploadAccountId)
+                      if (account) void loginAccount(account)
+                    }}
+                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
+                  >
+                    {busyKey?.startsWith('login:')
+                      ? '로그인 중'
+                      : `${naverAccounts.find((item) => item.id === uploadAccountId)?.username || '선택 계정'} 로그인`}
+                  </button>
+                ) : null}
               </div>
             )}
             {managingAccounts && !showNaverAccountForm ? (
