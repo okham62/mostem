@@ -295,6 +295,8 @@ export function BlogClient() {
   const [folderLabel, setFolderLabel] = useState('')
   const [pickingFolder, setPickingFolder] = useState(false)
   const [chromeNote, setChromeNote] = useState('')
+  const [uploadFinish, setUploadFinish] = useState<'' | 'draft' | 'schedule'>('')
+  const [scheduleAt, setScheduleAt] = useState('')
 
   const ping = (msg: string) => {
     setToast(msg)
@@ -729,6 +731,17 @@ export function BlogClient() {
       setError('업로드 계정을 선택하세요')
       return
     }
+    if (uploadFinish !== 'draft' && uploadFinish !== 'schedule') {
+      setError('일시저장 또는 예약을 선택하세요')
+      return
+    }
+    if (uploadFinish === 'schedule') {
+      const when = new Date(scheduleAt)
+      if (!scheduleAt || Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
+        setError('예약 시각은 지금부터 이후로 선택하세요')
+        return
+      }
+    }
     setBusyKey('chrome')
     setError('')
     setChromeNote('크롬 창을 여는 중')
@@ -853,6 +866,8 @@ export function BlogClient() {
                 })
                 .filter(Boolean)
                 .join(' '),
+              finish: uploadFinish,
+              scheduleAt: uploadFinish === 'schedule' ? scheduleAt : '',
             }),
           })
           const writeData = await writeRes.json().catch(() => ({}))
@@ -1712,9 +1727,54 @@ export function BlogClient() {
           </div>
 
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-white/80">마무리</h2>
+              <span className="text-[11px] text-white/35">하나를 선택해야 시작됩니다</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setUploadFinish('draft')}
+                className={cn(
+                  'rounded-full border px-4 py-3 text-sm font-medium transition',
+                  uploadFinish === 'draft'
+                    ? 'border-white bg-white text-neutral-950'
+                    : 'border-white/10 text-white/70 hover:border-white/25'
+                )}
+              >
+                일시저장
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadFinish('schedule')}
+                className={cn(
+                  'rounded-full border px-4 py-3 text-sm font-medium transition',
+                  uploadFinish === 'schedule'
+                    ? 'border-white bg-white text-neutral-950'
+                    : 'border-white/10 text-white/70 hover:border-white/25'
+                )}
+              >
+                예약
+              </button>
+            </div>
+            {uploadFinish === 'schedule' ? (
+              <input
+                type="datetime-local"
+                step={600}
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/25"
+                style={{ colorScheme: 'dark' }}
+              />
+            ) : null}
             <button
               type="button"
-              disabled={busyKey === 'chrome' || !folderPath.trim()}
+              disabled={
+                busyKey === 'chrome' ||
+                !folderPath.trim() ||
+                (uploadFinish !== 'draft' && uploadFinish !== 'schedule') ||
+                (uploadFinish === 'schedule' && !scheduleAt)
+              }
               onClick={() => void startChromeWrite()}
               className="mostem-upload-btn group relative flex w-full items-center justify-center overflow-hidden rounded-full bg-[linear-gradient(110deg,#fff8e8_0%,#f6d98a_38%,#fffdf6_50%,#f0c85a_100%)] px-6 py-4 text-[15px] font-semibold tracking-tight text-neutral-950 transition duration-300 hover:scale-[1.015] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
             >

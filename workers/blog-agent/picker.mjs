@@ -167,15 +167,15 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/open-chrome' && req.method === 'POST') {
     const body = await readJson(req)
     const typing = ['login', 'captcha', 'title', 'body', 'images', 'save']
-    if (typing.includes(writeJob.phase)) {
-      const { chromeAlive, resetNaverSession } = await import('./naver-type.mjs')
-      if (await chromeAlive()) {
-        res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
-        res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
-        return
-      }
+    const { chromeAlive, resetNaverSession } = await import('./naver-type.mjs')
+    const alive = await chromeAlive()
+    if (!alive) {
       resetNaverSession()
       writeJob = { phase: 'idle', message: '' }
+    } else if (typing.includes(writeJob.phase)) {
+      res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ ok: false, error: '이미 크롬에서 글을 쓰는 중입니다' }))
+      return
     }
     writeJob = { phase: 'chrome', message: '크롬 창을 여는 중' }
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
@@ -228,6 +228,8 @@ const server = http.createServer(async (req, res) => {
             paragraphs: Array.isArray(body.paragraphs) ? body.paragraphs.map((line) => String(line)) : [],
             imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths.map((line) => String(line)) : [],
             hashtags: String(body.hashtags || ''),
+            finish: body.finish === 'schedule' ? 'schedule' : 'draft',
+            scheduleAt: String(body.scheduleAt || ''),
             blocks: Array.isArray(body.blocks)
               ? body.blocks.map((item) => ({
                   imagePath: String(item?.imagePath || ''),

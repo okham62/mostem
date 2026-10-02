@@ -60,36 +60,59 @@ function debugReady() {
     .catch(() => false)
 }
 
-async function ensureChrome() {
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
+async function ensureChrome(startUrl) {
   if (await debugReady()) return
   if (!fs.existsSync(chromePath)) throw new Error('크롬을 찾지 못했습니다')
-  const child = spawn(
-    chromePath,
-    [
-      `--user-data-dir=${profileDir}`,
-      `--remote-debugging-port=${debugPort}`,
-      '--start-maximized',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-session-crashed-bubble',
-      '--hide-crash-restore-bubble',
-    ],
-    { detached: true, stdio: 'ignore' }
-  )
+  const args = [
+    `--user-data-dir=${profileDir}`,
+    `--remote-debugging-port=${debugPort}`,
+    '--start-maximized',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-session-crashed-bubble',
+    '--hide-crash-restore-bubble',
+    '--new-window',
+  ]
+  if (startUrl) args.push(startUrl)
+  const child = spawn(chromePath, args, {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: false,
+  })
   child.unref()
-  const deadline = Date.now() + 15000
+  const deadline = Date.now() + 12000
   while (Date.now() < deadline) {
     if (await debugReady()) return
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await new Promise((resolve) => setTimeout(resolve, 250))
   }
   throw new Error('크롬 창을 열지 못했습니다')
 }
 
-async function browser() {
+async function browser(startUrl) {
   if (!contextPromise) {
-    contextPromise = ensureChrome()
+    contextPromise = ensureChrome(startUrl)
       .then(async () => {
-        const connected = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`)
+        const connected = await withTimeout(
+          chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`),
+          8000,
+          '크롬 창 연결이 지연되었습니다'
+        )
         connected.close = async () => {}
         const context = connected.contexts()[0]
         if (!context) throw new Error('크롬 창을 열지 못했습니다')
@@ -200,6 +223,23 @@ async function answerSecurityCheck(page, report) {
   }
 }
 
+function isLoginUrl(url) {
+  return url.includes('nid.naver.com') || url.includes('nidlogin')
+}
+
+function isWriteUrl(url, blogId) {
+  try {
+    const current = new URL(url)
+    return (
+      current.hostname.includes('blog.naver.com') &&
+      current.pathname.includes('PostWriteForm') &&
+      current.searchParams.get('blogId') === blogId
+    )
+  } catch {
+    return false
+  }
+}
+
 async function login(page, loginId, password, report) {
   await page.goto('https://nid.naver.com/nidlogin.login', { waitUntil: 'domcontentloaded', timeout: 30000 })
   if (!page.url().includes('nid.naver.com')) return
@@ -268,20 +308,25 @@ async function typeTitle(page, frame, title) {
 
 async function openEditor(input, onStatus) {
   const report = (phase, message, extra) => onStatus?.({ phase, message, ...extra })
-  report('chrome', '글쓰기 창으로 이동')
-  const context = await browser()
   const blogId = String(input.blogId || '')
   const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${encodeURIComponent(blogId)}`
+  report('chrome', '글쓰기 창으로 이동')
+  const context = await browser(writeUrl)
+  const pages = context.pages()
   const page =
-    context.pages().find((item) => item.url().includes('PostWriteForm.naver') && item.url().includes(blogId)) ||
-    context.pages()[0] ||
+    pages.find((item) => isWriteUrl(item.url(), blogId)) ||
+    pages.find((item) => isLoginUrl(item.url())) ||
+    pages[0] ||
     (await context.newPage())
   await page.bringToFront()
-  const here = page.url().includes('PostWriteForm.naver') && page.url().includes(blogId)
-  if (!here) {
+  const onLogin = () => isLoginUrl(page.url())
+  const here = isWriteUrl(page.url(), blogId)
+  if (!here || (await page.locator('#id').count())) {
     report('login', '네이버 로그인 중')
-    await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
-    if (page.url().includes('nid.naver.com') || (await page.locator('#id').count())) {
+    if (!onLogin() && !(await page.locator('#id').count())) {
+      await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    }
+    if (onLogin() || (await page.locator('#id').count())) {
       await login(page, input.loginId, input.password, report)
       await page.goto(writeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
     }
@@ -296,12 +341,16 @@ async function openEditor(input, onStatus) {
   return page
 }
 
-export function beginNaver(input, onStatus) {
+export async function beginNaver(input, onStatus) {
+  if (!(await chromeAlive())) resetNaverSession()
   const report = guardStatus(onStatus)
   if (!opening) {
     const id = sessionId
     opening = openEditor(input, report).catch((error) => {
-      if (id === sessionId) opening = null
+      if (id === sessionId) {
+        opening = null
+        contextPromise = null
+      }
       throw error
     })
   }
@@ -346,8 +395,114 @@ export async function typeNaverPost(input, onStatus) {
     await page.keyboard.type(String(input.hashtags), { delay: 8 })
   }
 
-  await saveDraft(page, report)
-  report('done', '저장했습니다. 창은 닫지 않습니다. 발행은 직접 눌러 주세요.')
+  if (input.finish === 'schedule') {
+    await schedulePost(page, input.scheduleAt, report)
+    report('done', '예약했습니다. 창은 닫지 않습니다.')
+  } else {
+    await saveDraft(page, report)
+    report('done', '일시저장했습니다. 창은 닫지 않습니다.')
+  }
+}
+
+async function visibleExactButtons(page, name) {
+  const found = []
+  for (const frame of page.frames()) {
+    const buttons = frame.getByRole('button', { name, exact: true })
+    const count = await buttons.count().catch(() => 0)
+    for (let i = 0; i < count; i += 1) {
+      const button = buttons.nth(i)
+      if (await button.isVisible().catch(() => false)) found.push(button)
+    }
+  }
+  return found
+}
+
+async function clickExactText(page, text) {
+  for (const frame of page.frames()) {
+    const items = frame.getByText(text, { exact: true })
+    const count = await items.count().catch(() => 0)
+    for (let i = 0; i < count; i += 1) {
+      const item = items.nth(i)
+      if (await item.isVisible().catch(() => false)) {
+        await item.click({ timeout: 5000 })
+        return true
+      }
+    }
+  }
+  return false
+}
+
+async function chooseOption(select, wanted) {
+  const target = String(Number(wanted))
+  const padded = String(wanted).padStart(2, '0')
+  const options = select.locator('option')
+  const count = await options.count().catch(() => 0)
+  for (let i = 0; i < count; i += 1) {
+    const option = options.nth(i)
+    const value = (await option.getAttribute('value')) || ''
+    const text = (await option.innerText().catch(() => '')).trim()
+    if (value === padded || value === target || text === padded || text.startsWith(target)) {
+      await select.selectOption(value || { label: text })
+      return true
+    }
+  }
+  return false
+}
+
+async function fillReserveTime(page, when) {
+  const copy = new Date(when.getTime())
+  copy.setMinutes(Math.ceil(copy.getMinutes() / 10) * 10, 0, 0)
+  const date = `${copy.getFullYear()}-${String(copy.getMonth() + 1).padStart(2, '0')}-${String(copy.getDate()).padStart(2, '0')}`
+  const hour = String(copy.getHours()).padStart(2, '0')
+  const minute = String(copy.getMinutes()).padStart(2, '0')
+  let filled = false
+  for (const frame of page.frames()) {
+    const dateInput = frame.locator('input[type="date"], input[type="datetime-local"]').first()
+    if (await dateInput.isVisible().catch(() => false)) {
+      await dateInput.fill(date)
+      filled = true
+    }
+    const timeInput = frame.locator('input[type="time"]').first()
+    if (await timeInput.isVisible().catch(() => false)) {
+      await timeInput.fill(`${hour}:${minute}`)
+      filled = true
+    }
+    const selects = frame.locator('select')
+    const count = await selects.count().catch(() => 0)
+    const visible = []
+    for (let i = 0; i < count; i += 1) {
+      const select = selects.nth(i)
+      if (await select.isVisible().catch(() => false)) visible.push(select)
+    }
+    if (visible.length >= 2) {
+      if (await chooseOption(visible[0], hour)) filled = true
+      if (await chooseOption(visible[1], minute)) filled = true
+    }
+  }
+  return filled
+}
+
+async function schedulePost(page, scheduleAt, report) {
+  report('save', '예약하는 중')
+  await page.bringToFront()
+  const when = new Date(scheduleAt)
+  if (Number.isNaN(when.getTime())) throw new Error('예약 시각을 확인해 주세요.')
+  const openButtons = await visibleExactButtons(page, '발행')
+  if (!openButtons.length) throw new Error('발행 버튼을 찾지 못했습니다. 열린 창에서 예약해 주세요.')
+  await openButtons[0].click({ timeout: 8000 })
+  await page.waitForTimeout(700)
+  if (!(await clickExactText(page, '예약'))) {
+    throw new Error('예약 항목을 찾지 못했습니다. 열린 창에서 예약해 주세요.')
+  }
+  await page.waitForTimeout(400)
+  if (!(await fillReserveTime(page, when))) {
+    throw new Error('예약 시각 칸을 찾지 못했습니다. 열린 창에서 시각을 정해 주세요.')
+  }
+  const confirmButtons = await visibleExactButtons(page, '발행')
+  const confirm = confirmButtons[confirmButtons.length - 1]
+  if (!confirm) throw new Error('예약 확인 버튼을 찾지 못했습니다. 열린 창에서 예약을 눌러 주세요.')
+  await confirm.click({ timeout: 8000 })
+  await page.waitForTimeout(1200)
 }
 
 async function saveDraft(page, report) {
