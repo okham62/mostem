@@ -40,11 +40,6 @@ function parseHm(value: string) {
   return hour * 60 + minute
 }
 
-function sameLocalDay(iso: string | null | undefined, ymd: string, timeZone: string) {
-  if (!iso) return false
-  return zonedParts(new Date(iso), timeZone).ymd === ymd
-}
-
 export type DueCategoryAction = {
   scheduleId: string
   kind: Extract<BlogJobKind, 'category_open' | 'category_close'>
@@ -54,9 +49,33 @@ export type DueCategoryAction = {
   dateKey: string
 }
 
+function seoulInstant(ymd: string, hm: string) {
+  const [year, month, day] = ymd.split('-').map(Number)
+  const [hour, minute] = hm.split(':').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, 0))
+}
+
+/** Most recent Asia/Seoul weekday+time that is not after `now`. */
+function lastWeeklyInstant(dow: number, hm: string, now: Date, timeZone: string) {
+  const parts = zonedParts(now, timeZone)
+  const target = parseHm(hm)
+  if (target == null) return null
+  const nowMins = parts.hour * 60 + parts.minute
+  let daysBack = (parts.dow - dow + 7) % 7
+  if (daysBack === 0 && nowMins < target) daysBack = 7
+  const [year, month, day] = parts.ymd.split('-').map(Number)
+  const anchor = new Date(Date.UTC(year, month - 1, day))
+  anchor.setUTCDate(anchor.getUTCDate() - daysBack)
+  const y = anchor.getUTCFullYear()
+  const m = String(anchor.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(anchor.getUTCDate()).padStart(2, '0')
+  return seoulInstant(`${y}-${m}-${d}`, hm)
+}
+
 /**
- * If local wall-clock is at/past open or close slot today and not yet run today, enqueue.
- * Window: from scheduled minute through +90 minutes (agent poll friendly).
+ * The latest of this week's open/close times decides the category.
+ * If that moment has passed and has not been applied yet, it is due
+ * until the next opposite time.
  */
 export function dueCategoryActions(
   schedules: BlogCategoryScheduleRow[],
@@ -67,43 +86,21 @@ export function dueCategoryActions(
     if (!schedule.enabled) continue
     const tz = schedule.timezone || 'Asia/Seoul'
     const parts = zonedParts(now, tz)
-    const nowMins = parts.hour * 60 + parts.minute
-    const openMins = parseHm(schedule.open_time)
-    const closeMins = parseHm(schedule.close_time)
-
-    if (
-      openMins != null &&
-      parts.dow === schedule.open_dow &&
-      nowMins >= openMins &&
-      nowMins <= openMins + 90 &&
-      !sameLocalDay(schedule.last_open_at, parts.ymd, tz)
-    ) {
-      out.push({
-        scheduleId: schedule.id,
-        kind: 'category_open',
-        categoryName: schedule.category_name,
-        blogId: schedule.blog_id,
-        accountId: schedule.account_id,
-        dateKey: parts.ymd,
-      })
-    }
-
-    if (
-      closeMins != null &&
-      parts.dow === schedule.close_dow &&
-      nowMins >= closeMins &&
-      nowMins <= closeMins + 90 &&
-      !sameLocalDay(schedule.last_close_at, parts.ymd, tz)
-    ) {
-      out.push({
-        scheduleId: schedule.id,
-        kind: 'category_close',
-        categoryName: schedule.category_name,
-        blogId: schedule.blog_id,
-        accountId: schedule.account_id,
-        dateKey: parts.ymd,
-      })
-    }
+    const openAt = lastWeeklyInstant(schedule.open_dow, schedule.open_time, now, tz)
+    const closeAt = lastWeeklyInstant(schedule.close_dow, schedule.close_time, now, tz)
+    if (!openAt || !closeAt) continue
+    const openWins = openAt.getTime() >= closeAt.getTime()
+    const dueAt = openWins ? openAt : closeAt
+    const appliedAt = openWins ? schedule.last_open_at : schedule.last_close_at
+    if (appliedAt && new Date(appliedAt).getTime() >= dueAt.getTime()) continue
+    out.push({
+      scheduleId: schedule.id,
+      kind: openWins ? 'category_open' : 'category_close',
+      categoryName: schedule.category_name,
+      blogId: schedule.blog_id,
+      accountId: schedule.account_id,
+      dateKey: `${parts.ymd}:${openWins ? 'open' : 'close'}:${dueAt.toISOString()}`,
+    })
   }
   return out
 }

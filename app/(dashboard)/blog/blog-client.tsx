@@ -766,6 +766,92 @@ export function BlogClient() {
     void loadFolders()
   }, [loadTrends, loadPosts, loadAccounts, loadSchedules, loadFolders])
 
+  useEffect(() => {
+    if (mode !== 'product') return
+    let cancel = false
+    const push = async () => {
+      const items = []
+      for (const item of schedules) {
+        if (!item.enabled || !item.blog_id || !item.category_name) continue
+        let loginId = ''
+        let password = ''
+        let blogId = item.blog_id
+        if (item.account_id) {
+          const secretRes = await fetch('/api/blog/accounts/secret', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: item.account_id }),
+          })
+          const secret = await secretRes.json().catch(() => ({}))
+          if (secretRes.ok) {
+            loginId = String(secret.loginId || '')
+            password = String(secret.password || '')
+            blogId = String(secret.blogId || blogId)
+          }
+        }
+        items.push({
+          id: item.id,
+          categoryName: item.category_name,
+          blogId,
+          loginId,
+          password,
+          openDow: item.open_dow,
+          openTime: item.open_time,
+          closeDow: item.close_dow,
+          closeTime: item.close_time,
+          enabled: true,
+          lastOpenAt: item.last_open_at,
+          lastCloseAt: item.last_close_at,
+        })
+      }
+      if (cancel) return
+      await fetch('http://127.0.0.1:39217/category-schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      }).catch(() => null)
+    }
+    const pull = async () => {
+      const statusRes = await fetch('http://127.0.0.1:39217/category-schedules').catch(() => null)
+      if (!statusRes?.ok || cancel) return
+      const status = await statusRes.json().catch(() => ({}))
+      const rows = Array.isArray(status.items) ? status.items : []
+      let changed = false
+      for (const row of rows) {
+        const current = schedules.find((item) => item.id === row.id)
+        if (!current) continue
+        const patch: Record<string, unknown> = { id: current.id }
+        const openAt = row.lastOpenAt ? new Date(String(row.lastOpenAt)).getTime() : 0
+        const closeAt = row.lastCloseAt ? new Date(String(row.lastCloseAt)).getTime() : 0
+        const serverOpen = current.last_open_at ? new Date(current.last_open_at).getTime() : 0
+        const serverClose = current.last_close_at ? new Date(current.last_close_at).getTime() : 0
+        if (openAt > serverOpen) patch.lastOpenAt = row.lastOpenAt
+        if (closeAt > serverClose) patch.lastCloseAt = row.lastCloseAt
+        const error = row.lastError ? String(row.lastError) : null
+        if ((current.last_error || null) !== error) patch.lastError = error
+        if (Object.keys(patch).length === 1) continue
+        changed = true
+        await fetch('/api/blog/schedules', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        })
+      }
+      if (changed && !cancel) await loadSchedules()
+    }
+    const start = setTimeout(() => {
+      void push().then(() => pull())
+    }, 400)
+    const poll = setInterval(() => {
+      void pull()
+    }, 15000)
+    return () => {
+      cancel = true
+      clearTimeout(start)
+      clearInterval(poll)
+    }
+  }, [mode, schedules, loadSchedules])
+
   const AGENT_PICKER = 'http://127.0.0.1:39217/pick-folder'
 
   async function pickLocalFolder() {
@@ -2363,7 +2449,7 @@ export function BlogClient() {
               <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '카테고리 공개' : '네이버 카테고리 On/Off'}
             </div>
             <p className="text-xs leading-relaxed text-white/40">
-              예: 금 17:00 공개, 일 21:00 비공개. 그 시간에 이 PC가 켜져 있어야 합니다.
+              예: 금 17:00 공개, 일 21:00 비공개. 그 시간이 되면 이 PC의 크롬에서 카테고리를 고르고 공개 또는 비공개를 누른 뒤 확인까지 합니다. PC가 켜져 있어야 합니다.
             </p>
             <input
               value={catName}
@@ -2464,6 +2550,13 @@ export function BlogClient() {
                     공개 {WEEKDAY_LABELS[s.open_dow]} {s.open_time} · 비공개 {WEEKDAY_LABELS[s.close_dow]}{' '}
                     {s.close_time}
                   </p>
+                  {s.last_error ? <p className="mt-1 text-rose-300/80">{s.last_error}</p> : null}
+                  {!s.last_error && (s.last_open_at || s.last_close_at) ? (
+                    <p className="mt-1 text-white/35">
+                      최근 {new Date((s.last_close_at && (!s.last_open_at || s.last_close_at > s.last_open_at) ? s.last_close_at : s.last_open_at) || '').toLocaleString('ko-KR')}{' '}
+                      {s.last_close_at && (!s.last_open_at || s.last_close_at > s.last_open_at) ? '비공개' : '공개'}
+                    </p>
+                  ) : null}
                   <div className="mt-1 flex gap-2">
                     <button type="button" onClick={() => void toggleSchedule(s.id, !s.enabled)}>
                       {s.enabled ? '비활성' : '활성'}

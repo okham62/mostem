@@ -115,6 +115,13 @@ async function browser(startUrl) {
         )
         connected.close = async () => {}
         const context = connected.contexts()[0]
+        const acceptDialogs = (target) => {
+          target.on('dialog', (dialog) => {
+            void dialog.accept().catch(() => {})
+          })
+        }
+        context.pages().forEach(acceptDialogs)
+        context.on('page', acceptDialogs)
         if (!context) throw new Error('크롬 창을 열지 못했습니다')
         return context
       })
@@ -279,6 +286,140 @@ export async function loginNaverAccount(input, onStatus) {
   const home = blogId ? `https://blog.naver.com/${encodeURIComponent(blogId)}` : 'https://www.naver.com'
   await page.goto(home, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {})
   report('done', `${loginId} 로그인했습니다. 창은 닫지 않습니다.`)
+}
+
+function compactCategoryName(value) {
+  return String(value || '')
+    .replace(/\u00a0/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[·,，]/g, '')
+    .toLowerCase()
+}
+
+function categoryDistance(left, right) {
+  const a = compactCategoryName(left)
+  const b = compactCategoryName(right)
+  const rows = Array.from({ length: a.length + 1 }, (_, index) => [index])
+  for (let col = 1; col <= b.length; col += 1) rows[0][col] = col
+  for (let row = 1; row <= a.length; row += 1) {
+    for (let col = 1; col <= b.length; col += 1) {
+      const cost = a[row - 1] === b[col - 1] ? 0 : 1
+      rows[row][col] = Math.min(rows[row - 1][col] + 1, rows[row][col - 1] + 1, rows[row - 1][col - 1] + cost)
+    }
+  }
+  return rows[a.length][b.length]
+}
+
+async function categoryFrame(page) {
+  const deadline = Date.now() + 20000
+  while (Date.now() < deadline) {
+    const frame = page.frames().find((item) => item.url().includes('AdminCategoryView'))
+    if (frame && (await frame.locator('span._categoryName').count().catch(() => 0))) return frame
+    await page.waitForTimeout(300)
+  }
+  throw new Error('카테고리 설정 화면을 찾지 못했습니다')
+}
+
+async function chooseCategory(frame, categoryName) {
+  const rows = frame.locator('#tree li')
+  const count = await rows.count()
+  const available = []
+  let best = null
+  for (let index = 0; index < count; index += 1) {
+    const text = await rows.nth(index).evaluate((node) => {
+      const input = node.querySelector('input.cat_input')
+      if (input && input.value) return input.value
+      const span = node.querySelector('span._categoryName')
+      return span ? span.textContent || '' : ''
+    })
+    const clean = String(text || '').replace(/\u00a0/g, ' ').trim()
+    if (!clean || clean === '카테고리 전체보기') continue
+    available.push(clean)
+    const distance = categoryDistance(clean, categoryName)
+    if (!best || distance < best.distance) best = { index, distance, text: clean }
+  }
+  if (!best || best.distance > 1) {
+    throw new Error(
+      available.length
+        ? `카테고리 "${categoryName}"를 찾지 못했습니다. 있는 이름: ${available.join(', ')}`
+        : `카테고리 "${categoryName}"를 찾지 못했습니다`
+    )
+  }
+  const row = rows.nth(best.index)
+  const selected = (await row.locator('.tree-div-selected, input.cat_input').count()) > 0
+  return { row, name: best.text, selected }
+}
+
+export async function setNaverCategoryVisibility(input, onStatus) {
+  const report = (phase, message, extra) => onStatus?.({ phase, message, ...extra })
+  const blogId = String(input.blogId || '').trim()
+  const categoryName = String(input.categoryName || '').trim()
+  const open = Boolean(input.open)
+  if (!blogId) throw new Error('블로그 아이디가 없습니다')
+  if (!categoryName) throw new Error('카테고리명이 없습니다')
+  const adminUrl = `https://admin.blog.naver.com/${encodeURIComponent(blogId)}/config/blog`
+  report('chrome', open ? `${categoryName} 카테고리를 공개로 바꾸는 중` : `${categoryName} 카테고리를 비공개로 바꾸는 중`)
+  const context = await browser(adminUrl)
+  const pages = context.pages()
+  const page =
+    pages.find((item) => item.url().includes('admin.blog.naver.com')) ||
+    pages.find((item) => isLoginUrl(item.url())) ||
+    pages[0] ||
+    (await context.newPage())
+  await page.bringToFront()
+  try {
+    await page.goto(adminUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    if (isLoginUrl(page.url()) || (await page.locator('#id').count())) {
+      if (!input.loginId || !input.password) {
+        throw new Error('이 블로그로 로그인되어 있지 않습니다. 계정 로그인 후 다시 시도해 주세요.')
+      }
+      report('login', '네이버 로그인 중')
+      await login(page, input.loginId, input.password, report)
+      await page.goto(adminUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    }
+    const frame = await categoryFrame(page)
+    const chosen = await chooseCategory(frame, categoryName)
+    if (!chosen.selected) await chosen.row.locator('span._categoryName').click({ timeout: 8000 })
+    await frame.waitForFunction(
+      (wanted) => {
+        const value = String(document.querySelector('#category_name')?.value || '')
+          .replace(/\u00a0/g, '')
+          .replace(/\s+/g, '')
+          .replace(/[·,，]/g, '')
+          .toLowerCase()
+        return value && value === wanted
+      },
+      compactCategoryName(chosen.name),
+      { timeout: 8000 }
+    )
+    const already = await frame.locator('#pub_c1').isChecked()
+    if (already === open) {
+      report('done', `${chosen.name}은 이미 ${open ? '공개' : '비공개'}입니다. 창은 닫지 않습니다.`)
+      return { ok: true, unchanged: true, category: chosen.name }
+    }
+    const choice = open ? '#pub_c1' : '#pub_c2'
+    await frame.locator(choice).click({ force: true })
+    await page.waitForTimeout(400)
+    const chosenOpen = await frame.locator('#pub_c1').isChecked()
+    if (chosenOpen !== open) throw new Error(open ? '공개를 선택하지 못했습니다' : '비공개를 선택하지 못했습니다')
+    await frame.locator('#submit_button').click({ force: true, timeout: 8000 })
+    const done = page.locator('#_btnConfirm')
+    await done.waitFor({ state: 'visible', timeout: 10000 })
+    const resultText = (await page.locator('#resultMsg').innerText().catch(() => '')).trim()
+    await done.click({ timeout: 5000 })
+    await page.locator('#layerAlert').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    if (resultText && !resultText.includes('성공')) throw new Error(resultText || '카테고리 설정을 저장하지 못했습니다')
+    const saved = await categoryFrame(page)
+    const again = await chooseCategory(saved, chosen.name)
+    const locked = await again.row.locator('img[alt="비공개"]').count()
+    if ((locked > 0) === open) {
+      throw new Error(`${chosen.name} ${open ? '공개' : '비공개'} 확인을 눌렀지만 설정이 바뀌지 않았습니다`)
+    }
+    report('done', `${chosen.name}을 ${open ? '공개' : '비공개'}로 바꿨습니다. 창은 닫지 않습니다.`)
+    return { ok: true, unchanged: false, category: chosen.name }
+  } finally {
+    /* leave the window open */
+  }
 }
 
 async function editorFrame(page) {

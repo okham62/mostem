@@ -79,6 +79,9 @@ export async function PATCH(req: Request) {
   if (body.closeDow !== undefined) patch.close_dow = parseDow(body.closeDow, 0)
   if (body.closeTime !== undefined) patch.close_time = parseTime(body.closeTime, '21:00')
   if (typeof body.enabled === 'boolean') patch.enabled = body.enabled
+  if (typeof body.lastOpenAt === 'string' || body.lastOpenAt === null) patch.last_open_at = body.lastOpenAt
+  if (typeof body.lastCloseAt === 'string' || body.lastCloseAt === null) patch.last_close_at = body.lastCloseAt
+  if (typeof body.lastError === 'string' || body.lastError === null) patch.last_error = body.lastError
 
   try {
     const schedule = await updateCategorySchedule(session.user.id, id, patch as never)
