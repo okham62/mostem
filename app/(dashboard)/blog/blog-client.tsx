@@ -568,6 +568,45 @@ function accountBlogId(account: AccountRow) {
   return account.site_url.replace(/^https?:\/\/(m\.)?blog\.naver\.com\//i, '').split('/')[0] || ''
 }
 
+const AGENT_ORIGIN = 'http://127.0.0.1:39217'
+
+async function loopbackPermission() {
+  const permissions = navigator.permissions
+  if (!permissions?.query) return 'unknown'
+  for (const name of ['loopback-network', 'local-network-access']) {
+    try {
+      const status = await permissions.query({ name: name as PermissionName })
+      return status.state
+    } catch {
+      continue
+    }
+  }
+  return 'unknown'
+}
+
+async function agentBlockedMessage() {
+  const permission = await loopbackPermission()
+  if (permission === 'denied') {
+    return '브라우저가 로컬 프로그램 연결을 막고 있습니다. 주소창 자물쇠 → 사이트 설정에서 "기기의 앱"을 허용한 뒤 새로고침해 주세요.'
+  }
+  return '폴더 프로그램에 연결하지 못했습니다. 프로그램을 켠 뒤 다시 눌러 주세요. 연결 허용을 물으면 허용을 눌러 주세요.'
+}
+
+async function agentFetch(path: string, init: RequestInit = {}) {
+  try {
+    return await fetch(`${AGENT_ORIGIN}${path}`, {
+      ...init,
+      targetAddressSpace: 'loopback',
+    } as RequestInit)
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : ''
+    if (error instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(raw)) {
+      throw new Error(await agentBlockedMessage())
+    }
+    throw error
+  }
+}
+
 function NaverLinkMark({ status }: { status?: NaverLinkStatus }) {
   if (!status || status.state === 'checking') {
     return (
@@ -733,6 +772,7 @@ export function BlogClient() {
   const [openTime, setOpenTime] = useState('17:00')
   const [closeDow, setCloseDow] = useState<Weekday>(0)
   const [closeTime, setCloseTime] = useState('21:00')
+  const [scheduleNote, setScheduleNote] = useState('')
 
   const [folderTitles, setFolderTitles] = useState('')
   const [editingTitles, setEditingTitles] = useState(false)
@@ -969,14 +1009,14 @@ export function BlogClient() {
         })
       }
       if (cancel) return
-      await fetch('http://127.0.0.1:39217/category-schedules', {
+      await agentFetch('/category-schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
       }).catch(() => null)
     }
     const pull = async () => {
-      const statusRes = await fetch('http://127.0.0.1:39217/category-schedules').catch(() => null)
+      const statusRes = await agentFetch('/category-schedules').catch(() => null)
       if (!statusRes?.ok || cancel) return
       const status = await statusRes.json().catch(() => ({}))
       const rows = Array.isArray(status.items) ? status.items : []
@@ -1016,7 +1056,10 @@ export function BlogClient() {
     }
   }, [mode, schedules, loadSchedules])
 
-  const AGENT_PICKER = 'http://127.0.0.1:39217/pick-folder'
+  useEffect(() => {
+    if (mode !== 'product') return
+    void agentFetch('/health').catch(() => null)
+  }, [mode])
 
   async function pickLocalFolder() {
     setPickingFolder(true)
@@ -1027,7 +1070,7 @@ export function BlogClient() {
         folders.find((folder) => folder.mode === 'product')?.local_path ||
         folders[0]?.local_path ||
         ''
-      const res = await fetch(AGENT_PICKER, {
+      const res = await agentFetch('/pick-folder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: startPath }),
@@ -1044,8 +1087,8 @@ export function BlogClient() {
       const nextLabel = folderLabel || parts[parts.length - 1] || ''
       if (!folderLabel) setFolderLabel(nextLabel)
       await rememberFolder(nextPath, folderTitles, nextLabel)
-    } catch {
-      setError('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '폴더를 열지 못했습니다')
     } finally {
       setPickingFolder(false)
     }
@@ -1197,7 +1240,7 @@ export function BlogClient() {
       })
       const secret = await secretRes.json()
       if (!secretRes.ok) throw new Error(secret.error || '계정 정보를 읽지 못했습니다')
-      const openRes = await fetch('http://127.0.0.1:39217/login-account', {
+      const openRes = await agentFetch('/login-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1213,7 +1256,7 @@ export function BlogClient() {
       let done = false
       for (let i = 0; i < 90; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
-        const statusRes = await fetch('http://127.0.0.1:39217/write-status')
+        const statusRes = await agentFetch('/write-status')
         const status = await statusRes.json().catch(() => ({}))
         if (status.message) {
           last = String(status.message)
@@ -1232,7 +1275,7 @@ export function BlogClient() {
           })
           const answerData = await answerRes.json().catch(() => ({}))
           if (!answerRes.ok) throw new Error(answerData.error || '보안 확인 정답을 읽지 못했습니다')
-          await fetch('http://127.0.0.1:39217/captcha-answer', {
+          await agentFetch('/captcha-answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ answer: answerData.answer }),
@@ -1299,37 +1342,64 @@ export function BlogClient() {
     const chosen = blogCategories.filter((category) => selectedCategoryNos.includes(category.no))
     const names = chosen.length ? chosen.map((category) => category.name) : catName.trim() ? [catName.trim()] : []
     if (!names.length) {
-      setError('카테고리를 선택하세요')
+      setScheduleNote('카테고리를 먼저 고르세요')
       return
     }
-    setBusyKey('sched')
+    const now = new Date().toISOString()
+    const drafts = names.map((categoryName) => {
+      const existing = schedules.find((item) => item.category_name === categoryName)
+      return {
+        id: existing?.id || `pending:${categoryName}`,
+        user_id: existing?.user_id || '',
+        account_id: catAccountId || null,
+        category_name: categoryName,
+        blog_id: catBlogId,
+        open_dow: openDow,
+        open_time: openTime,
+        close_dow: closeDow,
+        close_time: closeTime,
+        timezone: 'Asia/Seoul',
+        enabled: true,
+        last_open_at: existing?.last_open_at || null,
+        last_close_at: existing?.last_close_at || null,
+        last_error: null,
+        meta: existing?.meta || {},
+        created_at: existing?.created_at || now,
+        updated_at: now,
+      } satisfies BlogCategoryScheduleRow
+    })
+    setSchedules((prev) => [...drafts, ...prev.filter((item) => !names.includes(item.category_name))])
+    setSelectedCategoryNos([])
+    setCatName('')
+    setScheduleNote(names.length > 1 ? `${names.length}개 예약됨` : '예약됨')
     setError('')
+    setBusyKey('sched')
     try {
-      for (const categoryName of names) {
-        const existing = schedules.find((item) => item.category_name === categoryName)
-        const res = await fetch('/api/blog/schedules', {
-          method: existing ? 'PATCH' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...(existing ? { id: existing.id } : {}),
-            categoryName,
-            blogId: catBlogId,
-            accountId: catAccountId || null,
-            openDow,
-            openTime,
-            closeDow,
-            closeTime,
-          }),
+      await Promise.all(
+        names.map(async (categoryName) => {
+          const existing = schedules.find((item) => item.category_name === categoryName)
+          const res = await fetch('/api/blog/schedules', {
+            method: existing ? 'PATCH' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...(existing ? { id: existing.id } : {}),
+              categoryName,
+              blogId: catBlogId,
+              accountId: catAccountId || null,
+              openDow,
+              openTime,
+              closeDow,
+              closeTime,
+            }),
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || '저장 실패')
         })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || '저장 실패')
-      }
-      setCatName('')
-      setSelectedCategoryNos([])
-      await loadSchedules()
-      ping(names.length > 1 ? `${names.length}개 카테고리 스케줄을 저장했습니다` : '카테고리 스케줄 저장됨')
+      )
+      void loadSchedules()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '저장 실패')
+      setScheduleNote(e instanceof Error ? e.message : '저장 실패')
+      void loadSchedules()
     } finally {
       setBusyKey(null)
     }
@@ -1448,7 +1518,7 @@ export function BlogClient() {
       const title = titles[Math.floor(Math.random() * titles.length)] || ''
       const step = slots.length > 1 ? `${index + 1}/${slots.length}편` : ''
       if (step) setChromeNote(`${step} 작성 중`)
-      const openRes = await fetch('http://127.0.0.1:39217/open-chrome', {
+      const openRes = await agentFetch('/open-chrome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1462,7 +1532,7 @@ export function BlogClient() {
       const openData = await openRes.json().catch(() => ({}))
       if (!openRes.ok) throw new Error(openData.error || '크롬 창을 열지 못했습니다. 폴더 프로그램을 확인해 주세요.')
       const articlePromise = (async () => {
-        const imageRes = await fetch('http://127.0.0.1:39217/folder-images', {
+        const imageRes = await agentFetch('/folder-images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: folderPath, skip: usedNames, limit: 10 }),
@@ -1509,7 +1579,7 @@ export function BlogClient() {
       let lastPhase = ''
       for (let i = 0; i < 180; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
-        const statusRes = await fetch('http://127.0.0.1:39217/write-status')
+        const statusRes = await agentFetch('/write-status')
         const status = await statusRes.json().catch(() => ({}))
         if (status.phase) lastPhase = String(status.phase)
         if (status.message) {
@@ -1529,7 +1599,7 @@ export function BlogClient() {
           })
           const answerData = await answerRes.json().catch(() => ({}))
           if (!answerRes.ok) throw new Error(answerData.error || '보안 확인 정답을 읽지 못했습니다')
-          await fetch('http://127.0.0.1:39217/captcha-answer', {
+          await agentFetch('/captcha-answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ answer: answerData.answer }),
@@ -1540,7 +1610,7 @@ export function BlogClient() {
           writeSent = true
           const articleData = articleState.packed.articleData
           const imageData = articleState.packed.imageData
-          const writeRes = await fetch('http://127.0.0.1:39217/write-post', {
+          const writeRes = await agentFetch('/write-post', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2404,19 +2474,33 @@ export function BlogClient() {
                   계정 추가
                 </button>
                 {naverAccounts.length > 0 ? (
-                  <button
-                    type="button"
-                    disabled={!uploadAccountId || Boolean(busyKey)}
-                    onClick={() => {
-                      const account = naverAccounts.find((item) => item.id === uploadAccountId)
-                      if (account) void loginAccount(account)
-                    }}
-                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
-                  >
-                    {busyKey?.startsWith('login:')
-                      ? '로그인 중'
-                      : `${naverAccounts.find((item) => item.id === uploadAccountId)?.username || '선택 계정'} 로그인`}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      disabled={!uploadAccountId || Boolean(busyKey)}
+                      onClick={() => {
+                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
+                        if (account) void loginAccount(account)
+                      }}
+                      className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
+                    >
+                      {busyKey?.startsWith('login:') ? '로그인 중' : '선택계정 로그인'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!uploadAccountId || Boolean(busyKey)}
+                      onClick={() => {
+                        if (!uploadAccountId) return
+                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
+                        const name = account?.username || '선택한 계정'
+                        if (!window.confirm(`${name} 계정을 삭제할까요?`)) return
+                        void removeAccount(uploadAccountId)
+                      }}
+                      className="rounded-full border border-rose-300/30 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-40"
+                    >
+                      선택계정 삭제
+                    </button>
+                  </>
                 ) : null}
               </div>
             )}
@@ -2735,14 +2819,20 @@ export function BlogClient() {
               <WeekTimeField title="공개" day={openDow} time={openTime} onDay={setOpenDow} onTime={setOpenTime} />
               <WeekTimeField title="비공개" day={closeDow} time={closeTime} onDay={setCloseDow} onTime={setCloseTime} />
             </div>
-            <button
-              type="button"
-              disabled={busyKey === 'sched'}
-              onClick={() => void addSchedule()}
-              className="rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/80 transition hover:bg-white/[0.04] disabled:opacity-50"
-            >
-              {selectedCategoryNos.length > 1 ? `${selectedCategoryNos.length}개 스케줄 추가` : '스케줄 추가'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void addSchedule()}
+                className="rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/80 transition hover:bg-white/[0.04] active:scale-[0.98]"
+              >
+                {selectedCategoryNos.length > 1 ? `${selectedCategoryNos.length}개 예약` : '스케줄 추가'}
+              </button>
+              {scheduleNote ? (
+                <p className={cn('text-xs', scheduleNote.includes('실패') || scheduleNote.includes('고르') ? 'text-rose-300' : 'text-emerald-300')}>
+                  {scheduleNote}
+                </p>
+              ) : null}
+            </div>
             <div className="space-y-2 pt-2">
               {schedules.map((s) => (
                 <div key={s.id} className="rounded-lg bg-white/5 px-3 py-2 text-xs text-white/60">
