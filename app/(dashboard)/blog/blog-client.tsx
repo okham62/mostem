@@ -2515,6 +2515,159 @@ export function BlogClient() {
                     </button>
                   </div>
                 ) : null}
+                <div className="space-y-4 border-t border-white/10 pt-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white/80">
+                    <CalendarClock className="h-4 w-4" /> 카테고리 공개
+                  </div>
+              <p className="text-xs leading-relaxed text-white/40">
+                계정을 고르면 그 블로그의 카테고리가 그대로 나옵니다. 여러 개를 고르고 공개·비공개 시간을 정하면, 그 시간이 될 때 이 PC의 크롬에서 고른 카테고리를 차례로 바꿉니다. PC가 켜져 있어야 합니다.
+              </p>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAccountMenuOpen((open) => !open)}
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-left text-sm outline-none"
+                >
+                  {(() => {
+                    const selected = accounts.find((a) => a.id === catAccountId && a.provider === 'naver')
+                    return selected ? (
+                      <span className="min-w-0 truncate">
+                        <span className="font-medium text-emerald-400">{selected.username}</span>
+                        <span className="text-white/45"> ({selected.site_url})</span>
+                      </span>
+                    ) : (
+                      <span className="text-white/45">네이버 계정 선택</span>
+                    )
+                  })()}
+                  <ChevronDown className={cn('h-4 w-4 shrink-0 text-white/40 transition', accountMenuOpen && 'rotate-180')} />
+                </button>
+                {accountMenuOpen ? (
+                  <>
+                    <button type="button" aria-label="닫기" className="fixed inset-0 z-10 cursor-default" onClick={() => setAccountMenuOpen(false)} />
+                    <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 py-1 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCatAccountId('')
+                          setCatBlogId('')
+                          setAccountMenuOpen(false)
+                        }}
+                        className="block w-full px-3 py-2.5 text-left text-sm text-white/45 hover:bg-white/[0.04]"
+                      >
+                        네이버 계정 선택
+                      </button>
+                      {accounts
+                        .filter((a) => a.provider === 'naver')
+                        .map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => {
+                              setCatAccountId(a.id)
+                              setCatBlogId(accountBlogId(a))
+                              setAccountMenuOpen(false)
+                            }}
+                            className="block w-full px-3 py-2.5 text-left text-sm hover:bg-white/[0.04]"
+                          >
+                            <span className="font-medium text-emerald-400">{a.username}</span>
+                            <span className="text-white/45"> ({a.site_url})</span>
+                          </button>
+                        ))}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+              {loadingCategories ? (
+                <p className="inline-flex items-center gap-1.5 text-xs text-white/45">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> 카테고리를 가져오는 중
+                </p>
+              ) : null}
+              {categoryLoadError ? <p className="text-xs text-rose-300/80">{categoryLoadError}</p> : null}
+              {!catAccountId ? (
+                <p className="text-xs text-white/40">네이버 계정을 고르면 그 블로그의 카테고리가 나옵니다.</p>
+              ) : null}
+              {blogCategories.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {blogCategories.map((category, index) => {
+                    const selected = selectedCategoryNos.includes(category.no)
+                    return (
+                      <button
+                        key={`${category.no}-${index}`}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategoryNos((prev) =>
+                            prev.includes(category.no) ? prev.filter((no) => no !== category.no) : [...prev, category.no]
+                          )
+                        }}
+                        className={
+                          selected
+                            ? 'rounded-full bg-gold/20 px-3 py-1.5 text-xs font-semibold text-gold'
+                            : 'rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10'
+                        }
+                      >
+                        {category.label}
+                        {category.open ? '' : ' · 비공개'}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+              {!loadingCategories && catAccountId && blogCategories.length === 0 ? (
+                <input
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  placeholder="카테고리를 가져오지 못하면 이름을 입력하세요"
+                  className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
+                />
+              ) : null}
+              <div className="grid grid-cols-2 gap-3">
+                <WeekTimeField title="공개" day={openDow} time={openTime} onDay={setOpenDow} onTime={setOpenTime} />
+                <WeekTimeField title="비공개" day={closeDow} time={closeTime} onDay={setCloseDow} onTime={setCloseTime} />
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void addSchedule()}
+                  className="rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/80 transition hover:bg-white/[0.04] active:scale-[0.98]"
+                >
+                  {selectedCategoryNos.length > 1 ? `${selectedCategoryNos.length}개 예약` : '스케줄 추가'}
+                </button>
+                {scheduleNote ? (
+                  <p className={cn('text-xs', scheduleNote.includes('실패') || scheduleNote.includes('고르') ? 'text-rose-300' : 'text-emerald-300')}>
+                    {scheduleNote}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2 pt-2">
+                {schedules.map((s) => (
+                  <div key={s.id} className="rounded-lg bg-white/5 px-3 py-2 text-xs text-white/60">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-semibold text-white">{s.category_name}</span>
+                      <span>{s.enabled ? 'ON' : 'OFF'}</span>
+                    </div>
+                    <p>
+                      공개 {WEEKDAY_LABELS[s.open_dow]} {s.open_time} · 비공개 {WEEKDAY_LABELS[s.close_dow]}{' '}
+                      {s.close_time}
+                    </p>
+                    {s.last_error ? <p className="mt-1 text-rose-300/80">{s.last_error}</p> : null}
+                    {!s.last_error && (s.last_open_at || s.last_close_at) ? (
+                      <p className="mt-1 text-white/35">
+                        최근 {new Date((s.last_close_at && (!s.last_open_at || s.last_close_at > s.last_open_at) ? s.last_close_at : s.last_open_at) || '').toLocaleString('ko-KR')}{' '}
+                        {s.last_close_at && (!s.last_open_at || s.last_close_at > s.last_open_at) ? '비공개' : '공개'}
+                      </p>
+                    ) : null}
+                    <div className="mt-1 flex gap-2">
+                      <button type="button" onClick={() => void toggleSchedule(s.id, !s.enabled)}>
+                        {s.enabled ? '비활성' : '활성'}
+                      </button>
+                      <button type="button" onClick={() => void removeSchedule(s.id)}>
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+                </div>
               </div>
             ) : null}
           </div>
@@ -2687,7 +2840,7 @@ export function BlogClient() {
         </div>
       ) : null}
 
-      {subTab === 'ops' || (mode === 'product' && writeSettingsOpen) ? (
+      {subTab === 'ops' && mode !== 'product' ? (
         <div className={mode === 'product' ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'}>
           <div className={mode === 'product' ? 'space-y-4 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8' : 'space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4'}>
             {mode === 'product' ? (
