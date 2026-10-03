@@ -975,8 +975,10 @@ export function BlogClient() {
     let cancel = false
     const push = async () => {
       const items = []
+      const liveAccountIds = new Set(accounts.filter((account) => account.provider === 'naver').map((account) => account.id))
       for (const item of schedules) {
         if (!item.enabled || !item.blog_id || !item.category_name) continue
+        if (!item.account_id || !liveAccountIds.has(item.account_id)) continue
         let loginId = ''
         let password = ''
         let blogId = item.blog_id
@@ -1054,7 +1056,7 @@ export function BlogClient() {
       clearTimeout(start)
       clearInterval(poll)
     }
-  }, [mode, schedules, loadSchedules])
+  }, [mode, schedules, accounts, loadSchedules])
 
   useEffect(() => {
     if (mode !== 'product') return
@@ -1300,8 +1302,8 @@ export function BlogClient() {
 
   async function removeAccount(id: string) {
     await fetch(`/api/blog/accounts?id=${id}`, { method: 'DELETE' })
-    await loadAccounts()
-    ping('계정 삭제됨')
+    await Promise.all([loadAccounts(), loadSchedules()])
+    ping('계정과 카테고리 예약을 삭제했습니다')
   }
 
   async function enqueueExternal(provider: 'tistory' | 'naver', postId?: string) {

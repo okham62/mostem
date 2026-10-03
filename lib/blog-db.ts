@@ -153,8 +153,43 @@ export async function insertBlogAccount(input: {
   return data as BlogAccountRow
 }
 
+function naverBlogId(account: BlogAccountRow) {
+  const metaId = typeof account.meta?.blogId === 'string' ? account.meta.blogId.trim() : ''
+  if (metaId) return metaId
+  const fromUrl = account.site_url.replace(/^https?:\/\/(m\.)?blog\.naver\.com\//i, '').split('/')[0]
+  return fromUrl || account.username.trim()
+}
+
+export async function deleteCategorySchedulesForAccount(userId: string, accountId: string, blogId = '') {
+  const supabase = createAdminClient()
+  const { error: byAccount } = await supabase
+    .from('blog_category_schedules')
+    .delete()
+    .eq('user_id', userId)
+    .eq('account_id', accountId)
+  if (byAccount) throw new Error(byAccount.message)
+  const id = blogId.trim()
+  if (!id) return
+  const { error: byBlog } = await supabase
+    .from('blog_category_schedules')
+    .delete()
+    .eq('user_id', userId)
+    .eq('blog_id', id)
+  if (byBlog) throw new Error(byBlog.message)
+}
+
 export async function deleteBlogAccount(userId: string, id: string) {
   const supabase = createAdminClient()
+  const { data: account, error: readError } = await supabase
+    .from('blog_accounts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('id', id)
+    .maybeSingle()
+  if (readError) throw new Error(readError.message)
+  if (account) {
+    await deleteCategorySchedulesForAccount(userId, id, naverBlogId(account as BlogAccountRow))
+  }
   const { error } = await supabase.from('blog_accounts').delete().eq('user_id', userId).eq('id', id)
   if (error) throw new Error(error.message)
 }
@@ -245,13 +280,27 @@ export async function markBlogJobRunning(id: string) {
 
 export async function listCategorySchedules(userId: string) {
   const supabase = createAdminClient()
+  const accounts = await listBlogAccounts(userId)
+  const liveBlogIds = new Set(accounts.map((account) => naverBlogId(account)).filter(Boolean))
   const { data, error } = await supabase
     .from('blog_category_schedules')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []) as BlogCategoryScheduleRow[]
+  const rows = (data ?? []) as BlogCategoryScheduleRow[]
+  const orphanIds = rows
+    .filter((row) => !row.account_id && !liveBlogIds.has(row.blog_id))
+    .map((row) => row.id)
+  if (orphanIds.length) {
+    const { error: cleanupError } = await supabase
+      .from('blog_category_schedules')
+      .delete()
+      .eq('user_id', userId)
+      .in('id', orphanIds)
+    if (cleanupError) throw new Error(cleanupError.message)
+  }
+  return rows.filter((row) => !orphanIds.includes(row.id))
 }
 
 export async function insertCategorySchedule(input: {
