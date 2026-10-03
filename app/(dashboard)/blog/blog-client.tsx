@@ -756,10 +756,10 @@ export function BlogClient() {
   const [naverPassword, setNaverPassword] = useState('')
   const [naverBlogId, setNaverBlogId] = useState('')
   const [showNaverAccountForm, setShowNaverAccountForm] = useState(false)
-  const [managingAccounts, setManagingAccounts] = useState(false)
   const [savingAccount, setSavingAccount] = useState(false)
 
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false)
+  const [writeSettingsOpen, setWriteSettingsOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [catAccountId, setCatAccountId] = useState('')
   const [catName, setCatName] = useState('')
@@ -2369,47 +2369,21 @@ export function BlogClient() {
         <section className="space-y-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
+              <span className="shrink-0 text-sm font-medium text-white/80">계정관리</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setManagingAccounts((open) => !open)}
+                  onClick={() => setWriteSettingsOpen((open) => !open)}
                   className={cn(
-                    'shrink-0 text-sm font-medium transition',
-                    managingAccounts ? 'text-white' : 'text-white/80 hover:text-white'
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                    writeSettingsOpen
+                      ? 'border-white/30 bg-white text-neutral-950'
+                      : 'border-white/15 text-white/70 hover:border-white/30 hover:text-white'
                   )}
                 >
-                  계정관리
+                  <Settings2 className="h-3.5 w-3.5" />
+                  설정
                 </button>
-                {naverAccounts.length > 0 ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={!uploadAccountId || Boolean(busyKey)}
-                      onClick={() => {
-                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
-                        if (account) void loginAccount(account)
-                      }}
-                      className="shrink-0 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
-                    >
-                      {busyKey?.startsWith('login:') ? '로그인 중' : '선택계정 로그인'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!uploadAccountId || Boolean(busyKey)}
-                      onClick={() => {
-                        if (!uploadAccountId) return
-                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
-                        const name = account?.username || '선택한 계정'
-                        if (!window.confirm(`${name} 계정을 삭제할까요?`)) return
-                        void removeAccount(uploadAccountId)
-                      }}
-                      className="shrink-0 rounded-full border border-rose-300/30 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-40"
-                    >
-                      선택계정 삭제
-                    </button>
-                  </>
-                ) : null}
-              </div>
               {naverAccounts.length > 0 ? (
                 <button
                   type="button"
@@ -2422,116 +2396,126 @@ export function BlogClient() {
                   {naverAccounts.length}
                 </button>
               ) : null}
+              </div>
             </div>
-            {showNaverAccountForm ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <input
-                  value={naverLoginId}
-                  onChange={(e) => setNaverLoginId(e.target.value)}
-                  placeholder="네이버 아이디"
-                  name="mostem-naver-login-id"
-                  autoComplete="off"
-                  readOnly
-                  onFocus={(e) => {
-                    e.currentTarget.readOnly = false
-                  }}
-                  className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25"
-                />
-                <input
-                  value={naverPassword}
-                  onChange={(e) => setNaverPassword(e.target.value)}
-                  placeholder="비밀번호"
-                  type="text"
-                  name="mostem-naver-login-secret"
-                  autoComplete="off"
-                  readOnly
-                  onFocus={(e) => {
-                    e.currentTarget.readOnly = false
-                  }}
-                  className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25"
-                />
-                <input
-                  value={naverBlogId}
-                  onChange={(e) => setNaverBlogId(e.target.value)}
-                  placeholder="블로그 아이디, 로그인 아이디와 같으면 비움"
-                  className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25 sm:col-span-2"
-                />
-                <button
-                  type="button"
-                  disabled={savingAccount}
-                  onClick={() => void saveNaverAccount()}
-                  className="rounded-full bg-white px-4 py-3 text-sm font-semibold text-neutral-950 disabled:opacity-50"
-                >
-                  {savingAccount ? '등록 중' : '계정 등록'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowNaverAccountForm(false)
-                    setNaverLoginId('')
-                    setNaverPassword('')
-                    setNaverBlogId('')
-                  }}
-                  className="rounded-full px-4 py-3 text-sm text-white/55 transition hover:text-white"
-                >
-                  닫기
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                {naverAccounts.map((account) => {
-                  const selected = account.id === uploadAccountId
-                  const linked = linkStatus[account.id]?.state === 'linked'
-                  return (
-                    <button
-                      key={account.id}
-                      type="button"
-                      onClick={() => setUploadAccountId(account.id)}
-                      className={cn(
-                        'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition',
-                        selected ? 'border-white/30 bg-white' : 'border-white/10 bg-white/[0.03]'
-                      )}
-                    >
-                      <span className={selected ? 'text-emerald-600' : 'text-emerald-400'}>
-                        {account.username || accountBlogId(account)}
-                      </span>
-                      <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
-                    </button>
-                  )
-                })}
-                <button
-                  type="button"
-                  onClick={() => setShowNaverAccountForm(true)}
-                  className="rounded-full border border-dashed border-white/15 px-3 py-1.5 text-sm text-white/50 transition hover:border-white/30 hover:text-white"
-                >
-                  계정 추가
-                </button>
-              </div>
-            )}
-            {managingAccounts && !showNaverAccountForm ? (
-              <ul className="space-y-2">
-                {naverAccounts.length === 0 ? (
-                  <li className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-white/40">
-                    등록된 계정이 없습니다.
-                  </li>
-                ) : (
-                  naverAccounts.map((account) => (
-                    <li
-                      key={account.id}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
-                    >
-                      <span className="truncate text-sm font-medium text-emerald-400">{account.username || accountBlogId(account)}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {naverAccounts.map((account) => {
+                const selected = account.id === uploadAccountId
+                const linked = linkStatus[account.id]?.state === 'linked'
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => setUploadAccountId(account.id)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition',
+                      selected ? 'border-white/30 bg-white' : 'border-white/10 bg-white/[0.03]'
+                    )}
+                  >
+                    <span className={selected ? 'text-emerald-600' : 'text-emerald-400'}>
+                      {account.username || accountBlogId(account)}
+                    </span>
+                    <span className={cn('h-1.5 w-1.5 rounded-full', linked ? 'bg-emerald-400' : 'bg-white/25')} />
+                  </button>
+                )
+              })}
+            </div>
+            {writeSettingsOpen ? (
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowNaverAccountForm((open) => !open)}
+                    className="rounded-full border border-dashed border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:border-white/30 hover:text-white"
+                  >
+                    계정 추가
+                  </button>
+                  {naverAccounts.length > 0 ? (
+                    <>
                       <button
                         type="button"
-                        onClick={() => void removeAccount(account.id)}
-                        className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-xs text-white/70 transition hover:border-rose-300/50 hover:text-rose-200"
+                        disabled={!uploadAccountId || Boolean(busyKey)}
+                        onClick={() => {
+                          const account = naverAccounts.find((item) => item.id === uploadAccountId)
+                          if (account) void loginAccount(account)
+                        }}
+                        className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
                       >
-                        삭제
+                        {busyKey?.startsWith('login:') ? '로그인 중' : '선택계정 로그인'}
                       </button>
-                    </li>
-                  ))
-                )}
-              </ul>
+                      <button
+                        type="button"
+                        disabled={!uploadAccountId || Boolean(busyKey)}
+                        onClick={() => {
+                          if (!uploadAccountId) return
+                          const account = naverAccounts.find((item) => item.id === uploadAccountId)
+                          const name = account?.username || '선택한 계정'
+                          if (!window.confirm(`${name} 계정을 삭제할까요?`)) return
+                          void removeAccount(uploadAccountId)
+                        }}
+                        className="rounded-full border border-rose-300/30 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-40"
+                      >
+                        선택계정 삭제
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+                {showNaverAccountForm ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      value={naverLoginId}
+                      onChange={(e) => setNaverLoginId(e.target.value)}
+                      placeholder="네이버 아이디"
+                      name="mostem-naver-login-id"
+                      autoComplete="off"
+                      readOnly
+                      onFocus={(e) => {
+                        e.currentTarget.readOnly = false
+                      }}
+                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25"
+                    />
+                    <input
+                      value={naverPassword}
+                      onChange={(e) => setNaverPassword(e.target.value)}
+                      placeholder="비밀번호"
+                      type="text"
+                      name="mostem-naver-login-secret"
+                      autoComplete="off"
+                      readOnly
+                      onFocus={(e) => {
+                        e.currentTarget.readOnly = false
+                      }}
+                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25"
+                    />
+                    <input
+                      value={naverBlogId}
+                      onChange={(e) => setNaverBlogId(e.target.value)}
+                      placeholder="블로그 아이디, 로그인 아이디와 같으면 비움"
+                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none transition placeholder:text-white/30 focus:border-white/25 sm:col-span-2"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingAccount}
+                      onClick={() => void saveNaverAccount()}
+                      className="rounded-full bg-white px-4 py-3 text-sm font-semibold text-neutral-950 disabled:opacity-50"
+                    >
+                      {savingAccount ? '등록 중' : '계정 등록'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNaverAccountForm(false)
+                        setNaverLoginId('')
+                        setNaverPassword('')
+                        setNaverBlogId('')
+                      }}
+                      className="rounded-full px-4 py-3 text-sm text-white/55 transition hover:text-white"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
 
@@ -2703,20 +2687,26 @@ export function BlogClient() {
         </div>
       ) : null}
 
-      {subTab === 'ops' || mode === 'product' ? (
+      {subTab === 'ops' || (mode === 'product' && writeSettingsOpen) ? (
         <div className={mode === 'product' ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'}>
           <div className={mode === 'product' ? 'space-y-4 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8' : 'space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4'}>
+            {mode === 'product' ? (
+              <div className="flex items-center gap-2 text-sm font-medium text-white/80">
+                <CalendarClock className="h-4 w-4" /> 카테고리 공개
+              </div>
+            ) : (
             <button
               type="button"
               onClick={() => setCategoryPanelOpen((open) => !open)}
               className="flex w-full items-center justify-between gap-3 text-left text-sm font-medium text-white/80"
             >
               <span className="flex items-center gap-2">
-                <CalendarClock className="h-4 w-4" /> {mode === 'product' ? '카테고리 공개' : '네이버 카테고리 On/Off'}
+                <CalendarClock className="h-4 w-4" /> 네이버 카테고리 On/Off
               </span>
               <ChevronDown className={cn('h-4 w-4 text-white/40 transition', categoryPanelOpen && 'rotate-180')} />
             </button>
-            {categoryPanelOpen ? (
+            )}
+            {categoryPanelOpen || mode === 'product' ? (
             <>
             <p className="text-xs leading-relaxed text-white/40">
               계정을 고르면 그 블로그의 카테고리가 그대로 나옵니다. 여러 개를 고르고 공개·비공개 시간을 정하면, 그 시간이 될 때 이 PC의 크롬에서 고른 카테고리를 차례로 바꿉니다. PC가 켜져 있어야 합니다.
