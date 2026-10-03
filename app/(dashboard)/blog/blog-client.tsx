@@ -2367,16 +2367,47 @@ export function BlogClient() {
         <section className="space-y-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setManagingAccounts((open) => !open)}
-                className={cn(
-                  'text-sm font-medium transition',
-                  managingAccounts ? 'text-white' : 'text-white/80 hover:text-white'
-                )}
-              >
-                계정관리
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setManagingAccounts((open) => !open)}
+                  className={cn(
+                    'shrink-0 text-sm font-medium transition',
+                    managingAccounts ? 'text-white' : 'text-white/80 hover:text-white'
+                  )}
+                >
+                  계정관리
+                </button>
+                {naverAccounts.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={!uploadAccountId || Boolean(busyKey)}
+                      onClick={() => {
+                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
+                        if (account) void loginAccount(account)
+                      }}
+                      className="shrink-0 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
+                    >
+                      {busyKey?.startsWith('login:') ? '로그인 중' : '선택계정 로그인'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!uploadAccountId || Boolean(busyKey)}
+                      onClick={() => {
+                        if (!uploadAccountId) return
+                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
+                        const name = account?.username || '선택한 계정'
+                        if (!window.confirm(`${name} 계정을 삭제할까요?`)) return
+                        void removeAccount(uploadAccountId)
+                      }}
+                      className="shrink-0 rounded-full border border-rose-300/30 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-40"
+                    >
+                      선택계정 삭제
+                    </button>
+                  </>
+                ) : null}
+              </div>
               {naverAccounts.length > 0 ? (
                 <button
                   type="button"
@@ -2473,35 +2504,6 @@ export function BlogClient() {
                 >
                   계정 추가
                 </button>
-                {naverAccounts.length > 0 ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={!uploadAccountId || Boolean(busyKey)}
-                      onClick={() => {
-                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
-                        if (account) void loginAccount(account)
-                      }}
-                      className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-40"
-                    >
-                      {busyKey?.startsWith('login:') ? '로그인 중' : '선택계정 로그인'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!uploadAccountId || Boolean(busyKey)}
-                      onClick={() => {
-                        if (!uploadAccountId) return
-                        const account = naverAccounts.find((item) => item.id === uploadAccountId)
-                        const name = account?.username || '선택한 계정'
-                        if (!window.confirm(`${name} 계정을 삭제할까요?`)) return
-                        void removeAccount(uploadAccountId)
-                      }}
-                      className="rounded-full border border-rose-300/30 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-40"
-                    >
-                      선택계정 삭제
-                    </button>
-                  </>
-                ) : null}
               </div>
             )}
             {managingAccounts && !showNaverAccountForm ? (
