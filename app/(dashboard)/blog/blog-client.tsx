@@ -2840,7 +2840,7 @@ export function BlogClient() {
         </div>
       ) : null}
 
-      {subTab === 'ops' && mode !== 'product' ? (
+      {subTab === 'ops' && String(mode) !== 'product' ? (
         <div className={mode === 'product' ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'}>
           <div className={mode === 'product' ? 'space-y-4 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 sm:p-8' : 'space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4'}>
             {mode === 'product' ? (
