@@ -603,14 +603,14 @@ function TradeHistory({
   const [to, setTo] = useState('')
   const active = Boolean(from || to)
   const visible = useMemo(() => {
-    if (!active) return []
-    return rows.filter((row) => {
+    const picked = rows.filter((row) => {
       const day = row.trade.tradedAt.slice(0, 10)
       if (from && day < from) return false
       if (to && day > to) return false
       return true
     })
-  }, [rows, from, to, active])
+    return picked.sort((a, b) => a.trade.tradedAt.localeCompare(b.trade.tradedAt) || a.trade.createdAt.localeCompare(b.trade.createdAt))
+  }, [rows, from, to])
 
   function pickMonth(key: string) {
     setMonth(key)
@@ -659,12 +659,12 @@ function TradeHistory({
         />
         {active ? (
           <button type="button" className="h-9 px-2 text-xs text-white/50 hover:text-white" onClick={() => pickMonth('')}>
-            닫기
+            전체
           </button>
         ) : (
-          <p className="text-xs text-white/40">월이나 날짜를 고르면 그 거래만 보입니다.</p>
+          <p className="text-xs text-white/40">예전 거래가 위, 최근 거래가 아래입니다.</p>
         )}
-        {active ? <p className="ml-auto text-xs text-white/45">{visible.length}건</p> : null}
+        <p className="ml-auto text-xs text-white/45">{visible.length}건</p>
       </div>
       {active && visible.length === 0 ? (
         <p className="px-4 pb-4 text-sm text-white/40">이 기간에 거래가 없습니다.</p>
