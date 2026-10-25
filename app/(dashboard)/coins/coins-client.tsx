@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { ChevronDown, Paperclip, Plus, X } from 'lucide-react'
+import { Paperclip, Plus, X } from 'lucide-react'
 import {
   COIN_EXCHANGES,
   MAX_TRADE_FILE_BYTES,
@@ -553,15 +553,10 @@ function monthLabel(key: string) {
   return `${year}년 ${Number(month)}월`
 }
 
-function groupLedgerByMonth(rows: CoinLedgerRow[]) {
-  const groups = new Map<string, CoinLedgerRow[]>()
-  for (const row of rows) {
-    const key = monthKey(row.trade.tradedAt)
-    const list = groups.get(key) ?? []
-    list.push(row)
-    groups.set(key, list)
-  }
-  return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a))
+function monthEnd(key: string) {
+  const [year, month] = key.split('-').map(Number)
+  const last = new Date(year, month, 0).getDate()
+  return `${key}-${String(last).padStart(2, '0')}`
 }
 
 function lotPnl(row: CoinLedgerRow, lots: Map<string, { qty: number; cost: number }>, price: number) {
@@ -599,55 +594,85 @@ function TradeHistory({
 }) {
   const rows = useMemo(() => runningLedger(item.trades), [item.trades])
   const lots = useMemo(() => openLots(item.trades), [item.trades])
-  const groups = useMemo(() => groupLedgerByMonth(rows), [rows])
-  const latest = groups[0]?.[0] ?? ''
-  const [openMonths, setOpenMonths] = useState<string[]>(latest ? [latest] : [])
+  const months = useMemo(() => {
+    const keys = new Set(rows.map((row) => monthKey(row.trade.tradedAt)))
+    return [...keys].sort((a, b) => b.localeCompare(a))
+  }, [rows])
+  const [month, setMonth] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const active = Boolean(from || to)
+  const visible = useMemo(() => {
+    if (!active) return []
+    return rows.filter((row) => {
+      const day = row.trade.tradedAt.slice(0, 10)
+      if (from && day < from) return false
+      if (to && day > to) return false
+      return true
+    })
+  }, [rows, from, to, active])
 
-  useEffect(() => {
-    setOpenMonths((prev) => (prev.includes(latest) || !latest ? prev : [latest, ...prev]))
-  }, [latest])
-
-  function toggleMonth(key: string) {
-    setOpenMonths((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
+  function pickMonth(key: string) {
+    setMonth(key)
+    if (!key) {
+      setFrom('')
+      setTo('')
+      return
+    }
+    setFrom(`${key}-01`)
+    setTo(monthEnd(key))
   }
 
   return (
     <div className="border-t border-white/8 bg-black/20">
-      {groups.length > 1 ? (
-        <div className="flex items-center justify-between px-3 py-2 sm:px-4">
-          <p className="text-xs text-white/40">최근 달만 열어 두었습니다. 이전 달은 눌러서 보세요.</p>
-          <button
-            type="button"
-            className="text-xs text-white/50 hover:text-white"
-            onClick={() =>
-              setOpenMonths((prev) => (prev.length === groups.length ? [latest] : groups.map(([key]) => key)))
-            }
-          >
-            {openMonths.length === groups.length ? '최근 달만' : '전체 펼치기'}
+      <div className="flex flex-wrap items-center gap-2 px-3 py-3 sm:px-4">
+        <select
+          value={month}
+          onChange={(event) => pickMonth(event.target.value)}
+          className="h-9 rounded-lg border border-white/10 bg-[#101014] px-2 text-sm text-white [color-scheme:dark]"
+        >
+          <option value="">월 선택</option>
+          {months.map((key) => (
+            <option key={key} value={key}>
+              {monthLabel(key)}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={from}
+          onChange={(event) => {
+            setFrom(event.target.value)
+            setMonth('')
+          }}
+          className="h-9 rounded-lg border border-white/10 bg-[#101014] px-2 text-sm text-white [color-scheme:dark]"
+        />
+        <span className="text-xs text-white/35">~</span>
+        <input
+          type="date"
+          value={to}
+          onChange={(event) => {
+            setTo(event.target.value)
+            setMonth('')
+          }}
+          className="h-9 rounded-lg border border-white/10 bg-[#101014] px-2 text-sm text-white [color-scheme:dark]"
+        />
+        {active ? (
+          <button type="button" className="h-9 px-2 text-xs text-white/50 hover:text-white" onClick={() => pickMonth('')}>
+            닫기
           </button>
-        </div>
+        ) : (
+          <p className="text-xs text-white/40">월이나 날짜를 고르면 그 거래만 보입니다.</p>
+        )}
+        {active ? <p className="ml-auto text-xs text-white/45">{visible.length}건</p> : null}
+      </div>
+      {active && visible.length === 0 ? (
+        <p className="px-4 pb-4 text-sm text-white/40">이 기간에 거래가 없습니다.</p>
       ) : null}
-      <div className="space-y-1 px-3 py-3 lg:hidden">
-        {groups.map(([key, monthRows]) => {
-          const open = openMonths.includes(key) || groups.length === 1
-          return (
-            <div key={key}>
-              {groups.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => toggleMonth(key)}
-                  className="mb-2 flex w-full items-center justify-between rounded-xl bg-white/8 px-3 py-3 text-left"
-                >
-                  <span className="text-[15px] font-bold text-white">{monthLabel(key)}</span>
-                  <span className="flex items-center gap-2 text-sm text-white/50">
-                    {monthRows.length}건
-                    <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
-                  </span>
-                </button>
-              ) : null}
-              {open ? (
+      {visible.length ? (
+      <div className="space-y-1 px-3 pb-3 lg:hidden">
                 <div className="overflow-hidden rounded-xl border border-white/10 bg-[#101014]">
-                  {monthRows.map((row, index) => {
+                  {visible.map((row, index) => {
                     const buy = row.signedQty >= 0
                     const pnl = lotPnl(row, lots, price)
                     return (
@@ -708,31 +733,10 @@ function TradeHistory({
                     )
                   })}
                 </div>
-              ) : null}
-            </div>
-          )
-        })}
       </div>
+      ) : null}
+      {visible.length ? (
       <div className="hidden lg:block">
-        {groups.map(([key, monthRows]) => {
-          const open = openMonths.includes(key) || groups.length === 1
-          const last = monthRows[monthRows.length - 1]
-          return (
-            <div key={key}>
-              {groups.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => toggleMonth(key)}
-                  className="flex w-full items-center justify-between border-t border-white/8 px-4 py-2.5 text-left hover:bg-white/4"
-                >
-                  <span className="text-sm font-bold text-white">{monthLabel(key)}</span>
-                  <span className="flex items-center gap-2 text-xs text-white/45">
-                    {monthRows.length}건 · 누적 {formatQty(last.afterQty)} · 평단 {formatKrw(last.afterAvg)}
-                    <ChevronDown className={cn('h-4 w-4 transition', open && 'rotate-180')} />
-                  </span>
-                </button>
-              ) : null}
-              {open ? (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[920px] text-left text-[13px]">
                     <thead className="text-white/40">
@@ -750,7 +754,7 @@ function TradeHistory({
                       </tr>
                     </thead>
                     <tbody>
-                      {monthRows.map((row) => {
+                      {visible.map((row) => {
                         const pnl = lotPnl(row, lots, price)
                         return (
                         <tr key={row.trade.id} className="border-t border-white/10 text-white/80 hover:bg-white/4">
@@ -799,11 +803,8 @@ function TradeHistory({
                     </tbody>
                   </table>
                 </div>
-              ) : null}
-            </div>
-          )
-        })}
       </div>
+      ) : null}
     </div>
   )
 }
