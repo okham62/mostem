@@ -123,6 +123,34 @@ export function runningLedger(trades: CoinTrade[]): CoinLedgerRow[] {
   })
 }
 
+export function openLots(trades: CoinTrade[]) {
+  const lots: Array<{ id: string; qty: number; cost: number }> = []
+  const open = new Map<string, { qty: number; cost: number }>()
+  for (const trade of sortTrades(trades)) {
+    if (trade.side === 'buy') {
+      const lot = { id: trade.id, qty: trade.qty, cost: trade.amount }
+      lots.push(lot)
+      open.set(trade.id, { qty: lot.qty, cost: lot.cost })
+      continue
+    }
+    let left = trade.qty
+    for (const lot of lots) {
+      if (left <= 1e-12 || lot.qty <= 1e-12) continue
+      const take = Math.min(lot.qty, left)
+      const unit = lot.cost / lot.qty
+      lot.qty -= take
+      lot.cost -= unit * take
+      left -= take
+      if (lot.qty < 1e-12) {
+        lot.qty = 0
+        lot.cost = 0
+      }
+      open.set(lot.id, { qty: lot.qty, cost: lot.cost })
+    }
+  }
+  return open
+}
+
 export function holdingsFromTrades(trades: CoinTrade[]): CoinHolding[] {
   const groups = new Map<string, CoinTrade[]>()
   for (const trade of trades) {

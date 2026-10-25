@@ -14,6 +14,7 @@ import {
   formatSignedKrw,
   formatSignedQty,
   holdingsFromTrades,
+  openLots,
   runningLedger,
   num,
   todayIso,
@@ -170,7 +171,7 @@ export function CoinsClient({ initial, initialPrices }: { initial: CoinPerson[];
     }
     const missing = symbols.some((symbol) => !initialPrices[symbol]?.krw)
     if (missing) load()
-    const id = window.setInterval(load, 20000)
+    const id = window.setInterval(load, 5000)
     return () => {
       ctrl.abort()
       window.clearInterval(id)
@@ -370,6 +371,7 @@ export function CoinsClient({ initial, initialPrices }: { initial: CoinPerson[];
                 {open ? (
                   <TradeHistory
                     item={item}
+                    price={prices[item.symbol]?.krw ?? 0}
                     onEdit={(trade) =>
                       setSheet({
                         side: trade.side,
@@ -562,18 +564,41 @@ function groupLedgerByMonth(rows: CoinLedgerRow[]) {
   return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a))
 }
 
+function lotPnl(row: CoinLedgerRow, lots: Map<string, { qty: number; cost: number }>, price: number) {
+  if (row.trade.side !== 'buy' || price <= 0) return null
+  const lot = lots.get(row.trade.id)
+  const qty = lot?.qty ?? 0
+  const cost = lot?.cost ?? 0
+  if (qty <= 1e-12 || cost <= 0) return { closed: true as const, amount: 0, pct: 0, qty: 0 }
+  const amount = qty * price - cost
+  return { closed: false as const, amount, pct: (amount / cost) * 100, qty }
+}
+
+function TradePnl({ pnl }: { pnl: ReturnType<typeof lotPnl> }) {
+  if (!pnl) return <span className="text-white/30">—</span>
+  if (pnl.closed) return <span className="text-white/35">청산</span>
+  return (
+    <span className={cn('font-semibold', pnl.amount >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
+      {formatPnl(pnl.amount, pnl.pct)}
+    </span>
+  )
+}
+
 function TradeHistory({
   item,
+  price,
   onEdit,
   onRemove,
   onOpenFile,
 }: {
   item: CoinHolding
+  price: number
   onEdit: (trade: CoinTrade) => void
   onRemove: (trade: CoinTrade) => void
   onOpenFile: (trade: CoinTrade, file: CoinTradeFile) => void
 }) {
   const rows = useMemo(() => runningLedger(item.trades), [item.trades])
+  const lots = useMemo(() => openLots(item.trades), [item.trades])
   const groups = useMemo(() => groupLedgerByMonth(rows), [rows])
   const latest = groups[0]?.[0] ?? ''
   const [openMonths, setOpenMonths] = useState<string[]>(latest ? [latest] : [])
@@ -624,6 +649,7 @@ function TradeHistory({
                 <div className="overflow-hidden rounded-xl border border-white/10 bg-[#101014]">
                   {monthRows.map((row, index) => {
                     const buy = row.signedQty >= 0
+                    const pnl = lotPnl(row, lots, price)
                     return (
                       <div
                         key={row.trade.id}
@@ -650,6 +676,15 @@ function TradeHistory({
                           <p className={cn('text-[13px] font-bold', buy ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
                             {formatSignedKrw(row.signedAmount)}
                           </p>
+                        </div>
+                        <div className="mt-1 flex items-baseline justify-between gap-2 text-[12px]">
+                          <p className="text-white/45">
+                            평가손익
+                            {pnl && !pnl.closed && pnl.qty + 1e-8 < row.trade.qty ? (
+                              <span className="ml-1 text-white/30">잔량 {formatQty(pnl.qty)}</span>
+                            ) : null}
+                          </p>
+                          <TradePnl pnl={pnl} />
                         </div>
                         {row.trade.memo ? <p className="mt-1 text-[12px] text-white/40">{row.trade.memo}</p> : null}
                         {row.trade.files.length ? (
@@ -699,7 +734,7 @@ function TradeHistory({
               ) : null}
               {open ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-left text-[13px]">
+                  <table className="w-full min-w-[920px] text-left text-[13px]">
                     <thead className="text-white/40">
                       <tr>
                         <th className="px-3 py-2.5 font-medium">날짜</th>
@@ -709,12 +744,15 @@ function TradeHistory({
                         <th className="px-3 py-2.5 font-medium">누적수량</th>
                         <th className="px-3 py-2.5 font-medium">누적원금</th>
                         <th className="px-3 py-2.5 font-medium">최종평단</th>
+                        <th className="px-3 py-2.5 font-medium">평가손익</th>
                         <th className="px-3 py-2.5 font-medium">메모</th>
                         <th className="px-3 py-2.5 font-medium"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {monthRows.map((row) => (
+                      {monthRows.map((row) => {
+                        const pnl = lotPnl(row, lots, price)
+                        return (
                         <tr key={row.trade.id} className="border-t border-white/10 text-white/80 hover:bg-white/4">
                           <td className="whitespace-nowrap px-3 py-2.5 text-white/50">{row.trade.tradedAt}</td>
                           <td className={cn('px-3 py-2.5 font-semibold', row.signedQty >= 0 ? 'text-[#25a750]' : 'text-[#ca3f64]')}>
@@ -727,6 +765,12 @@ function TradeHistory({
                           <td className="px-3 py-2.5">{formatQty(row.afterQty)}</td>
                           <td className="px-3 py-2.5">{formatKrw(row.afterPrincipal)}</td>
                           <td className="px-3 py-2.5 font-semibold text-white">{formatKrw(row.afterAvg)}</td>
+                          <td className="whitespace-nowrap px-3 py-2.5">
+                            <TradePnl pnl={pnl} />
+                            {pnl && !pnl.closed && pnl.qty + 1e-8 < row.trade.qty ? (
+                              <p className="text-[11px] text-white/35">잔량 {formatQty(pnl.qty)}</p>
+                            ) : null}
+                          </td>
                           <td className="max-w-[180px] truncate px-3 py-2.5 text-white/55" title={row.trade.memo}>
                             {row.trade.memo || '—'}
                             {row.trade.files.length ? (
@@ -750,7 +794,8 @@ function TradeHistory({
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
