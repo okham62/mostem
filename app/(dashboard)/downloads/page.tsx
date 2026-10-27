@@ -24,14 +24,14 @@ function localSize(name: string) {
 const catalog: CatalogItem[] = [
   {
     title: 'Mimi Studio',
-    summary: '글을 만들고 연결한 블로그에 올리는 Windows 프로그램입니다. 승인된 메일 주소로 로그인합니다.',
-    file: 'MimiStudio-Setup-0.1.10.exe',
-    href: 'https://github.com/okham62/mimi-studio-download/releases/download/v0.1.10/MimiStudio-Setup-0.1.10.exe',
+    summary: '글을 만들고 연결한 블로그에 올리는 Windows 프로그램입니다. 승인된 아이디로 로그인합니다.',
+    file: 'MimiStudio-Setup-0.1.11.exe',
+    href: 'https://github.com/okham62/mimi-studio-download/releases/download/v0.1.11/MimiStudio-Setup-0.1.11.exe',
     size: '120.3MB',
     steps: [
       '받은 파일을 실행합니다. Windows가 막으면 추가 정보 다음 실행을 누릅니다.',
       '설치 창에서 확인을 누릅니다.',
-      '승인된 메일 주소로 로그인합니다.',
+      '승인된 아이디로 로그인합니다.',
     ],
   },
   {
