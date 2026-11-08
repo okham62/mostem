@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PlatformLogo } from '@/components/platform-logos'
 import { HANBANG_PLATFORMS, type HanbangPlatformId } from '@/lib/hanbang-platforms'
 
 export type HanbangChannel = {
@@ -11,14 +12,36 @@ export type HanbangChannel = {
   channel_name: string
 }
 
-const COLORS: Record<HanbangPlatformId, string> = {
-  youtube: '#ff0033',
-  tiktok: '#111111',
-  instagram: '#d62976',
-  threads: '#1c1c1e',
-  facebook: '#1877f2',
-  x: '#111111',
-  pinterest: '#e60023',
+function HanbangMark({ id }: { id: HanbangPlatformId }) {
+  if (id === 'youtube' || id === 'instagram' || id === 'tiktok' || id === 'threads') {
+    return (
+      <span className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-[14px] ${id === 'threads' ? 'bg-[#101010] ring-1 ring-white/10' : ''}`}>
+        <PlatformLogo id={id} className="h-11 w-11" />
+      </span>
+    )
+  }
+  if (id === 'facebook') {
+    return (
+      <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
+        <rect width="48" height="48" rx="14" fill="#0866FF" />
+        <path fill="#fff" d="M26.7 36V25.2h3.3l.5-3.8h-3.8v-2c0-1.1.3-1.8 1.9-1.8h2V13.8c-.4-.1-1.5-.1-2.8-.1-2.8 0-4.7 1.7-4.7 4.8v2.9H19.4v3.8h3.7V36h3.6z" />
+      </svg>
+    )
+  }
+  if (id === 'x') {
+    return (
+      <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
+        <rect width="48" height="48" rx="14" fill="#000" stroke="#2a2a2a" />
+        <path fill="#fff" d="M13.2 13h5.2l5.2 7 6.2-7h5.1l-8.2 9.3L35.2 35h-5.2l-5.8-7.6L17.6 35h-5.2l8.8-10L13.2 13z" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
+      <rect width="48" height="48" rx="14" fill="#E60023" />
+      <path fill="#fff" d="M24 12.5c-4 0-7.2 3.2-7.2 7.2 0 5 4.5 8.4 7.2 12.8 2.7-4.4 7.2-7.8 7.2-12.8 0-4-3.2-7.2-7.2-7.2zm0 9.7a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
+    </svg>
+  )
 }
 
 export function HanbangBoard({
@@ -154,12 +177,7 @@ export function HanbangBoard({
                   active ? 'border-sky-400/70 bg-sky-500/10' : 'border-white/10 bg-black/20'
                 }`}
               >
-                <span
-                  className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
-                  style={{ background: COLORS[platform.id] }}
-                >
-                  {platform.label.slice(0, 1)}
-                </span>
+                <HanbangMark id={platform.id} />
                 <p className="mt-2 w-full truncate text-center text-xs font-medium text-white">{platform.label}</p>
                 {primary ? (
                   <>
