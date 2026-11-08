@@ -70,11 +70,20 @@ export default function AddYouTubeChannelPage() {
 
   const addedCount = justAdded.size
 
+  const finish = () => {
+    if (window.opener && !window.opener.closed) {
+      window.opener.location.reload()
+      window.close()
+      return
+    }
+    router.push('/hanbang')
+  }
+
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => router.push('/hanbang')}
+          onClick={finish}
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--card-border)] text-[var(--muted)] hover:text-[var(--foreground)]"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -148,7 +157,7 @@ export default function AddYouTubeChannelPage() {
       </div>
 
       {addedCount > 0 && (
-        <Button variant="primary" size="lg" className="w-full" onClick={() => router.push('/hanbang')}>
+        <Button variant="primary" size="lg" className="w-full" onClick={finish}>
           완료 ({addedCount}개 채널 추가됨)
         </Button>
       )}

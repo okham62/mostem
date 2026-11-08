@@ -66,6 +66,18 @@ export function HanbangBoard({
     [channels, selected]
   )
 
+  const openConnect = (url: string) => {
+    const width = 520
+    const height = 720
+    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2)
+    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2)
+    window.open(
+      url,
+      'mostem-channel-connect',
+      `popup=yes,width=${width},height=${height},left=${left},top=${top}`
+    )
+  }
+
   const toggle = (id: string) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : prev.concat(id)))
   }
@@ -201,12 +213,13 @@ export function HanbangBoard({
                     </button>
                   </>
                 ) : ready[platform.id] ? (
-                  <a
-                    href={platform.authorize}
+                  <button
+                    type="button"
+                    onClick={() => openConnect(platform.authorize)}
                     className="mt-3 w-full rounded-md border border-white/15 py-1.5 text-center text-[11px] text-white/80 hover:bg-white/5"
                   >
                     연결하기
-                  </a>
+                  </button>
                 ) : (
                   <button
                     type="button"
