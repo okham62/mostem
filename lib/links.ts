@@ -230,6 +230,7 @@ export const RESERVED_PROFILE_SLUGS = new Set(
     'coins',
     'upload',
     'accounts',
+    'hanbang',
     'history',
     'compose',
     'profit',
