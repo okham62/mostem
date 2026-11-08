@@ -10,12 +10,12 @@ export async function GET(req: Request) {
   const baseUrl = process.env.NEXTAUTH_URL || process.env.AUTH_URL || 'http://localhost:3000'
 
   if (error || !code) {
-    return NextResponse.redirect(`${baseUrl}/accounts?error=oauth_denied`)
+    return NextResponse.redirect(`${baseUrl}/hanbang?error=oauth_denied`)
   }
 
   const session = await auth()
   if (!session?.user || session.user.id !== state) {
-    return NextResponse.redirect(`${baseUrl}/accounts?error=unauthorized`)
+    return NextResponse.redirect(`${baseUrl}/hanbang?error=unauthorized`)
   }
 
   // 1. 코드 → 토큰 교환
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   const tokens = await tokenRes.json()
 
   if (!tokens.access_token) {
-    return NextResponse.redirect(`${baseUrl}/accounts?error=token_error`)
+    return NextResponse.redirect(`${baseUrl}/hanbang?error=token_error`)
   }
 
   // 2. 유튜브 채널 목록 가져오기
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const channelsData = await channelsRes.json()
 
   if (!channelsRes.ok) {
-    return NextResponse.redirect(`${baseUrl}/accounts?error=api_error`)
+    return NextResponse.redirect(`${baseUrl}/hanbang?error=api_error`)
   }
 
   const channels = (channelsData.items ?? []).map((ch: {

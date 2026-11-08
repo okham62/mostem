@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   LineChart,
   Link2,
+  Send,
   Users,
   Download,
   LogOut,
@@ -58,6 +59,7 @@ export type NavItem = {
 }
 
 export const publish: NavItem[] = [
+  { href: '/hanbang', label: '한방살포', icon: Send },
   { href: '/threads?status=collected', label: 'Threads', icon: ThreadsIcon },
   { href: '/instagram?status=collected', label: 'Instagram', icon: InstagramIcon },
   { href: '/tiktok?status=collected', label: 'TikTok', icon: TiktokIcon },

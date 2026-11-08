@@ -12,6 +12,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/markets': '마켓 시세',
   '/trends': '트렌드 데이터',
   '/shopping': '쇼핑 베스트',
+  '/hanbang': '한방살포',
   '/threads': 'Threads',
   '/instagram': 'Instagram',
   '/tiktok': 'TikTok',

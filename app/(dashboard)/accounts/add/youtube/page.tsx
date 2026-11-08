@@ -74,7 +74,7 @@ export default function AddYouTubeChannelPage() {
     <div className="mx-auto max-w-xl space-y-6">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => router.push('/accounts')}
+          onClick={() => router.push('/hanbang')}
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--card-border)] text-[var(--muted)] hover:text-[var(--foreground)]"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -148,7 +148,7 @@ export default function AddYouTubeChannelPage() {
       </div>
 
       {addedCount > 0 && (
-        <Button variant="primary" size="lg" className="w-full" onClick={() => router.push('/accounts')}>
+        <Button variant="primary" size="lg" className="w-full" onClick={() => router.push('/hanbang')}>
           완료 ({addedCount}개 채널 추가됨)
         </Button>
       )}
