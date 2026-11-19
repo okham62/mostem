@@ -289,23 +289,38 @@ export function ThreadsBoard({
   // work; for posts whose links already died, ask the logged-in Hami extension for fresh ones.
   const recoverQueue = useRef<Map<string, { id: string; url: string }>>(new Map())
   const recoverTried = useRef<Set<string>>(new Set())
+  const recoverAttempts = useRef<Map<string, number>>(new Map())
   const recovering = useRef(false)
+  const [recoverInfo, setRecoverInfo] = useState<{ done: number; total: number; note?: string } | null>(null)
 
   const recoverDead = useCallback(async () => {
     if (recovering.current) return
     recovering.current = true
+    let offlineWaits = 0
     try {
       while (recoverQueue.current.size) {
-        const batch = Array.from(recoverQueue.current.values()).slice(0, 4)
-        batch.forEach((row) => {
-          recoverQueue.current.delete(row.id)
-          recoverTried.current.add(row.id)
-        })
+        // The extension opens each post in a background tab, so keep batches small (2) — a batch
+        // that takes too long used to time out and those posts were never retried.
+        const batch = Array.from(recoverQueue.current.values()).slice(0, 2)
         const live = await requestHamiPostMedia(batch)
-        if (!live.ok || !live.posts.length) {
-          if (live.error === 'extension offline') break
+        if (live.error === 'extension offline') {
+          setRecoverInfo((info) => info && { ...info, note: '하미 확장이 꺼져 있어요 — 켜지면 이어서 복구해요' })
+          if (++offlineWaits > 100) break
+          await new Promise((resolve) => setTimeout(resolve, 3000))
           continue
         }
+        offlineWaits = 0
+        const answered = new Set(live.posts.filter((row) => row.mediaItems?.length).map((row) => row.id))
+        for (const row of batch) {
+          recoverQueue.current.delete(row.id)
+          const tries = (recoverAttempts.current.get(row.id) ?? 0) + 1
+          recoverAttempts.current.set(row.id, tries)
+          // Retry later (up to 3 times) when the extension didn't answer for this post.
+          if (!answered.has(row.id) && tries < 3) recoverQueue.current.set(row.id, row)
+          else recoverTried.current.add(row.id)
+        }
+        setRecoverInfo((info) => info && { ...info, done: recoverTried.current.size, note: undefined })
+        if (!live.posts.length) continue
         // Show the fresh links right away, then store our own copy.
         patchMedia(
           live.posts
@@ -322,15 +337,27 @@ export function ThreadsBoard({
       }
     } finally {
       recovering.current = false
+      setRecoverInfo((info) => (info && !recoverQueue.current.size ? null : info))
     }
   }, [patchMedia])
 
   const queueRecover = useCallback(
     (rows: Array<{ id: string; url?: string | null; author?: string | null; postId?: string | null }>) => {
+      let added = 0
       for (const row of rows) {
         if (recoverTried.current.has(row.id) || recoverQueue.current.has(row.id)) continue
         const url = threadsPermalink({ url: row.url ?? null, author: row.author ?? null, postId: row.postId ?? null })
-        if (url) recoverQueue.current.set(row.id, { id: row.id, url })
+        if (url) {
+          recoverQueue.current.set(row.id, { id: row.id, url })
+          added += 1
+        }
+      }
+      if (added) {
+        setRecoverInfo((info) => ({
+          done: recoverTried.current.size,
+          total: recoverTried.current.size + recoverQueue.current.size,
+          note: info?.note,
+        }))
       }
       void recoverDead()
     },
@@ -534,6 +561,13 @@ export function ThreadsBoard({
           </a>
         </div>
       </div>
+
+      {recoverInfo ? (
+        <p className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">
+          지난 수집물의 사진·영상을 하미로 다시 불러와 영구 보관하는 중… {recoverInfo.done}/{recoverInfo.total}
+          {recoverInfo.note ? ` · ${recoverInfo.note}` : ' · 끝나면 삭제하기 전까지 계속 보여요'}
+        </p>
+      ) : null}
 
       {repairMessage ? (
         <p className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/70">

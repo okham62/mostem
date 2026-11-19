@@ -26,7 +26,7 @@ export function requestHamiPostMedia(
     const timer = window.setTimeout(() => {
       window.removeEventListener('message', onMessage)
       resolve({ ok: false, posts: [], error: 'timeout' })
-    }, 90_000)
+    }, 180_000)
 
     function onMessage(event: MessageEvent) {
       const data = event.data as { source?: string; type?: string; id?: string; ok?: boolean; error?: string; posts?: LivePostMedia[] }
