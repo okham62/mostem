@@ -7,6 +7,31 @@ export function cleanMediaUrl(url?: string | null) {
   return value
 }
 
+/** Our own copy (Supabase storage) — never expires, unlike Threads/Instagram CDN links. */
+export const ARCHIVE_BUCKET = 'collected-media'
+
+export function isArchivedMediaUrl(url?: string | null) {
+  if (!url) return false
+  return url.includes(`/storage/v1/object/public/${ARCHIVE_BUCKET}/`)
+}
+
+/**
+ * True when a picture of the post still points at an expiring CDN link (videos are copied in the
+ * same pass when possible; a video-only item counts as its picture).
+ */
+export function mediaNeedsArchive(items: CollectMediaItem[]) {
+  return items.some((item) => {
+    const picture = cleanMediaUrl(item.poster) ?? (item.type === 'image' ? cleanMediaUrl(item.url) : null)
+    if (picture) return !isArchivedMediaUrl(picture)
+    const video = cleanMediaUrl(item.videoUrl) ?? (item.type === 'video' ? cleanMediaUrl(item.url) : null)
+    return Boolean(video && !video.includes('.m3u8') && !isArchivedMediaUrl(video))
+  })
+}
+
+export function mediaHasArchive(items: CollectMediaItem[]) {
+  return items.some((item) => isArchivedMediaUrl(item.url) || isArchivedMediaUrl(item.poster) || isArchivedMediaUrl(item.videoUrl))
+}
+
 export function isVideoFile(url: string) {
   return /\.(mp4|m3u8|webm|mov)(\?|$)/i.test(url)
 }

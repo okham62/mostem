@@ -107,17 +107,17 @@ export function CollectedBoard({
       if (!res.ok || !alive) return
       const data = await res.json()
       if (Array.isArray(data.posts) && alive) {
-        setPosts(
-          hydrateScheduledPosts(
-            data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)),
-          ),
-        )
+        const next = hydrateScheduledPosts(
+          data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)),
+        ) as CollectedPost[]
+        // Skip the re-render when nothing changed (this runs in the background every few seconds).
+        setPosts((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
       }
     }
-    void pull()
+    // The server already rendered the list — no immediate refetch, just background sync.
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void pull()
-    }, 2500)
+    }, 10_000)
     const onFocus = () => void pull()
     window.addEventListener('focus', onFocus)
     return () => {

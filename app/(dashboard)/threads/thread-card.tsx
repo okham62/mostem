@@ -1,8 +1,9 @@
 'use client'
 
+import { memo, useMemo } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { GRADE_LABEL, derivePostStats, formatCount, formatMultiplier } from '@/lib/collect-labels'
-import { isHashtag, parseMediaItems, serializeMediaItems, splitCaption } from '@/lib/collect-media'
+import { isHashtag, parseMediaItems, splitCaption } from '@/lib/collect-media'
 import { openThreadEdit } from '@/lib/open-thread-edit'
 import {
   clearStoredSchedule,
@@ -15,7 +16,8 @@ import { StatusForceBadge } from './status-force-badge'
 import { ThreadMedia } from './thread-media'
 import type { CollectedPost } from '@/types'
 
-export function ThreadCard({
+/** Memoized: the board re-syncs in the background and only changed cards should re-render. */
+export const ThreadCard = memo(function ThreadCard({
   post,
   onRemoved,
   onUpdated,
@@ -37,7 +39,9 @@ export function ThreadCard({
   const shortDate = collected ? `${collected.getMonth() + 1}/${collected.getDate()}` : ''
   const stats = derivePostStats(post)
   const grade = stats.grade ? GRADE_LABEL[stats.grade] : null
-  const mediaItems = parseMediaItems(post)
+  // Same array while media_url is unchanged, so the video tiles don't restart on re-render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mediaItems = useMemo(() => parseMediaItems(post), [post.media_url, post.thumbnail_url])
   const originalUrl = threadsPermalink({
     url: post.url,
     author: post.author,
@@ -143,17 +147,7 @@ export function ThreadCard({
 
       <div className="mb-3 aspect-[8/5] w-full overflow-hidden rounded-2xl">
         {mediaItems.length > 0 ? (
-          <ThreadMedia
-            items={mediaItems}
-            postId={post.id}
-            onRefreshed={(items) =>
-              onUpdated?.({
-                ...post,
-                media_url: serializeMediaItems(items),
-                thumbnail_url: items[0]?.poster ?? items[0]?.url ?? post.thumbnail_url,
-              })
-            }
-          />
+          <ThreadMedia items={mediaItems} postId={post.id} />
         ) : (
           <div className="flex h-full w-full items-center justify-center rounded-2xl border border-white/10 bg-[#101014] text-[11px] text-white/25">
             미디어 없음
@@ -216,4 +210,4 @@ export function ThreadCard({
       </div>
     </article>
   )
-}
+})

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -26,7 +26,8 @@ import {
   formatCount,
   mediaSrc,
 } from '@/lib/collect-labels'
-import { imagePosterUrl, parseMediaItems } from '@/lib/collect-media'
+import { imagePosterUrl, parseMediaItems, serializeMediaItems } from '@/lib/collect-media'
+import { requestHamiPostMedia } from '@/lib/threads-live-media'
 import { hydrateScheduledPosts, resolveScheduledAt } from '@/lib/post-schedule'
 import { openThreadEdit } from '@/lib/open-thread-edit'
 import { publicThreadsAvatar, requestHamiThreadsProfiles } from '@/lib/threads-profile'
@@ -89,6 +90,27 @@ function thumbOf(post: CollectedPost) {
   const items = parseMediaItems(post)
   return mediaSrc(imagePosterUrl(items[0]?.poster, items[0]?.url, post.thumbnail_url))
 }
+
+/**
+ * Apply a fresh server list without re-rendering unchanged cards: rows whose content is identical
+ * keep their old object, and if nothing changed the old array is returned (no render at all).
+ */
+function mergePosts(prev: CollectedPost[], next: CollectedPost[]) {
+  const byId = new Map(prev.map((post) => [post.id, post]))
+  let changed = prev.length !== next.length
+  const merged = next.map((post, index) => {
+    const old = byId.get(post.id)
+    if (old && JSON.stringify(old) === JSON.stringify(post)) {
+      if (prev[index] !== old) changed = true
+      return old
+    }
+    changed = true
+    return post
+  })
+  return changed ? merged : prev
+}
+
+type MediaPatch = { id: string; media_url: string; thumbnail_url?: string | null }
 
 function GradePill({ post }: { post: CollectedPost }) {
   const stats = derivePostStats(post)
@@ -210,24 +232,38 @@ export function ThreadsBoard({
     if (saved === 'list' || saved === 'kanban' || saved === 'grid') setView(saved)
   }, [])
 
+  const hiddenRef = useRef<string[]>([])
+  hiddenRef.current = hiddenIds
+  const postsRef = useRef(posts)
+  postsRef.current = posts
+
+  // Background sync (new collects from the extension). The page already has the list from the
+  // server, so this never blocks the screen; unchanged cards are not re-rendered.
   useEffect(() => {
     let alive = true
+    let busy = false
     async function pull() {
-      const res = await fetch('/api/threads/posts', { cache: 'no-store' })
-      if (!res.ok || !alive) return
-      const data = await res.json()
-      if (Array.isArray(data.posts) && alive) {
-        setPosts(
-          hydrateScheduledPosts(
-            data.posts.filter((post: CollectedPost) => !hiddenIds.includes(post.id)),
-          ),
-        )
+      if (busy) return
+      busy = true
+      try {
+        const res = await fetch('/api/threads/posts', { cache: 'no-store' })
+        if (!res.ok || !alive) return
+        const data = await res.json()
+        if (Array.isArray(data.posts) && alive) {
+          const next = hydrateScheduledPosts(
+            data.posts.filter((post: CollectedPost) => !hiddenRef.current.includes(post.id)),
+          ) as CollectedPost[]
+          setPosts((prev) => mergePosts(prev, next))
+        }
+      } catch {
+        /* offline — keep what we show */
+      } finally {
+        busy = false
       }
     }
-    void pull()
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void pull()
-    }, 2000)
+    }, 10_000)
     const onFocus = () => void pull()
     window.addEventListener('focus', onFocus)
     return () => {
@@ -235,7 +271,100 @@ export function ThreadsBoard({
       window.clearInterval(timer)
       window.removeEventListener('focus', onFocus)
     }
-  }, [hiddenIds])
+  }, [])
+
+  const patchMedia = useCallback((patches: MediaPatch[]) => {
+    if (!patches.length) return
+    const byId = new Map(patches.map((patch) => [patch.id, patch]))
+    setPosts((prev) =>
+      prev.map((post) => {
+        const patch = byId.get(post.id)
+        if (!patch) return post
+        return { ...post, media_url: patch.media_url, thumbnail_url: patch.thumbnail_url ?? post.thumbnail_url }
+      }),
+    )
+  }, [])
+
+  // Keep collected media forever: copy pictures/videos into our storage while the CDN links still
+  // work; for posts whose links already died, ask the logged-in Hami extension for fresh ones.
+  const recoverQueue = useRef<Map<string, { id: string; url: string }>>(new Map())
+  const recoverTried = useRef<Set<string>>(new Set())
+  const recovering = useRef(false)
+
+  const recoverDead = useCallback(async () => {
+    if (recovering.current) return
+    recovering.current = true
+    try {
+      while (recoverQueue.current.size) {
+        const batch = Array.from(recoverQueue.current.values()).slice(0, 4)
+        batch.forEach((row) => {
+          recoverQueue.current.delete(row.id)
+          recoverTried.current.add(row.id)
+        })
+        const live = await requestHamiPostMedia(batch)
+        if (!live.ok || !live.posts.length) {
+          if (live.error === 'extension offline') break
+          continue
+        }
+        // Show the fresh links right away, then store our own copy.
+        patchMedia(
+          live.posts
+            .filter((row) => row.mediaItems?.length)
+            .map((row) => ({ id: row.id, media_url: serializeMediaItems(row.mediaItems) ?? '' })),
+        )
+        const res = await fetch('/api/threads/posts/retain-media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ posts: live.posts.map((row) => ({ id: row.id, items: row.mediaItems })) }),
+        }).catch(() => null)
+        const data = res?.ok ? await res.json().catch(() => null) : null
+        if (Array.isArray(data?.posts)) patchMedia(data.posts as MediaPatch[])
+      }
+    } finally {
+      recovering.current = false
+    }
+  }, [patchMedia])
+
+  const queueRecover = useCallback(
+    (rows: Array<{ id: string; url?: string | null; author?: string | null; postId?: string | null }>) => {
+      for (const row of rows) {
+        if (recoverTried.current.has(row.id) || recoverQueue.current.has(row.id)) continue
+        const url = threadsPermalink({ url: row.url ?? null, author: row.author ?? null, postId: row.postId ?? null })
+        if (url) recoverQueue.current.set(row.id, { id: row.id, url })
+      }
+      void recoverDead()
+    },
+    [recoverDead],
+  )
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      for (let round = 0; round < 30 && alive; round += 1) {
+        const res = await fetch('/api/threads/posts/retain-media', { method: 'POST' }).catch(() => null)
+        if (!res?.ok || !alive) return
+        const data = await res.json().catch(() => null)
+        if (!data) return
+        if (Array.isArray(data.posts)) patchMedia(data.posts as MediaPatch[])
+        if (Array.isArray(data.expired) && data.expired.length) queueRecover(data.expired)
+        if (!data.remaining) return
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [patchMedia, queueRecover])
+
+  // A card whose picture/video failed to load asks to be recovered.
+  useEffect(() => {
+    const onDead = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail
+      const post = postsRef.current.find((row) => row.id === id)
+      if (post) queueRecover([{ id: post.id, url: post.url, author: post.author, postId: post.post_id }])
+    }
+    window.addEventListener('mostem:media-dead', onDead)
+    return () => window.removeEventListener('mostem:media-dead', onDead)
+  }, [queueRecover])
   const [query, setQuery] = useState('')
   const [grade, setGrade] = useState<'all' | PerformanceGrade>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -340,15 +469,15 @@ export function ThreadsBoard({
     window.localStorage.setItem('mostem-threads-view', next)
   }
 
-  function onRemoved(id: string) {
+  const onRemoved = useCallback((id: string) => {
     setHiddenIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
     setPosts((prev) => prev.filter((post) => post.id !== id))
     void fetch(`/api/threads/posts/${id}`, { method: 'DELETE' })
-  }
+  }, [])
 
-  function onUpdated(next: CollectedPost) {
+  const onUpdated = useCallback((next: CollectedPost) => {
     setPosts((prev) => prev.map((post) => (post.id === next.id ? next : post)))
-  }
+  }, [])
 
   return (
     <div className="space-y-5">

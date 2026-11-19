@@ -1,8 +1,42 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import type { CollectPlatform } from '@/types'
+import type { CollectPlatform, CollectedPost } from '@/types'
 import { logActivity } from '@/lib/log'
+import {
+  isArchivedMediaUrl,
+  mediaHasArchive,
+  mediaNeedsArchive,
+  parseMediaItems,
+  serializeMediaItems,
+} from '@/lib/collect-media'
+import { archiveMediaItems } from '@/lib/collected-media-store'
+
+export const maxDuration = 60
+
+/** Copy new posts' media into our storage right away (CDN links die within days). Bounded in time. */
+async function archiveCollected(userId: string, rows: Record<string, unknown>[]) {
+  const supabase = createAdminClient()
+  const work = rows
+    .map((row) => row as unknown as CollectedPost)
+    .filter((post) => mediaNeedsArchive(parseMediaItems(post)))
+    .slice(0, 6)
+    .map(async (post) => {
+      const current = parseMediaItems(post)
+      const next = await archiveMediaItems(userId, post.post_id, current).catch(() => current)
+      if (!mediaHasArchive(next)) return
+      const serialized = serializeMediaItems(next)
+      if (!serialized || serialized === serializeMediaItems(current)) return
+      const thumbnail = next.find((item) => isArchivedMediaUrl(item.poster))?.poster ?? post.thumbnail_url
+      await supabase
+        .from('collected_posts')
+        .update({ media_url: serialized, thumbnail_url: thumbnail })
+        .eq('user_id', userId)
+        .eq('platform', post.platform)
+        .eq('post_id', post.post_id)
+    })
+  await Promise.race([Promise.allSettled(work), new Promise((resolve) => setTimeout(resolve, 9_000))])
+}
 
 type IncomingPost = {
   platform?: CollectPlatform
@@ -165,6 +199,10 @@ function mediaLen(value?: string | null) {
 }
 
 function pickMediaUrl(next: string | null, prev: string | null | undefined) {
+  // Keep our stored copies: a re-collect brings fresh CDN links that expire again in a few days.
+  if (prev?.includes('/storage/v1/object/public/') && !next?.includes('/storage/v1/object/public/') && mediaLen(next) <= mediaLen(prev)) {
+    return prev
+  }
   if (mediaLen(next) > 0 || mediaLen(prev) > 0) {
     return mediaLen(next) >= mediaLen(prev) ? next : prev ?? null
   }
@@ -193,7 +231,9 @@ function mergeRow(next: CollectRow, prev?: Record<string, unknown> | null): Coll
     ...next,
     status: typeof prev.status === 'string' && prev.status ? prev.status : next.status,
     caption: keepText(next.caption, prev.caption as string | null),
-    thumbnail_url: keepText(next.thumbnail_url, prev.thumbnail_url as string | null),
+    thumbnail_url: isArchivedMediaUrl(prev.thumbnail_url as string | null)
+      ? (prev.thumbnail_url as string)
+      : keepText(next.thumbnail_url, prev.thumbnail_url as string | null),
     media_url: pickMediaUrl(next.media_url, prev.media_url as string | null),
     url: keepText(next.url, prev.url as string | null),
     author: keepText(next.author, prev.author as string | null),
@@ -280,6 +320,8 @@ export async function POST(req: Request) {
       { status: 500 }
     )
   }
+
+  await archiveCollected(session.user.id, merged).catch(() => undefined)
 
   const { data: saved } = await supabase
     .from('collected_posts')

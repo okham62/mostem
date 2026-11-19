@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { deleteArchivedPost } from '@/lib/collected-media-store'
 import {
   attachScheduleTimes,
   readScheduleMap,
@@ -126,13 +127,18 @@ export async function DELETE(
   }
 
   const supabase = createAdminClient()
-  const { error } = await supabase
+  const { data: removed, error } = await supabase
     .from('collected_posts')
     .delete()
     .eq('id', params.id)
     .eq('user_id', session.user.id)
+    .select('post_id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Stored media copies go with the post (kept until the user deletes it).
+  const postKey = removed?.[0]?.post_id
+  if (postKey) await deleteArchivedPost(session.user.id, String(postKey)).catch(() => undefined)
 
   try {
     await setStoredScheduleAt(session.user.id, params.id, null)

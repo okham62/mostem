@@ -26,14 +26,13 @@ function MuteIcon({ muted = true }: { muted?: boolean }) {
   )
 }
 
-const mediaRefreshOnce = new Set<string>()
+const reportedDead = new Set<string>()
 
-async function refreshPostMedia(postId: string) {
-  if (!postId || mediaRefreshOnce.has(postId)) return null
-  mediaRefreshOnce.add(postId)
-  const res = await fetch(`/api/threads/posts/${postId}/refresh-media`, { method: 'POST' })
-  const data = await res.json().catch(() => ({}))
-  return Array.isArray(data.items) ? (data.items as CollectMediaItem[]) : null
+/** Tell the board this post's links died; it asks the logged-in extension for fresh ones and stores a copy. */
+function reportDeadMedia(postId?: string) {
+  if (!postId || reportedDead.has(postId)) return
+  reportedDead.add(postId)
+  window.dispatchEvent(new CustomEvent('mostem:media-dead', { detail: postId }))
 }
 
 function FallbackImage({
@@ -85,8 +84,15 @@ function MediaTile({
   const videoUrl = cleanMediaUrl(item.videoUrl) ?? (item.type === 'video' ? cleanMediaUrl(item.url) : null)
   const tileRef = useRef<HTMLButtonElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [inView, setInView] = useState(true)
+  // Start "not visible": otherwise every video on the board starts downloading before the observer runs.
+  const [inView, setInView] = useState(false)
+  // The <video> is only mounted once the card has come near the screen (then kept, so it doesn't reload).
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (inView) setArmed(true)
+  }, [inView])
   const [videoReady, setVideoReady] = useState(false)
+  useEffect(() => setVideoReady(false), [videoUrl])
 
   useEffect(() => {
     const node = tileRef.current
@@ -131,16 +137,16 @@ function MediaTile({
       el.removeEventListener('loadeddata', tryPlay)
       el.removeEventListener('canplay', tryPlay)
     }
-  }, [inView, videoUrl])
+  }, [inView, videoUrl, armed])
 
   return (
     <button ref={tileRef} type="button" onClick={onOpen} className="relative h-full w-full cursor-pointer bg-black">
       {imageUrl ? (
         <div className={`absolute inset-0 ${videoReady ? 'opacity-0' : 'opacity-100'} transition-opacity duration-150`}>
-          <FallbackImage url={imageUrl} onDead={onDead} />
+          <FallbackImage key={imageUrl} url={imageUrl} onDead={onDead} />
         </div>
       ) : null}
-      {videoUrl ? (
+      {videoUrl && armed ? (
         <video
           ref={videoRef}
           src={mediaSrc(videoUrl) ?? videoUrl}
@@ -149,7 +155,7 @@ function MediaTile({
           loop
           playsInline
           autoPlay
-          preload={inView ? 'auto' : 'metadata'}
+          preload={inView ? 'auto' : 'none'}
           disablePictureInPicture
           onError={() => onDead?.()}
           onLoadedData={(event) => {
@@ -345,11 +351,9 @@ function MediaLightbox({ viewer, onClose, onIndex }: { viewer: Viewer; onClose: 
 export function ThreadMedia({
   items,
   postId,
-  onRefreshed,
 }: {
   items: CollectMediaItem[]
   postId?: string
-  onRefreshed?: (items: CollectMediaItem[]) => void
 }) {
   const valid = useMemo(
     () =>
@@ -363,10 +367,7 @@ export function ThreadMedia({
   const [viewer, setViewer] = useState<Viewer | null>(null)
 
   function requestRefresh() {
-    if (!postId) return
-    void refreshPostMedia(postId).then((next) => {
-      if (next?.length) onRefreshed?.(next)
-    })
+    reportDeadMedia(postId)
   }
 
   if (shown.length === 0) return null

@@ -105,5 +105,7 @@ export function derivePostStats(post: {
 export function mediaSrc(url?: string | null) {
   if (!url) return null
   if (url.startsWith('/')) return url
+  // Archived copies are served straight from the storage CDN (no proxy hop — much faster).
+  if (url.includes('/storage/v1/object/public/')) return url
   return `/api/media/proxy?url=${encodeURIComponent(url)}`
 }
