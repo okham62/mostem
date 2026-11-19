@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { getMarkets } from '@/lib/markets'
+import { getSharedMarkets } from '@/lib/shared-data'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const data = await getMarkets()
+  const data = await getSharedMarkets().catch(() => getMarkets())
   return NextResponse.json(data, {
     headers: { 'Cache-Control': 'no-store' },
   })

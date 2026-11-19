@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { getShoppingTrends, type TrendTab } from '@/lib/trends'
+import { getSharedShoppingTrends } from '@/lib/shared-data'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -20,12 +21,13 @@ export async function GET(request: Request) {
     tabParam === 'popular' || tabParam === 'new' || tabParam === 'rising' ? tabParam : undefined
 
   try {
-    const data = await getShoppingTrends(weeks, {
+    const query = {
       cat: url.searchParams.get('cat') || undefined,
       q: url.searchParams.get('q') || undefined,
       timing: url.searchParams.get('timing') || undefined,
       tab,
-    })
+    }
+    const data = await getSharedShoppingTrends(weeks, query).catch(() => getShoppingTrends(weeks, query))
     return NextResponse.json(data, {
       headers: { 'Cache-Control': 'no-store' },
     })
